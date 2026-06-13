@@ -8,6 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "scheduler": "tsx src/scheduler.ts",
     "setup:gmail": "tsx scripts/setup-gmail-oauth.ts",
+    "setup:lineworks": "tsx scripts/setup-lineworks.ts",
     "start": "node dist/server.js",
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
