@@ -135,12 +135,13 @@ export async function runEmailAlertJob(
     // Gmail自分宛メール
     notifications.push(await sendGmailNotification(subject, alertText));
 
-    // Slack
+    // Slack（SLACK_WEBHOOK_URL が設定されている場合）
     notifications.push(await sendSlackNotification(alertText, summary));
 
-    // LINE WORKS（認証情報がある場合のみ有効）
+    // LINE WORKS（認証情報 + LINEWORKS_DRY_RUN=false のとき実送信）
     try {
-      const lw = await createLineworksConnector().sendNotification(alertText);
+      const lwText = `${subject}\n\n${alertText}`;
+      const lw = await createLineworksConnector().sendNotification(lwText);
       notifications.push({ channel: 'lineworks', sent: !lw.dryRun, dryRun: lw.dryRun });
     } catch (err) {
       notifications.push({ channel: 'lineworks', sent: false, dryRun: false, error: String(err) });
