@@ -5,6 +5,7 @@ import { analyzeMessage } from './ai/analyzeMessage.js';
 import type { AnalyzeMessageInput, MessageSource, OriginalChannel } from './domain/types.js';
 import { analyzeAndSaveMessage } from './jobs/analyzeIncomingMessages.js';
 import { generateAndSendReport } from './jobs/generateReports.js';
+import { runEmailAlertJob, type AlertSlot } from './jobs/emailAlertJob.js';
 import { createRepository } from './repositories/createRepository.js';
 import { createLineworksConnector, type LineworksWebhookPayload } from './connectors/lineworks.js';
 import { nowIso } from './utils/date.js';
@@ -115,6 +116,21 @@ app.get('/dev/reply-drafts', async (c) => {
   }
 });
 
+app.post('/jobs/email-alert', async (c) => {
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as { slot?: string };
+    const validSlots: AlertSlot[] = ['morning', 'noon', 'evening'];
+    const rawSlot = body.slot ?? process.env.ALERT_SLOT ?? 'morning';
+    const slot: AlertSlot = validSlots.includes(rawSlot as AlertSlot)
+      ? (rawSlot as AlertSlot)
+      : 'morning';
+    const result = await runEmailAlertJob(repository, slot);
+    return c.json(result);
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+  }
+});
+
 app.post('/jobs/report/morning', async (c) => {
   const report = await generateAndSendReport(repository, 'morning');
   return c.json(report);
@@ -147,4 +163,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   serve({ fetch: app.fetch, port }, (info) => {
     console.log(`社長AI管制塔 Phase 1 listening on http://localhost:${info.port}`);
   });
+
+  if (process.env.SCHEDULER_ENABLED === 'true') {
+    import('./scheduler.js').then(({ startScheduler }) => startScheduler()).catch(console.error);
+  }
 }

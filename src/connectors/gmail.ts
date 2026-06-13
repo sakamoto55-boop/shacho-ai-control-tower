@@ -16,6 +16,7 @@ export interface GmailMessageLike {
 export interface GmailConnector {
   fetchRecentImportantEmails(): Promise<IncomingMessageInput[]>;
   fetchUnreadEmails(): Promise<IncomingMessageInput[]>;
+  fetchUnrepliedEmails(): Promise<IncomingMessageInput[]>;
 }
 
 export function normalizeGmailMessage(message: GmailMessageLike): IncomingMessageInput {
@@ -41,6 +42,10 @@ export class MockGmailConnector implements GmailConnector {
   }
 
   async fetchUnreadEmails(): Promise<IncomingMessageInput[]> {
+    return [];
+  }
+
+  async fetchUnrepliedEmails(): Promise<IncomingMessageInput[]> {
     return [];
   }
 }
