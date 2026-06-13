@@ -39,12 +39,22 @@ export function classifyPriority(text: string, risk: AnalyzeRiskResult): Priorit
       '確認',
       '依頼',
       'お願いします',
+      'お願いできますか',
+      'お願いいたします',
       '調整',
       '資料',
       '写真',
       '請求書',
       '日程',
-      '手配'
+      '手配',
+      '判断',
+      '判断をいただけますか',
+      '希望します',
+      '入居',
+      '退去',
+      '利用者',
+      '施設長',
+      '申込'
     ])
   ) {
     return 'B';

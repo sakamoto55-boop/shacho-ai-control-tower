@@ -40,8 +40,10 @@ function buildHeader(kind: ReportKind): string {
 
 function describeInbox(item: InboxRecord): string {
   const project = item.projectName || item.customerName || item.senderName || '案件未特定';
-  const action = item.priority === 'A' ? '社長確認' : item.replyNeeded ? '返信確認' : '担当振り分け';
-  return `${project} / ${item.summary} / ${action}`;
+  const room = item.roomName ? `[${item.roomName}]` : '';
+  const action = item.priority === 'A' ? '→社長確認' : item.replyNeeded ? '→返信確認' : '→担当振り分け';
+  const risk = item.riskLevel === 'high' ? ' ⚠高リスク' : item.riskLevel === 'medium' ? ' △中リスク' : '';
+  return `${room}${project} / ${item.summary}${risk} ${action}`;
 }
 
 function describeReplyDraft(item: ReplyDraftRecord, inbox: InboxRecord[]): string {
@@ -93,27 +95,34 @@ export async function generateDailyReport(
         ? '午前中の割り込みと午後に止まりそうな案件を確認してください。'
         : '本日の未完了と明日の最重要事項を確認してください。';
 
-  const text = `${buildHeader(kind)}
+  const text = [
+    buildHeader(kind),
+    purposeLine,
+    '',
+    '--- 件数サマリー ---',
+    `重要未返信    : ${counts.importantUnreplied}件`,
+    `社長判断必要  : ${counts.presidentDecision}件`,
+    `担当振り分け  : ${counts.delegateTasks}件`,
+    `今日中の期限  : ${counts.dueToday}件`,
+    `リスク検知    : ${counts.risks}件`,
+    `返信下書き待ち: ${counts.replyDrafts}件`,
+    `期限超過      : ${counts.overdue}件`,
+    '',
+    '--- 最優先案件 ---',
+    lineOrNone(topInbox, (item, index) => `${index + 1}. ${describeInbox(item)}`),
+    '',
+    '--- 確認待ち返信下書き ---',
+    lineOrNone(topDrafts, (item, index) => `${index + 1}. ${describeReplyDraft(item, inbox)}`),
+    '',
+    '--- 期限・滞留タスク ---',
+    lineOrNone(topTasks, (item, index) => {
+      const owner = item.ownerName ? `${item.ownerType}:${item.ownerName}` : item.ownerType;
+      const pres = item.requiresPresident ? ' [社長判断]' : '';
+      return `${index + 1}. ${item.taskTitle} / ${owner} / ${item.dueDateText}${pres}`;
+    }),
+    ''
+  ].join('\n');
 
-${purposeLine}
-
-重要未返信：${counts.importantUnreplied}件
-社長判断必要：${counts.presidentDecision}件
-担当者へ振るタスク：${counts.delegateTasks}件
-今日中の期限：${counts.dueToday}件
-リスク検知：${counts.risks}件
-返信下書き：${counts.replyDrafts}件
-期限超過：${counts.overdue}件
-
-最優先：
-${lineOrNone(topInbox, (item, index) => `${index + 1}. ${describeInbox(item)}`)}
-
-確認待ち返信：
-${lineOrNone(topDrafts, (item, index) => `${index + 1}. ${describeReplyDraft(item, inbox)}`)}
-
-期限・滞留タスク：
-${lineOrNone(topTasks, (item, index) => `${index + 1}. ${item.taskTitle} / ${item.ownerType}${item.ownerName ? `:${item.ownerName}` : ''} / ${item.dueDateText}`)}
-`;
 
   return {
     kind,

@@ -40,6 +40,18 @@ export type ReplyTone =
 
 export type ApprovalStatus = 'waiting' | 'approved' | 'needs_revision' | 'sent' | 'canceled';
 
+/**
+ * 会話ログの1メッセージ。送信者が社長か相手かを明示する。
+ * senderType='president' の発言は背景情報として扱い、タスク・返信対象にしない。
+ */
+export interface ChatMessage {
+  /** 'president' = 社長（自分）が送った言葉 / 'other' = 相手から受け取った言葉 */
+  senderType: 'president' | 'other';
+  senderName: string;
+  text: string;
+  timestamp: string;
+}
+
 export interface IncomingMessageInput {
   source: MessageSource;
   externalMessageId?: string;
@@ -52,7 +64,13 @@ export interface IncomingMessageInput {
   text: string;
 }
 
-export interface AnalyzeMessageInput extends IncomingMessageInput {}
+export interface AnalyzeMessageInput extends IncomingMessageInput {
+  /**
+   * 会話の流れを保持する配列。
+   * 提供された場合、AIは最後の発言者が社長かどうかを判断して返信要否を決定する。
+   */
+  chatHistory?: ChatMessage[];
+}
 
 export interface AnalyzeTaskResult {
   taskTitle: string;

@@ -14,9 +14,11 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
     "@hono/node-server": "^1.13.8",
     "dotenv": "^16.4.7",
-    "hono": "^4.6.15"
+    "hono": "^4.6.15",
+    "openai": "^6.42.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
