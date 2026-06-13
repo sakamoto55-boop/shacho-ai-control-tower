@@ -68,11 +68,16 @@ function formatReplyDraft(draft: ReplyDraftRecord | undefined): string {
   return `  ${preview}${ellipsis}${warning}`;
 }
 
-function formatBundle(bundle: StoredMessageBundle, index: number): string {
+function formatBundle(
+  bundle: StoredMessageBundle,
+  index: number,
+  isNew: boolean
+): string {
   const { inbox, tasks, replyDraft } = bundle;
   const icon = PRIORITY_ICON[inbox.priority] ?? '⚪';
   const age = formatReceivedAge(inbox.receivedAt);
   const jst = formatJstDateTime(inbox.receivedAt);
+  const badge = isNew ? '★新着' : '⏳未処理継続';
   const riskText =
     inbox.riskType !== 'none'
       ? `\n  リスク: ${RISK_LABEL[inbox.riskType] ?? inbox.riskType} (${inbox.riskLevel.toUpperCase()})`
@@ -83,7 +88,7 @@ function formatBundle(bundle: StoredMessageBundle, index: number): string {
       : inbox.senderAddress || '差出人不明';
 
   return [
-    `${icon} [${inbox.priority}] #${index + 1}  ${age}（${jst}）`,
+    `${icon} [${inbox.priority}] ${badge}  #${index + 1}  ${age}（${jst}）`,
     `  件名: ${inbox.subject || '（件名なし）'}`,
     `  差出人: ${sender}`,
     `  要約: ${inbox.summary}`,
@@ -119,7 +124,8 @@ export function buildAlertSummary(bundles: StoredMessageBundle[]): EmailAlertSum
 export function formatEmailAlert(
   bundles: StoredMessageBundle[],
   slot: AlertSlot,
-  now = new Date()
+  now = new Date(),
+  newInboxIds?: Set<string>
 ): string {
   const label = SLOT_LABEL[slot];
   const jstNow = now.toLocaleString('ja-JP', {
@@ -145,11 +151,14 @@ export function formatEmailAlert(
   }
 
   const summary = buildAlertSummary(bundles);
+  const newCount = newInboxIds ? bundles.filter((b) => newInboxIds.has(b.inbox.id)).length : bundles.length;
+  const outstandingCount = bundles.length - newCount;
   const summaryLine = [
-    `要対応: ${summary.total}件`,
+    `要対応合計: ${summary.total}件`,
+    `★新着: ${newCount}件`,
+    `⏳未処理継続: ${outstandingCount}件`,
     `優先度A: ${summary.priorityA}件`,
-    `リスク検知: ${summary.risks}件`,
-    `返信必要: ${summary.replyNeeded}件`
+    `リスク: ${summary.risks}件`
   ].join(' ｜ ');
 
   const sortedBundles = [...bundles].sort((a, b) => {
@@ -164,7 +173,9 @@ export function formatEmailAlert(
     return score(b) - score(a);
   });
 
-  const items = sortedBundles.map((b, i) => formatBundle(b, i)).join('\n\n');
+  const items = sortedBundles
+    .map((b, i) => formatBundle(b, i, !newInboxIds || newInboxIds.has(b.inbox.id)))
+    .join('\n\n');
 
   return [
     header,

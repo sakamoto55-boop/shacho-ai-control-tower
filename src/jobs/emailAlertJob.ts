@@ -15,6 +15,7 @@ export interface EmailAlertResult {
   slotLabel: string;
   processedCount: number;
   newCount: number;
+  outstandingCount: number;
   priorityACounts: number;
   riskCount: number;
   errors: string[];
@@ -31,10 +32,6 @@ const SLOT_LABEL: Record<AlertSlot, string> = {
 
 async function saveAlertToFile(text: string, slot: AlertSlot, now: Date): Promise<string> {
   const basePath = process.env.ALERT_SAVE_PATH ?? './data/alerts';
-  const dateStr = now
-    .toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
-    .replace(/[/\s:]/g, '-')
-    .replace(/-+$/, '');
   const filename = `alert-${now.toISOString().slice(0, 10)}-${slot}.txt`;
   const fullPath = resolve(basePath, filename);
   await mkdir(basePath, { recursive: true });
@@ -66,8 +63,8 @@ export async function runEmailAlertJob(
 ): Promise<EmailAlertResult> {
   const errors: string[] = [];
 
+  // 1. Gmail から新着メールを取得・分析・保存
   const connector = isGmailConfigured() ? new RealGmailConnector() : createGmailConnector();
-
   const [unread, unreplied] = await Promise.allSettled([
     connector.fetchUnreadEmails(),
     connector.fetchUnrepliedEmails()
@@ -75,20 +72,17 @@ export async function runEmailAlertJob(
 
   const unreadList = unread.status === 'fulfilled' ? unread.value : [];
   const unrepliedList = unreplied.status === 'fulfilled' ? unreplied.value : [];
-
   if (unread.status === 'rejected') errors.push(`未読取得エラー: ${String(unread.reason)}`);
   if (unreplied.status === 'rejected') errors.push(`未返信取得エラー: ${String(unreplied.reason)}`);
 
   const messages = deduplicateByExternalId(unreadList, unrepliedList);
-
-  const bundles: StoredMessageBundle[] = [];
+  const freshBundles: StoredMessageBundle[] = [];
   let newCount = 0;
 
   for (const msg of messages) {
     try {
       const bundle = await analyzeAndSaveMessage(repository, msg);
-      bundles.push(bundle);
-      // If repository returned the same record (duplicate), inbox.createdAt will be old
+      freshBundles.push(bundle);
       const isNew = Date.now() - new Date(bundle.inbox.createdAt).getTime() < 60_000;
       if (isNew) newCount += 1;
     } catch (err) {
@@ -96,8 +90,30 @@ export async function runEmailAlertJob(
     }
   }
 
-  const alertText = formatEmailAlert(bundles, slot, now);
-  const summary = buildAlertSummary(bundles);
+  // 2. リポジトリから未処理の既存メールを取得してバンドルを再構成
+  // unreviewed / task_created / draft_created はすべて「未対応」として扱う
+  const PENDING_STATUSES = new Set(['unreviewed', 'task_created', 'draft_created']);
+  const [allInbox, openTasks, waitingDrafts] = await Promise.all([
+    repository.getInboxRecordsByDateRange(),
+    repository.getOpenTasks(),
+    repository.getWaitingReplyDrafts()
+  ]);
+  const unreviewedInbox = allInbox.filter((r) => PENDING_STATUSES.has(r.status));
+
+  const freshInboxIds = new Set(freshBundles.map((b) => b.inbox.id));
+  const outstandingBundles: StoredMessageBundle[] = unreviewedInbox
+    .filter((inbox) => !freshInboxIds.has(inbox.id))
+    .map((inbox) => ({
+      inbox,
+      tasks: openTasks.filter((t) => t.sourceInboxId === inbox.id),
+      replyDraft: waitingDrafts.find((d) => d.sourceInboxId === inbox.id)
+    }));
+
+  const allBundles = [...freshBundles, ...outstandingBundles];
+  const newInboxIds = new Set(freshBundles.map((b) => b.inbox.id));
+
+  const alertText = formatEmailAlert(allBundles, slot, now, newInboxIds);
+  const summary = buildAlertSummary(allBundles);
 
   let savedPath: string | undefined;
   try {
@@ -116,13 +132,16 @@ export async function runEmailAlertJob(
     }
   }
 
-  console.log(`[EmailAlert] ${SLOT_LABEL[slot]}の部 完了: ${bundles.length}件処理, A優先${summary.priorityA}件, リスク${summary.risks}件`);
+  console.log(
+    `[EmailAlert] ${SLOT_LABEL[slot]}の部 完了: 新着${newCount}件 + 未処理継続${outstandingBundles.length}件, A優先${summary.priorityA}件`
+  );
 
   return {
     slot,
     slotLabel: SLOT_LABEL[slot],
-    processedCount: bundles.length,
+    processedCount: allBundles.length,
     newCount,
+    outstandingCount: outstandingBundles.length,
     priorityACounts: summary.priorityA,
     riskCount: summary.risks,
     errors,

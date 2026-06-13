@@ -72,6 +72,18 @@ describe('formatEmailAlert', () => {
     expect(text).toContain('HIGH');
   });
 
+  it('shows ★新着 when inboxId is in newInboxIds set', () => {
+    const bundle = makeBundle({ id: 'new-id', externalMessageId: 'ext-new' });
+    const text = formatEmailAlert([bundle], 'morning', new Date(), new Set(['new-id']));
+    expect(text).toContain('★新着');
+  });
+
+  it('shows ⏳未処理継続 when inboxId is NOT in newInboxIds set', () => {
+    const bundle = makeBundle({ id: 'old-id', externalMessageId: 'ext-old' });
+    const text = formatEmailAlert([bundle], 'morning', new Date(), new Set(['other-id']));
+    expect(text).toContain('⏳未処理継続');
+  });
+
   it('shows correct next slot for each slot', () => {
     const b = makeBundle();
     expect(formatEmailAlert([b], 'morning')).toContain('12:30');

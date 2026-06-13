@@ -23,6 +23,8 @@ describe('runEmailAlertJob', () => {
     expect(result.slot).toBe('morning');
     expect(result.slotLabel).toBe('朝');
     expect(result.processedCount).toBe(0);
+    expect(result.newCount).toBe(0);
+    expect(result.outstandingCount).toBe(0);
     expect(result.errors).toHaveLength(0);
     expect(result.alertText).toContain('メールアラート');
     expect(result.alertText).toContain('朝の部');
