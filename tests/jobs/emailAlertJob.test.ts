@@ -29,6 +29,7 @@ describe('runEmailAlertJob', () => {
     expect(result.alertText).toContain('メールアラート');
     expect(result.alertText).toContain('朝の部');
     expect(result.alertText).toContain('要対応メールはありません');
+    expect(result.notifications).toBeDefined();
   });
 
   it('returns correct slot labels for all slots', async () => {

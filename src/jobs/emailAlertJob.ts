@@ -4,6 +4,9 @@ import { buildAlertSummary, formatEmailAlert } from '../alerts/emailAlertFormatt
 import { isGmailConfigured, RealGmailConnector } from '../connectors/gmailClient.js';
 import { createGmailConnector } from '../connectors/gmail.js';
 import { createLineworksConnector } from '../connectors/lineworks.js';
+import { sendGmailNotification } from '../notifiers/gmailNotifier.js';
+import { sendSlackNotification } from '../notifiers/slackNotifier.js';
+import type { NotificationResult } from '../notifiers/NotificationResult.js';
 import type { StoredMessageBundle } from '../domain/types.js';
 import type { Repository } from '../repositories/Repository.js';
 import { analyzeAndSaveMessage } from './analyzeIncomingMessages.js';
@@ -21,7 +24,7 @@ export interface EmailAlertResult {
   errors: string[];
   alertText: string;
   savedPath?: string;
-  sentToLineworks: boolean;
+  notifications: NotificationResult[];
 }
 
 const SLOT_LABEL: Record<AlertSlot, string> = {
@@ -122,18 +125,32 @@ export async function runEmailAlertJob(
     errors.push(`保存エラー: ${String(err)}`);
   }
 
-  let sentToLineworks = false;
-  if (summary.priorityA > 0 || summary.risks > 0) {
+  const notifications: NotificationResult[] = [];
+  const shouldNotify = summary.priorityA > 0 || summary.risks > 0 || allBundles.length > 0;
+
+  if (shouldNotify) {
+    const slotLabel = SLOT_LABEL[slot];
+    const subject = `【社長AI管制塔｜${slotLabel}】要対応${allBundles.length}件 / A優先${summary.priorityA}件`;
+
+    // Gmail自分宛メール
+    notifications.push(await sendGmailNotification(subject, alertText));
+
+    // Slack
+    notifications.push(await sendSlackNotification(alertText, summary));
+
+    // LINE WORKS（認証情報がある場合のみ有効）
     try {
-      await createLineworksConnector().sendNotification(alertText);
-      sentToLineworks = true;
+      const lw = await createLineworksConnector().sendNotification(alertText);
+      notifications.push({ channel: 'lineworks', sent: !lw.dryRun, dryRun: lw.dryRun });
     } catch (err) {
-      errors.push(`LINE WORKS送信エラー: ${String(err)}`);
+      notifications.push({ channel: 'lineworks', sent: false, dryRun: false, error: String(err) });
     }
   }
 
+  const sentChannels = notifications.filter((n) => n.sent).map((n) => n.channel);
   console.log(
-    `[EmailAlert] ${SLOT_LABEL[slot]}の部 完了: 新着${newCount}件 + 未処理継続${outstandingBundles.length}件, A優先${summary.priorityA}件`
+    `[EmailAlert] ${SLOT_LABEL[slot]}の部 完了: 新着${newCount}件 + 未処理継続${outstandingBundles.length}件, A優先${summary.priorityA}件` +
+      (sentChannels.length ? ` → 通知: ${sentChannels.join(', ')}` : ' → 通知: なし（未設定）')
   );
 
   return {
@@ -147,6 +164,6 @@ export async function runEmailAlertJob(
     errors,
     alertText,
     savedPath,
-    sentToLineworks
+    notifications
   };
 }
