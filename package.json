@@ -6,8 +6,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "dev:client": "cd client && npm run dev",
     "start": "node dist/server.js",
     "build": "tsc -p tsconfig.json",
+    "build:client": "cd client && npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",

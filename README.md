@@ -2,6 +2,71 @@
 
 会社メール、LINE WORKS、手入力された外部連絡をAI分析し、要約、タスク抽出、返信下書き、リスク判定、朝昼晩レポートを作るローカルMVPです。
 
+---
+
+## AI社長室 スマホMVP（フロントエンド）
+
+`client/` ディレクトリに、**iPhone最優先のスマホ対応Webアプリ**が含まれています。
+
+### 画面一覧
+
+| 画面 | 説明 |
+|------|------|
+| ホーム | 挨拶カード・クイックアクション・業務ポータルへのリンク |
+| AI相談チャット | チャット形式でAIにメール要約・返信文作成・タスク整理を依頼 |
+| 今日の要対応 | 優先度A/B・確認待ち・作成待ちをカード形式で管理 |
+| 作成依頼 | 社内連絡文・返信文・銀行資料・Manus/Claude指示文など10種 |
+| 経営ダッシュボード | 月次売上・粗利・資金繰り・未請求・事故クレームをカード表示 |
+| 設定 | 会社選択・権限区分・連携サービス管理 |
+
+### フロントエンドのセットアップ・起動
+
+```bash
+cd client
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # ../public/ に本番ビルド出力
+```
+
+### 主要コンポーネント
+
+```
+client/src/
+├── components/
+│   ├── Navigation.tsx       # 下部固定ナビゲーション（5タブ）
+│   └── screens/
+│       ├── Home.tsx         # ホーム画面
+│       ├── AiChat.tsx       # AI相談チャット
+│       ├── TodayActions.tsx # 今日の要対応（アコーディオン形式）
+│       ├── CreateRequest.tsx # 作成依頼（テンプレート選択）
+│       ├── Dashboard.tsx    # 経営ダッシュボード
+│       └── Settings.tsx     # 設定・会社選択
+├── data/
+│   └── mockData.ts          # 仮データ（API連携まで使用）
+└── types/
+    └── index.ts             # 型定義
+```
+
+### 今後のAPI連携ポイント
+
+| 機能 | エンドポイント | プロバイダー |
+|------|---------------|-------------|
+| AI相談チャット | `POST /api/chat` | Claude API（ストリーミング対応予定） |
+| 今日の要対応 | `GET /api/actions` | Gmail API + LINE WORKS API |
+| 経営ダッシュボード | `GET /api/dashboard` | freee API + Google Sheets API |
+| 作成依頼 | `POST /api/create` | Claude API（テンプレート別プロンプト） |
+| 設定保存 | `PUT /api/settings` | ローカルDB（Phase 1はlocalStorage） |
+
+### 技術スタック（フロントエンド）
+
+- React 18 + TypeScript
+- Vite 5
+- 純CSS変数（外部CSSフレームワーク不使用）
+- iPhone Safe Area対応（`env(safe-area-inset-*)` 使用）
+- PWA対応（apple-mobile-web-app-capable設定済み）
+
+---
+
 このリポジトリは、最初からGmail、LINE WORKS、kintone、AI APIへ本番接続しません。Phase 1では、外部APIキーなしで動くローカルMVPを優先します。
 
 ## MVPの範囲
