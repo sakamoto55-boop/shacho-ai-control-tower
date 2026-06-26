@@ -28,6 +28,53 @@ export default function Settings({ company, onCompanyChange }: Props) {
 
   return (
     <div className="screen-content">
+      {/* ── デモモード表示 ── */}
+      <div
+        style={{
+          background: '#FEF9C3',
+          border: '1px solid #FDE68A',
+          borderRadius: 12,
+          padding: '14px 16px',
+          marginBottom: 18,
+        }}
+      >
+        <div style={{ fontSize: 12, fontWeight: 800, color: '#92400E', marginBottom: 10 }}>
+          ⚠️ 動作モード設定
+        </div>
+        {[
+          { label: 'デモモード',     value: 'ON',  on: true },
+          { label: '本番準備モード', value: 'OFF', on: false },
+          { label: '外部接続',       value: '未接続', on: false },
+          { label: '読み取り専用予定', value: 'ON', on: true },
+          { label: '書き込み禁止',   value: 'ON',  on: true },
+        ].map((row) => (
+          <div
+            key={row.label}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '6px 0',
+              borderBottom: '1px solid #FDE68A44',
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#92400E' }}>{row.label}</span>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 800,
+                color: row.on ? '#065F46' : '#991B1B',
+                background: row.on ? '#D1FAE5' : '#FEE2E2',
+                borderRadius: 6,
+                padding: '2px 8px',
+              }}
+            >
+              {row.value}
+            </span>
+          </div>
+        ))}
+      </div>
+
       {/* ── データ連携ステータス ── */}
       <div
         style={{
@@ -354,7 +401,7 @@ export default function Settings({ company, onCompanyChange }: Props) {
           lineHeight: 1.7,
         }}
       >
-        AI社長室 v0.2.0 Phase 2 — {selectedCompany?.name}
+        AI社長室 v0.3.5 Phase 3.5 — {selectedCompany?.name}
         <br />
         フロントエンドMVP（仮データのみ · 外部書き込みなし）
       </div>

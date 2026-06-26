@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ActionItem, Priority } from '../../types'
 import { actionItems } from '../../data/mockData'
+import DemoBanner from '../DemoBanner'
 
 const SECTIONS: { priority: Priority; label: string; icon: string; color: string }[] = [
   { priority: 'A', label: '優先度A ― 今日必ず対応', icon: '🔴', color: '#EF4444' },
@@ -45,6 +46,7 @@ export default function TodayActions() {
   return (
     <>
       <div className="screen-content">
+        <DemoBanner />
         {SECTIONS.map((sec) => {
           const items = actionItems.filter((i) => i.priority === sec.priority)
           const isOpen = expanded === sec.priority

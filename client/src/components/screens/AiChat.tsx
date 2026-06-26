@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import type { AiMode, ChatMessage } from '../../types'
+import type { Screen } from '../../types'
 import { aiModes, initialChatMessages, mockAiResponses } from '../../data/mockData'
+import DemoBanner from '../DemoBanner'
 
 interface Props {
   onVoice: () => void
+  onNavigate: (screen: Screen) => void
 }
 
 function getMockResponse(mode: AiMode, input: string): string {
@@ -16,7 +19,7 @@ function getMockResponse(mode: AiMode, input: string): string {
   return modeResponses['default'] ?? mockAiResponses['secretary']['default']
 }
 
-export default function AiChat({ onVoice }: Props) {
+export default function AiChat({ onVoice, onNavigate }: Props) {
   const [activeMode, setActiveMode] = useState<AiMode>('secretary')
   const [messages, setMessages] = useState<ChatMessage[]>(initialChatMessages)
   const [input, setInput] = useState('')
@@ -176,6 +179,7 @@ export default function AiChat({ onVoice }: Props) {
           scrollbarWidth: 'none',
         }}
       >
+        <DemoBanner />
         {messages.map((msg) => (
           <ChatBubble key={msg.id} message={msg} modeColor={currentMode.color} />
         ))}
@@ -220,6 +224,26 @@ export default function AiChat({ onVoice }: Props) {
           borderTop: '1px solid var(--border)',
         }}
       >
+        <button
+          onClick={() => onNavigate('create')}
+          style={{
+            width: '100%',
+            marginBottom: 8,
+            padding: '9px 14px',
+            borderRadius: 12,
+            background: '#FFF7ED',
+            border: '1.5px solid #FED7AA',
+            color: '#C2410C',
+            fontSize: 13,
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+          }}
+        >
+          ✍️ 作成依頼へ（文書・返信・指示文）
+        </button>
         <div
           style={{
             display: 'flex',

@@ -3,6 +3,8 @@ import { actionItems } from '../data/mockData'
 
 const unreadA = actionItems.filter((i: { priority: string; isRead: boolean }) => i.priority === 'A' && !i.isRead).length
 
+// ナビ5項目: ホーム / AIコックピット / AI相談 / 要対応 / 経営
+// 「作成」はホーム・AI相談・コックピット内のボタンから遷移
 const NAV_ITEMS: {
   screen: Screen
   icon: string
@@ -11,8 +13,8 @@ const NAV_ITEMS: {
 }[] = [
   { screen: 'home',      icon: '🏠', label: 'ホーム' },
   { screen: 'cockpit',   icon: '🎯', label: 'コックピット' },
+  { screen: 'chat',      icon: '🤖', label: 'AI相談' },
   { screen: 'actions',   icon: '⚡', label: '要対応', badge: unreadA },
-  { screen: 'create',    icon: '✍️', label: '作成' },
   { screen: 'dashboard', icon: '📈', label: '経営' },
 ]
 

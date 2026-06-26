@@ -74,7 +74,7 @@ export default function App() {
         {screen === 'home' && (
           <Home onNavigate={navigate} company={companyData?.name ?? 'LCC株式会社'} onVoice={() => setShowVoice(true)} />
         )}
-        {screen === 'chat' && <AiChat onVoice={() => setShowVoice(true)} />}
+        {screen === 'chat' && <AiChat onVoice={() => setShowVoice(true)} onNavigate={navigate} />}
         {screen === 'actions' && <TodayActions />}
         {screen === 'create' && <CreateRequest onNavigateToChat={() => navigate('chat')} />}
         {screen === 'dashboard' && <Dashboard />}

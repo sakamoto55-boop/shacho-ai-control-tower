@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Screen } from '../../types'
 import { actionItems, todayBriefing, situationCards, dashboardMetrics } from '../../data/mockData'
+import DemoBanner from '../DemoBanner'
 
 interface Props {
   onNavigate: (screen: Screen) => void
@@ -51,6 +52,7 @@ export default function Home({ onNavigate, onVoice }: Props) {
 
   return (
     <div className="screen-content">
+      <DemoBanner />
       {/* ── AIブリーフィングカード ── */}
       <div
         style={{

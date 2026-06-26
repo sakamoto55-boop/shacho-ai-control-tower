@@ -7,6 +7,7 @@ import {
   aiJudgement,
   searchIndex,
 } from '../../data/mockData'
+import DemoBanner from '../DemoBanner'
 
 const IMPORTANCE_CONFIG = {
   critical: { label: '最優先', color: '#EF4444', bg: '#FEF2F2' },
@@ -68,6 +69,7 @@ export default function CockpitScreen() {
 
   return (
     <div className="screen-content">
+      <DemoBanner />
 
       {/* ── AI判断一言 ── */}
       <div

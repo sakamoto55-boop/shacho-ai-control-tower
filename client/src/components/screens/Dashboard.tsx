@@ -6,6 +6,7 @@ import {
   departmentMetrics,
 } from '../../data/mockData'
 import type { DashboardMetric, CashflowWeek, ProjectMetric } from '../../types'
+import DemoBanner from '../DemoBanner'
 
 const TODAY = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' })
 const MAX_BALANCE = Math.max(...cashflowWeeks.map((w) => w.balance))
@@ -19,6 +20,7 @@ export default function Dashboard() {
 
   return (
     <div className="screen-content">
+      <DemoBanner />
       {/* ── 月次サマリー ── */}
       <div
         style={{
