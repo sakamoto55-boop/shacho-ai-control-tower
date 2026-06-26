@@ -157,8 +157,30 @@ export default function Home({ onNavigate, onVoice }: Props) {
               ))}
             </div>
 
+            {/* AIコックピットへ */}
+            <button
+              onClick={() => onNavigate('cockpit')}
+              style={{
+                width: '100%',
+                minHeight: 44,
+                borderRadius: 12,
+                background: 'rgba(255,255,255,0.95)',
+                color: '#1B3D6F',
+                fontSize: 13,
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                marginTop: 12,
+                marginBottom: 8,
+              }}
+            >
+              🎯 AIコックピットへ — 全状況を30秒で確認
+            </button>
+
             {/* ボタン列 */}
-            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={() => onNavigate('chat')}
                 style={{

@@ -1,5 +1,5 @@
 // ─── Screen / Navigation ─────────────────────────────────
-export type Screen = 'home' | 'chat' | 'actions' | 'create' | 'dashboard' | 'settings'
+export type Screen = 'home' | 'chat' | 'actions' | 'create' | 'dashboard' | 'settings' | 'cockpit'
 
 // ─── Task / Priority ─────────────────────────────────────
 export type Priority = 'A' | 'B' | 'waiting-confirm' | 'waiting-create'
@@ -185,4 +185,82 @@ export interface ApiIntegrationPoint {
   provider: string
   note: string
   phase: number
+}
+
+// ─── Phase 3: AIコックピット ──────────────────────────────
+export type HealthStatus = 'good' | 'warning' | 'danger' | 'normal'
+export type ActionImportance = 'critical' | 'high' | 'medium'
+export type SuggestionType = 'reply' | 'document' | 'delegate' | 'schedule' | 'detail' | 'postpone'
+export type TimelinePeriod =
+  | 'yesterday'
+  | 'today'
+  | 'tomorrow'
+  | 'this-week'
+  | 'next-week'
+  | 'this-month'
+export type SearchCategory = '人' | '案件' | '連絡' | '書類' | '予定' | 'タスク'
+
+export interface HealthBreakdownItem {
+  category: string
+  status: HealthStatus
+  label: string
+  icon: string
+  score: number
+}
+
+export interface CompanyHealthScore {
+  total: number
+  grade: 'A' | 'B' | 'C' | 'D'
+  comment: string
+  breakdown: HealthBreakdownItem[]
+  updatedAt: string
+}
+
+export interface ActionSuggestion {
+  id: string
+  label: string
+  icon: string
+  type: SuggestionType
+  draft: string
+}
+
+export interface PriorityAction {
+  id: string
+  rank: number
+  title: string
+  importance: ActionImportance
+  deadline: string
+  reason: string
+  recommendedAction: string
+  category: string
+  relatedScreen?: Screen
+  suggestions: ActionSuggestion[]
+}
+
+export interface TimelineEvent {
+  id: string
+  title: string
+  category: string
+  alertLevel?: AlertLevel
+  time?: string
+}
+
+export interface TimelinePeriodData {
+  period: TimelinePeriod
+  label: string
+  events: TimelineEvent[]
+}
+
+export interface SearchResult {
+  id: string
+  category: SearchCategory
+  title: string
+  sub: string
+  alertLevel?: AlertLevel
+}
+
+export interface AiJudgement {
+  message: string
+  focusItems: string[]
+  generatedAt: string
 }

@@ -9,6 +9,7 @@ import TodayActions from './components/screens/TodayActions'
 import CreateRequest from './components/screens/CreateRequest'
 import Dashboard from './components/screens/Dashboard'
 import Settings from './components/screens/Settings'
+import CockpitScreen from './components/screens/CockpitScreen'
 
 const SCREEN_TITLES: Record<Screen, string> = {
   home: 'AI社長室',
@@ -17,6 +18,7 @@ const SCREEN_TITLES: Record<Screen, string> = {
   create: '作成依頼',
   dashboard: '経営ダッシュボード',
   settings: '設定',
+  cockpit: 'AIコックピット',
 }
 
 const SCREEN_SUBS: Record<Screen, string> = {
@@ -26,6 +28,7 @@ const SCREEN_SUBS: Record<Screen, string> = {
   create: '文書・資料・指示文',
   dashboard: '財務・リスク状況',
   settings: 'アカウント・連携設定',
+  cockpit: '会社の今を30秒で把握',
 }
 
 export default function App() {
@@ -84,6 +87,7 @@ export default function App() {
             }}
           />
         )}
+        {screen === 'cockpit' && <CockpitScreen />}
       </main>
 
       {/* フローティングマイクボタン（チャット画面以外） */}

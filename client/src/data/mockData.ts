@@ -1,16 +1,21 @@
 import type {
   AiModeConfig,
   ActionItem,
+  AiJudgement,
   Briefing,
   CashflowWeek,
   ChatMessage,
   Company,
+  CompanyHealthScore,
   CreateTemplate,
   DashboardMetric,
   DepartmentMetric,
   Integration,
+  PriorityAction,
   ProjectMetric,
+  SearchResult,
   SituationCard,
+  TimelinePeriodData,
   ApiIntegrationPoint,
 } from '../types'
 
@@ -635,3 +640,466 @@ export const mockAiResponses: Record<string, Record<string, string>> = {
       '承知しました。[AI福祉モード]\n\n介護・福祉系業務の記録管理・加算算定・監査対応をサポートします。',
   },
 }
+
+// ── Phase 3: 会社健康スコア ────────────────────────────────
+export const companyHealthScore: CompanyHealthScore = {
+  total: 67,
+  grade: 'C',
+  comment:
+    '資金繰りと未請求案件の回収遅れが全体スコアを押し下げています。事故対応が長引いており、今週中に銀行資料・未請求・事故の3点を処理することが急務です。',
+  updatedAt: '2026-06-26 07:30',
+  breakdown: [
+    { category: '資金繰り', status: 'warning', label: '注意', icon: '💰', score: 55 },
+    { category: '粗利率',   status: 'good',    label: '良好', icon: '📊', score: 82 },
+    { category: '未請求',   status: 'danger',  label: '要対応', icon: '🧾', score: 40 },
+    { category: '事故対応', status: 'danger',  label: '要対応', icon: '🚨', score: 38 },
+    { category: '人員配置', status: 'warning', label: 'やや不足', icon: '👷', score: 60 },
+    { category: '営業',     status: 'normal',  label: '普通', icon: '📋', score: 70 },
+  ],
+}
+
+// ── Phase 3: AI優先順位アクション ─────────────────────────
+export const priorityActions: PriorityAction[] = [
+  {
+    id: 'pa1',
+    rank: 1,
+    title: '銀行追加資料の準備・提出',
+    importance: 'critical',
+    deadline: '本日17:00',
+    reason:
+      '三菱UFJ銀行から融資審査のための追加資料提出を求めるメールが届いています。期限は本日17時で、回答が遅れると審査がリセットされる可能性があります。',
+    recommendedAction: '事業計画書の最新版と直近3ヶ月の試算表を添付して返信する',
+    category: '銀行',
+    relatedScreen: 'actions',
+    suggestions: [
+      {
+        id: 'pa1-s1',
+        label: '返信文を作る',
+        icon: '✉️',
+        type: 'reply',
+        draft: `【銀行返信文 — 仮生成サンプル】
+
+三菱UFJ銀行
+佐藤担当者様
+
+お世話になっております。LCC株式会社 代表取締役 坂本でございます。
+この度はご連絡いただきありがとうございます。
+
+ご要望の追加資料につきまして、以下のとおり準備いたしました。
+
+添付書類：
+・事業計画書（最新版）
+・直近3ヶ月試算表（4月〜6月）
+・受注見込み一覧
+
+ご確認のほど、何卒よろしくお願いいたします。
+
+LCC株式会社
+代表取締役 坂本
+
+※ これは仮生成サンプルです。Claude API接続後は実際の状況に合わせた文章が自動生成されます。`,
+      },
+      {
+        id: 'pa1-s2',
+        label: '資料作成へ',
+        icon: '📄',
+        type: 'document',
+        draft: `【銀行向け資料 — 構成案（仮）】
+
+■ 表紙
+　LCC株式会社 / 追加資料 / 2026年6月26日
+
+■ 1. 直近の事業状況
+　・売上推移（4月〜6月）：¥28.4M（前年比+12%）
+　・粗利率：28.6%（業界平均25%を上回る）
+　・受注残：¥45M（7月〜9月分）
+
+■ 2. 資金繰り計画
+　・7月〜9月の入金・支出予測
+　・資金ショートリスクへの対策
+
+■ 3. 融資の用途と返済計画
+　・使途：設備投資（現場機材）
+　・返済：月額¥450,000 / 60ヶ月
+
+※ これは仮生成サンプルです。`,
+      },
+    ],
+  },
+  {
+    id: 'pa2',
+    rank: 2,
+    title: '現場事故の状況確認と対応指示',
+    importance: 'critical',
+    deadline: '本日中',
+    reason:
+      '○○リフォーム現場で昨日発生した事故について、顧客への報告と保険会社への連絡がまだ完了していません。放置すると法的リスクおよびクレーム拡大につながります。',
+    recommendedAction: '現場責任者から詳細を確認し、顧客・保険会社に状況報告を行う',
+    category: '事故',
+    relatedScreen: 'actions',
+    suggestions: [
+      {
+        id: 'pa2-s1',
+        label: '担当へ依頼文を作る',
+        icon: '📨',
+        type: 'delegate',
+        draft: `【現場担当者への指示文 — 仮生成サンプル】
+
+工務部 現場担当者 各位
+
+代表取締役 坂本より
+
+○○リフォーム現場の事故対応について、本日中に以下を実施してください。
+
+【本日の対応事項】
+1. 事故状況の詳細を写真・図面で記録する
+2. 顧客（○○様）へ現状報告の連絡を入れる
+3. 損害保険会社（△△損保）に事故通知を行う
+4. 再発防止策を本日中に坂本まで報告する
+
+期限：本日18:00まで
+
+緊急の場合は直接連絡してください。
+
+LCC株式会社 代表取締役 坂本
+
+※ これは仮生成サンプルです。`,
+      },
+      {
+        id: 'pa2-s2',
+        label: '顧客への報告文を作る',
+        icon: '✉️',
+        type: 'reply',
+        draft: `【顧客報告文 — 仮生成サンプル】
+
+○○様
+
+平素より大変お世話になっております。
+LCC株式会社 代表取締役 坂本でございます。
+
+このたびは、現場作業中に不慮の事故が発生いたしまして、誠に申し訳ございません。
+
+現在の状況と対応についてご報告申し上げます。
+
+【発生状況】
+6月25日（木）午後、作業中に○○が発生いたしました。
+
+【対応状況】
+・作業を一時停止し、安全確認を完了しています
+・損害保険会社への連絡を行っております
+・再発防止策を検討中です
+
+【今後のスケジュール】
+本日中に詳細なご報告をさせていただきます。
+
+ご心配をおかけして大変申し訳ございません。
+
+LCC株式会社 代表取締役 坂本
+
+※ これは仮生成サンプルです。`,
+      },
+    ],
+  },
+  {
+    id: 'pa3',
+    rank: 3,
+    title: '未請求案件3件の担当確認',
+    importance: 'high',
+    deadline: '本日中',
+    reason:
+      '完了済み案件3件（合計¥6,800,000）の請求書がまだ発行されていません。月末を過ぎると翌月計上になり、資金繰りにさらに影響します。',
+    recommendedAction: '経理担当者に今週中の請求書発行を依頼し、入金予定日を確認する',
+    category: '請求',
+    relatedScreen: 'actions',
+    suggestions: [
+      {
+        id: 'pa3-s1',
+        label: '担当へ依頼文を作る',
+        icon: '📨',
+        type: 'delegate',
+        draft: `【経理担当者への依頼文 — 仮生成サンプル】
+
+経理担当 各位
+
+代表取締役 坂本より
+
+以下の完了済み案件について、今週金曜日（6/27）までに請求書を発行してください。
+
+【未請求案件リスト】
+1. ○○工事（完了：6/10）
+　　金額：¥2,800,000
+　　請求先：田中建設 田中部長
+
+2. △△修繕（完了：6/15）
+　　金額：¥2,400,000
+　　請求先：山田物産 山田様
+
+3. □□外構工事（完了：6/20）
+　　金額：¥1,600,000
+　　請求先：鈴木ハウス 鈴木様
+
+合計：¥6,800,000
+
+発行後、各先様の入金予定日を確認して坂本まで報告してください。
+
+LCC株式会社 代表取締役 坂本
+
+※ これは仮生成サンプルです。`,
+      },
+      {
+        id: 'pa3-s2',
+        label: '詳細を見る',
+        icon: '🔍',
+        type: 'detail',
+        draft: `【未請求案件 詳細 — 仮データ】
+
+■ 案件1：○○工事
+　完了日：2026年6月10日
+　請求金額：¥2,800,000（税込）
+　請求先：田中建設株式会社 田中部長
+　入金サイト：完了後30日
+　予定入金日：2026年7月10日
+
+■ 案件2：△△修繕工事
+　完了日：2026年6月15日
+　請求金額：¥2,400,000（税込）
+　請求先：山田物産株式会社 山田様
+　入金サイト：完了後30日
+　予定入金日：2026年7月15日
+
+■ 案件3：□□外構工事
+　完了日：2026年6月20日
+　請求金額：¥1,600,000（税込）
+　請求先：鈴木ハウス 鈴木様
+　入金サイト：完了後30日
+　予定入金日：2026年7月20日
+
+合計未請求額：¥6,800,000
+
+※ これは仮データです。`,
+      },
+    ],
+  },
+  {
+    id: 'pa4',
+    rank: 4,
+    title: '工事代金未払い先への連絡',
+    importance: 'high',
+    deadline: '今週中',
+    reason:
+      'B工務店への工事代金¥1,800,000が支払期限から2週間超過しています。このまま放置すると回収リスクが高まります。',
+    recommendedAction: 'まず電話で状況確認。回答次第で内容証明の準備を検討する',
+    category: '請求',
+    relatedScreen: 'actions',
+    suggestions: [
+      {
+        id: 'pa4-s1',
+        label: '督促文を作る',
+        icon: '✉️',
+        type: 'reply',
+        draft: `【支払督促文 — 仮生成サンプル】
+
+B工務店
+担当者様
+
+お世話になっております。LCC株式会社 坂本でございます。
+
+さて、6月10日付請求書（請求金額 ¥1,800,000）について、支払期日（6月15日）を経過しておりますが、いまだご入金の確認が取れておりません。
+
+お手数ですが、お振込みの予定をご確認いただき、6月28日（金）までにご連絡をいただけますでしょうか。
+
+何かご不明な点がございましたら、お気軽にご連絡ください。
+
+LCC株式会社 代表取締役 坂本
+
+※ これは仮生成サンプルです。`,
+      },
+      {
+        id: 'pa4-s2',
+        label: '保留にする',
+        icon: '⏸️',
+        type: 'postpone',
+        draft: `【保留メモ — 仮生成サンプル】
+
+案件：B工務店 工事代金回収
+金額：¥1,800,000
+保留理由：（理由を入力してください）
+次回確認日：2026年7月3日
+
+この項目を一時保留としました。
+設定した日付に再通知します。
+
+※ これは仮機能のサンプルです。`,
+      },
+    ],
+  },
+  {
+    id: 'pa5',
+    rank: 5,
+    title: '人員不足現場への応援手配',
+    importance: 'medium',
+    deadline: '明日まで',
+    reason:
+      '来週3現場が同時進行となりますが、電気工事1名・左官工1名が不足しています。明日までに手配しないと来週の工程が止まります。',
+    recommendedAction: '協力会社リストから電気工事業者と左官業者に今日中に連絡する',
+    category: '現場',
+    relatedScreen: 'actions',
+    suggestions: [
+      {
+        id: 'pa5-s1',
+        label: '予定登録案を作る',
+        icon: '📅',
+        type: 'schedule',
+        draft: `【予定登録案 — 仮生成サンプル】
+
+タイトル：人員手配確認（来週分）
+日時：2026年6月27日（土）9:00
+場所：事務所 / 電話対応
+担当：坂本（代表）
+
+確認事項：
+1. 協力電気工事業者（田中電気）に連絡
+　　来週月〜水の応援可否確認
+
+2. 左官業者（山田左官）に連絡
+　　来週火〜木の応援可否確認
+
+3. 応援不可の場合は別の業者リスト確認
+
+備考：
+人員が確保できない場合は工程調整を検討する
+
+※ これはカレンダー登録案です（実際には登録されません）。`,
+      },
+      {
+        id: 'pa5-s2',
+        label: '依頼文を作る',
+        icon: '📨',
+        type: 'delegate',
+        draft: `【協力業者への依頼文 — 仮生成サンプル】
+
+田中電気工業 田中社長
+
+お世話になっております。LCC株式会社の坂本です。
+
+来週（6月30日〜7月4日）の現場について、電気工事の応援をお願いしたくご連絡しました。
+
+【必要な応援内容】
+期間：6月30日（月）〜7月2日（水）
+現場：○○リフォーム（○○市○○町）
+作業：電気配線工事、コンセント増設
+人数：1名
+
+お手間をおかけして恐縮ですが、ご都合をお聞かせいただけますでしょうか。
+
+LCC株式会社 代表取締役 坂本
+
+※ これは仮生成サンプルです。`,
+      },
+    ],
+  },
+]
+
+// ── Phase 3: 時系列ビュー ──────────────────────────────────
+export const timelinePeriods: TimelinePeriodData[] = [
+  {
+    period: 'yesterday',
+    label: '昨日',
+    events: [
+      { id: 'y1', title: '○○リフォーム現場で事故発生', category: '事故', alertLevel: 'danger', time: '14:30' },
+      { id: 'y2', title: '三菱UFJ銀行より追加資料要請メール受信', category: '銀行', alertLevel: 'warning', time: '10:15' },
+      { id: 'y3', title: '未請求案件3件が発覚（合計¥6.8M）', category: '請求', alertLevel: 'warning', time: '09:00' },
+      { id: 'y4', title: 'B工務店 未払い確認（期限超過14日）', category: '回収', alertLevel: 'warning', time: '16:00' },
+      { id: 'y5', title: '□□外構工事 完了報告受領', category: '現場', time: '17:30' },
+    ],
+  },
+  {
+    period: 'today',
+    label: '今日',
+    events: [
+      { id: 't1', title: '銀行追加資料 提出期限（17:00）', category: '銀行', alertLevel: 'danger', time: '17:00' },
+      { id: 't2', title: '事故現場 状況確認・顧客報告', category: '事故', alertLevel: 'danger', time: '午前中' },
+      { id: 't3', title: '未請求3件 担当確認・依頼', category: '請求', alertLevel: 'warning', time: '午前' },
+      { id: 't4', title: 'B工務店 支払督促連絡', category: '回収', alertLevel: 'warning', time: '午後' },
+      { id: 't5', title: '来週人員不足 協力業者連絡', category: '現場', time: '夕方' },
+    ],
+  },
+  {
+    period: 'tomorrow',
+    label: '明日',
+    events: [
+      { id: 'tm1', title: '人員手配 最終確認', category: '現場', time: '09:00' },
+      { id: 'tm2', title: '銀行回答待ち（融資審査進捗）', category: '銀行', time: '随時' },
+      { id: 'tm3', title: '○○建設 追客電話（見積提出21日超過）', category: '営業', alertLevel: 'warning', time: '午前' },
+      { id: 'tm4', title: '月次損益確認（工務部・営業部）', category: '経営', time: '午後' },
+    ],
+  },
+  {
+    period: 'this-week',
+    label: '今週',
+    events: [
+      { id: 'w1', title: '未請求3件 請求書発行完了', category: '請求', alertLevel: 'warning' },
+      { id: 'w2', title: '事故対応 保険会社との調整', category: '事故', alertLevel: 'warning' },
+      { id: 'w3', title: '資金繰り表 7月〜9月分更新', category: '経営' },
+      { id: 'w4', title: 'B工務店 入金確認', category: '回収' },
+      { id: 'w5', title: '来週3現場の人員配置 確定', category: '現場' },
+    ],
+  },
+  {
+    period: 'next-week',
+    label: '来週',
+    events: [
+      { id: 'nw1', title: '3現場 同時稼働スタート', category: '現場' },
+      { id: 'nw2', title: '処遇改善加算 7月分書類準備（みらい）', category: '福祉', alertLevel: 'warning' },
+      { id: 'nw3', title: '銀行融資 審査結果見込み', category: '銀行' },
+      { id: 'nw4', title: '○○建設 提案フォロー', category: '営業' },
+    ],
+  },
+  {
+    period: 'this-month',
+    label: '今月',
+    events: [
+      { id: 'm1', title: '月次決算 粗利確認（28.6%）', category: '経営' },
+      { id: 'm2', title: '未請求¥6.8M 全件入金確認', category: '請求' },
+      { id: 'm3', title: '事故案件 完全クローズ', category: '事故' },
+      { id: 'm4', title: '銀行融資 最終回答受領', category: '銀行' },
+      { id: 'm5', title: 'ケアプラン更新2件（みらい 6/30期限）', category: '福祉', alertLevel: 'danger' },
+    ],
+  },
+]
+
+// ── Phase 3: AI判断一言 ────────────────────────────────────
+export const aiJudgement: AiJudgement = {
+  message:
+    '坂本社長、今日は「銀行資料（17時締切）」と「事故対応報告」を最優先で処理してください。未請求¥6.8Mは本日中に経理へ依頼を出すだけで構いません。午後に時間が取れる場合は、B工務店への督促連絡も入れてください。',
+  focusItems: ['銀行資料提出（17時厳守）', '事故対応・顧客報告', '未請求3件 経理へ依頼'],
+  generatedAt: '2026-06-26 07:30',
+}
+
+// ── Phase 3: 検索インデックス（仮データ） ──────────────────
+export const searchIndex: SearchResult[] = [
+  // 人
+  { id: 's-p1', category: '人', title: '田中 誠', sub: '田中建設 部長 / 取引先', alertLevel: undefined },
+  { id: 's-p2', category: '人', title: '加藤 健一', sub: '現場監督 / LCC従業員', alertLevel: undefined },
+  { id: 's-p3', category: '人', title: '佐藤 真一', sub: '三菱UFJ銀行 担当者', alertLevel: 'warning' },
+  { id: 's-p4', category: '人', title: '山田 哲也', sub: '外注 / 左官工', alertLevel: undefined },
+  // 案件
+  { id: 's-pr1', category: '案件', title: '○○リフォーム工事', sub: '進行中 / 事故発生中', alertLevel: 'danger' },
+  { id: 's-pr2', category: '案件', title: '△△ビル修繕', sub: '進行中 / 資材搬入待ち', alertLevel: 'warning' },
+  { id: 's-pr3', category: '案件', title: '□□外構工事', sub: '完了 / 未請求¥1.6M', alertLevel: 'warning' },
+  { id: 's-pr4', category: '案件', title: '○○建設 新築外構', sub: '提案中 / 21日経過', alertLevel: 'warning' },
+  // 連絡
+  { id: 's-c1', category: '連絡', title: '三菱UFJ銀行 追加資料要請', sub: '6/25受信 / 本日17時期限', alertLevel: 'danger' },
+  { id: 's-c2', category: '連絡', title: 'B工務店 未払い督促', sub: '¥1,800,000 / 期限超過14日', alertLevel: 'warning' },
+  { id: 's-c3', category: '連絡', title: '鈴木様 見積依頼', sub: '6/19受信 / 未回答7日', alertLevel: undefined },
+  // 書類
+  { id: 's-d1', category: '書類', title: '事業計画書（最新版）', sub: '2026年6月 / Drive未連携', alertLevel: undefined },
+  { id: 's-d2', category: '書類', title: '試算表 6月期', sub: 'freee未連携 / 作成予定', alertLevel: undefined },
+  { id: 's-d3', category: '書類', title: '○○工事 請求書未発行', sub: '¥2,800,000 / 至急', alertLevel: 'warning' },
+  // 予定
+  { id: 's-e1', category: '予定', title: '銀行資料提出期限', sub: '本日17:00 / 厳守', alertLevel: 'danger' },
+  { id: 's-e2', category: '予定', title: '来週月曜 3現場スタート', sub: '人員確定要', alertLevel: 'warning' },
+  // タスク
+  { id: 's-t1', category: 'タスク', title: '未請求3件 請求書発行依頼', sub: '経理担当 / 今週中', alertLevel: 'warning' },
+  { id: 's-t2', category: 'タスク', title: '事故 保険会社連絡', sub: '本日中', alertLevel: 'danger' },
+]

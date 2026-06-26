@@ -9,10 +9,10 @@ const NAV_ITEMS: {
   label: string
   badge?: number
 }[] = [
-  { screen: 'home', icon: '🏠', label: 'ホーム' },
-  { screen: 'chat', icon: '🤖', label: 'AI相談' },
-  { screen: 'actions', icon: '⚡', label: '要対応', badge: unreadA },
-  { screen: 'create', icon: '✍️', label: '作成' },
+  { screen: 'home',      icon: '🏠', label: 'ホーム' },
+  { screen: 'cockpit',   icon: '🎯', label: 'コックピット' },
+  { screen: 'actions',   icon: '⚡', label: '要対応', badge: unreadA },
+  { screen: 'create',    icon: '✍️', label: '作成' },
   { screen: 'dashboard', icon: '📈', label: '経営' },
 ]
 
@@ -29,8 +29,9 @@ export default function Navigation({ current, onNavigate }: Props) {
           key={item.screen}
           className={`nav-item ${current === item.screen ? 'active' : ''}`}
           onClick={() => onNavigate(item.screen)}
+          style={{ fontSize: 9 }}
         >
-          <span className="nav-item-icon">{item.icon}</span>
+          <span className="nav-item-icon" style={{ fontSize: 19 }}>{item.icon}</span>
           {item.badge && item.badge > 0 ? (
             <span className="nav-badge">{item.badge}</span>
           ) : null}
