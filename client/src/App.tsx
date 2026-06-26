@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Screen } from './types'
 import { companies } from './data/mockData'
 import Navigation from './components/Navigation'
+import VoiceModal from './components/VoiceModal'
 import Home from './components/screens/Home'
 import AiChat from './components/screens/AiChat'
 import TodayActions from './components/screens/TodayActions'
@@ -30,14 +31,13 @@ const SCREEN_SUBS: Record<Screen, string> = {
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home')
   const [company, setCompany] = useState('lcc')
+  const [showVoice, setShowVoice] = useState(false)
 
   const companyData = companies.find((c) => c.id === company)
-  const sub =
-    screen === 'home' ? (companyData?.name ?? 'LCC株式会社') : SCREEN_SUBS[screen]
+  const sub = screen === 'home' ? (companyData?.name ?? 'LCC株式会社') : SCREEN_SUBS[screen]
 
   function navigate(s: Screen) {
     setScreen(s)
-    window.scrollTo(0, 0)
   }
 
   return (
@@ -68,18 +68,54 @@ export default function App() {
 
       {/* スクリーン */}
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {screen === 'home' && <Home onNavigate={navigate} company={companyData?.name ?? 'LCC株式会社'} />}
-        {screen === 'chat' && <AiChat />}
+        {screen === 'home' && (
+          <Home onNavigate={navigate} company={companyData?.name ?? 'LCC株式会社'} onVoice={() => setShowVoice(true)} />
+        )}
+        {screen === 'chat' && <AiChat onVoice={() => setShowVoice(true)} />}
         {screen === 'actions' && <TodayActions />}
         {screen === 'create' && <CreateRequest onNavigateToChat={() => navigate('chat')} />}
         {screen === 'dashboard' && <Dashboard />}
         {screen === 'settings' && (
-          <Settings company={company} onCompanyChange={(id) => { setCompany(id); navigate('home') }} />
+          <Settings
+            company={company}
+            onCompanyChange={(id) => {
+              setCompany(id)
+              navigate('home')
+            }}
+          />
         )}
       </main>
 
+      {/* フローティングマイクボタン（チャット画面以外） */}
+      {screen !== 'chat' && (
+        <button
+          onClick={() => setShowVoice(true)}
+          style={{
+            position: 'absolute',
+            bottom: 'calc(var(--nav-height) + var(--safe-bottom) + 16px)',
+            right: 16,
+            width: 52,
+            height: 52,
+            borderRadius: '50%',
+            background: 'var(--orange)',
+            color: '#fff',
+            fontSize: 22,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 16px rgba(249,115,22,0.4)',
+            zIndex: 50,
+          }}
+        >
+          🎤
+        </button>
+      )}
+
       {/* ボトムナビ */}
       <Navigation current={screen} onNavigate={navigate} />
+
+      {/* 音声入力モーダル */}
+      {showVoice && <VoiceModal onClose={() => setShowVoice(false)} />}
     </div>
   )
 }

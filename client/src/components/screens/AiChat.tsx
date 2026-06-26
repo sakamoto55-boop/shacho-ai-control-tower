@@ -1,30 +1,28 @@
 import { useState, useRef, useEffect } from 'react'
-import type { ChatMessage } from '../../types'
-import { initialChatMessages, promptSuggestions } from '../../data/mockData'
+import type { AiMode, ChatMessage } from '../../types'
+import { aiModes, initialChatMessages, mockAiResponses } from '../../data/mockData'
 
-const MOCK_RESPONSES: Record<string, string> = {
-  default:
-    '承知しました。現在はMVPモードのため、実際のAI応答はまだ接続されていません。\n\nClaude APIと接続後は、メール内容の要約・返信文作成・タスク整理など、リアルタイムでサポートします。\n\n**今後の連携予定：**\n• Claude API (claude-opus-4-8)\n• Gmail API\n• LINE WORKS API\n• Google Drive API',
-  メール:
-    '**昨日の重要メール（仮データ）：**\n\n🔴 田中建設 田中部長\n「工事代金未払い件について至急連絡ください」\n→ 本日17時まで要返信\n\n🟡 三菱UFJ銀行 佐藤担当\n「融資審査書類の追加提出依頼」\n→ 本日中に書類準備\n\n🟡 山田様（個人）\n「新規案件見積もり依頼（戸建てリフォーム）」\n→ 今週中に見積作成',
-  今日: '**今日のやるべきこと：**\n\n✅ 最優先（午前中に）\n1. 田中建設への返信\n2. 銀行書類の準備・送付\n3. 現場事故の状況確認\n\n📋 午後\n4. freee請求書確認\n5. 外注見積もり確認\n\n📝 今週中\n6. 戸建てリフォーム見積作成\n7. 社員研修日程の承認',
-  返信:
-    '**返信文案（田中建設 田中部長あて）：**\n\n---\n田中部長\n\nお世話になっております。坂本でございます。\nご連絡をいただきありがとうございます。\n\n工事代金の件につきまして、確認の上、本日中にご連絡させていただきます。\nご迷惑をおかけしており、誠に申し訳ございません。\n\n何卒よろしくお願いいたします。\n\nLCC株式会社\n代表取締役 坂本\n---\n\nこの文面でよろしければ、コピーしてご使用ください。',
+interface Props {
+  onVoice: () => void
 }
 
-function getMockResponse(input: string): string {
-  if (input.includes('メール') || input.includes('まとめ')) return MOCK_RESPONSES['メール']
-  if (input.includes('今日') || input.includes('やるべき')) return MOCK_RESPONSES['今日']
-  if (input.includes('返信')) return MOCK_RESPONSES['返信']
-  return MOCK_RESPONSES['default']
+function getMockResponse(mode: AiMode, input: string): string {
+  const modeResponses = mockAiResponses[mode]
+  if (!modeResponses) return mockAiResponses['secretary']['default']
+
+  for (const [key, val] of Object.entries(modeResponses)) {
+    if (key !== 'default' && input.includes(key)) return val
+  }
+  return modeResponses['default'] ?? mockAiResponses['secretary']['default']
 }
 
-export default function AiChat() {
+export default function AiChat({ onVoice }: Props) {
+  const [activeMode, setActiveMode] = useState<AiMode>('secretary')
   const [messages, setMessages] = useState<ChatMessage[]>(initialChatMessages)
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const tabBarRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -46,12 +44,12 @@ export default function AiChat() {
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: getMockResponse(text),
+        content: getMockResponse(activeMode, text),
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, aiMsg])
       setIsTyping(false)
-    }, 1200)
+    }, 1000)
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -60,6 +58,22 @@ export default function AiChat() {
       sendMessage(input)
     }
   }
+
+  function switchMode(mode: AiMode) {
+    setActiveMode(mode)
+    const modeConfig = aiModes.find((m) => m.id === mode)
+    if (!modeConfig) return
+    const switchMsg: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: `**${modeConfig.icon} ${modeConfig.label}モードに切り替えました**\n\n${modeConfig.prompts.slice(0, 3).map((p) => `• ${p}`).join('\n')}\n\nなど、${modeConfig.label}に関することをお気軽にどうぞ。`,
+      timestamp: new Date(),
+    }
+    setMessages((prev) => [...prev, switchMsg])
+  }
+
+  const currentMode = aiModes.find((m) => m.id === activeMode)!
+  const prompts = currentMode.prompts
 
   return (
     <div
@@ -70,31 +84,76 @@ export default function AiChat() {
         overflow: 'hidden',
       }}
     >
-      {/* プロンプト例（横スクロール） */}
+      {/* ── AIモードタブバー ── */}
+      <div
+        ref={tabBarRef}
+        style={{
+          flexShrink: 0,
+          display: 'flex',
+          gap: 6,
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+          padding: '10px 14px 4px',
+          borderBottom: '1px solid var(--border)',
+          background: '#fff',
+        }}
+      >
+        {aiModes.map((m) => {
+          const isActive = m.id === activeMode
+          return (
+            <button
+              key={m.id}
+              onClick={() => switchMode(m.id)}
+              style={{
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '8px 14px',
+                borderRadius: 999,
+                fontSize: 13,
+                fontWeight: 700,
+                background: isActive ? m.color : 'var(--bg)',
+                color: isActive ? '#fff' : 'var(--text-secondary)',
+                border: isActive ? 'none' : '1.5px solid var(--border)',
+                transition: 'all 0.15s',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span>{m.icon}</span>
+              <span>{m.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ── プロンプト例（横スクロール） ── */}
       <div
         style={{
           flexShrink: 0,
-          padding: '10px 14px 6px',
           display: 'flex',
           gap: 8,
           overflowX: 'auto',
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'none',
+          padding: '8px 14px 6px',
+          background: 'var(--bg)',
         }}
       >
-        {promptSuggestions.map((s) => (
+        {prompts.map((s) => (
           <button
             key={s}
             onClick={() => sendMessage(s)}
             style={{
               flexShrink: 0,
               background: '#fff',
-              border: '1.5px solid var(--border)',
+              border: `1.5px solid ${currentMode.color}30`,
               borderRadius: 999,
               padding: '7px 14px',
               fontSize: 12,
               fontWeight: 600,
-              color: 'var(--navy)',
+              color: currentMode.color,
               whiteSpace: 'nowrap',
             }}
           >
@@ -103,7 +162,7 @@ export default function AiChat() {
         ))}
       </div>
 
-      {/* メッセージリスト */}
+      {/* ── メッセージリスト ── */}
       <div
         style={{
           flex: 1,
@@ -118,11 +177,11 @@ export default function AiChat() {
         }}
       >
         {messages.map((msg) => (
-          <ChatBubble key={msg.id} message={msg} />
+          <ChatBubble key={msg.id} message={msg} modeColor={currentMode.color} />
         ))}
         {isTyping && (
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-            <AiAvatar />
+            <AiAvatar icon={currentMode.icon} color={currentMode.color} />
             <div
               style={{
                 background: '#fff',
@@ -140,9 +199,9 @@ export default function AiChat() {
                   style={{
                     width: 7,
                     height: 7,
-                    background: 'var(--text-muted)',
+                    background: currentMode.color,
                     borderRadius: '50%',
-                    animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
+                    animation: `chatBounce 1.2s ease-in-out ${i * 0.2}s infinite`,
                   }}
                 />
               ))}
@@ -152,7 +211,7 @@ export default function AiChat() {
         <div ref={bottomRef} />
       </div>
 
-      {/* 入力エリア */}
+      {/* ── 入力エリア ── */}
       <div
         style={{
           flexShrink: 0,
@@ -170,15 +229,14 @@ export default function AiChat() {
             borderRadius: 24,
             padding: '8px 8px 8px 16px',
             boxShadow: 'var(--shadow-md)',
-            border: '1.5px solid var(--border)',
+            border: `1.5px solid ${currentMode.color}30`,
           }}
         >
           <textarea
-            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="社長、何でもどうぞ..."
+            placeholder={`${currentMode.icon} ${currentMode.label}に聞く...`}
             rows={1}
             style={{
               flex: 1,
@@ -192,8 +250,8 @@ export default function AiChat() {
               color: 'var(--text-primary)',
             }}
           />
-          {/* 音声入力ボタン風 */}
           <button
+            onClick={onVoice}
             style={{
               width: 40,
               height: 40,
@@ -209,7 +267,6 @@ export default function AiChat() {
           >
             🎤
           </button>
-          {/* 送信ボタン */}
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim()}
@@ -217,12 +274,13 @@ export default function AiChat() {
               width: 44,
               height: 44,
               borderRadius: '50%',
-              background: input.trim() ? 'var(--navy)' : 'var(--border)',
+              background: input.trim() ? currentMode.color : 'var(--border)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 18,
               flexShrink: 0,
+              color: '#fff',
               transition: 'background 0.2s',
             }}
           >
@@ -232,7 +290,7 @@ export default function AiChat() {
       </div>
 
       <style>{`
-        @keyframes bounce {
+        @keyframes chatBounce {
           0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
           40% { transform: scale(1); opacity: 1; }
         }
@@ -241,14 +299,14 @@ export default function AiChat() {
   )
 }
 
-function AiAvatar() {
+function AiAvatar({ icon, color }: { icon: string; color: string }) {
   return (
     <div
       style={{
         width: 32,
         height: 32,
         borderRadius: '50%',
-        background: 'var(--navy)',
+        background: color,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -256,12 +314,12 @@ function AiAvatar() {
         flexShrink: 0,
       }}
     >
-      🤖
+      {icon}
     </div>
   )
 }
 
-function ChatBubble({ message }: { message: ChatMessage }) {
+function ChatBubble({ message, modeColor }: { message: ChatMessage; modeColor: string }) {
   const isUser = message.role === 'user'
   return (
     <div
@@ -272,16 +330,32 @@ function ChatBubble({ message }: { message: ChatMessage }) {
         alignItems: 'flex-end',
       }}
     >
-      {!isUser && <AiAvatar />}
+      {!isUser && (
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            background: modeColor,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 16,
+            flexShrink: 0,
+          }}
+        >
+          🤖
+        </div>
+      )}
       <div
         style={{
           maxWidth: '78%',
-          background: isUser ? 'var(--navy)' : '#fff',
+          background: isUser ? modeColor : '#fff',
           color: isUser ? '#fff' : 'var(--text-primary)',
           borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
           padding: '11px 15px',
           fontSize: 14,
-          lineHeight: 1.6,
+          lineHeight: 1.65,
           boxShadow: 'var(--shadow)',
           whiteSpace: 'pre-wrap',
         }}

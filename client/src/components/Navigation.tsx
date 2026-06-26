@@ -1,7 +1,7 @@
 import type { Screen } from '../types'
-import { mockActionItems } from '../data/mockData'
+import { actionItems } from '../data/mockData'
 
-const unreadA = mockActionItems.filter((i) => i.priority === 'A' && !i.isRead).length
+const unreadA = actionItems.filter((i: { priority: string; isRead: boolean }) => i.priority === 'A' && !i.isRead).length
 
 const NAV_ITEMS: {
   screen: Screen

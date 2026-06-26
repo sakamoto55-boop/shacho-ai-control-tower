@@ -1,21 +1,18 @@
+import { useState } from 'react'
 import type { Screen } from '../../types'
-import { mockActionItems, dashboardMetrics } from '../../data/mockData'
+import { actionItems, todayBriefing, situationCards, dashboardMetrics } from '../../data/mockData'
 
 interface Props {
   onNavigate: (screen: Screen) => void
-  company: string
+  company?: string
+  onVoice: () => void
 }
 
-const priorityACount = mockActionItems.filter((i) => i.priority === 'A' && !i.isRead).length
-const alertCount = dashboardMetrics.filter((m) => m.alert).length
+const priorityACount = actionItems.filter((i) => i.priority === 'A' && !i.isRead).length
+const alertMetrics = dashboardMetrics.filter((m) => m.alert).length
 
-export default function Home({ onNavigate, company }: Props) {
-  const today = new Date().toLocaleDateString('ja-JP', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
-  })
+export default function Home({ onNavigate, onVoice }: Props) {
+  const [briefingExpanded, setBriefingExpanded] = useState(true)
 
   const quickCards = [
     {
@@ -46,66 +43,172 @@ export default function Home({ onNavigate, company }: Props) {
       screen: 'dashboard' as Screen,
       icon: '📈',
       label: '経営を見る',
-      sub: `注意項目: ${alertCount}件`,
+      sub: `注意: ${alertMetrics}件`,
       color: '#2d5a9e',
-      badge: alertCount > 0 ? alertCount : null,
+      badge: alertMetrics > 0 ? alertMetrics : null,
     },
   ]
 
   return (
     <div className="screen-content">
-      {/* 挨拶カード */}
+      {/* ── AIブリーフィングカード ── */}
       <div
         style={{
-          background: 'linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '20px 18px',
-          marginBottom: 18,
+          background: 'linear-gradient(135deg, #0f2647 0%, #1B3D6F 60%, #2d5a9e 100%)',
+          borderRadius: 20,
+          padding: '18px',
+          marginBottom: 14,
           color: '#fff',
           position: 'relative',
           overflow: 'hidden',
         }}
       >
+        {/* 背景円 */}
         <div
           style={{
             position: 'absolute',
-            right: -20,
-            top: -20,
-            width: 120,
-            height: 120,
+            right: -30,
+            top: -30,
+            width: 140,
+            height: 140,
             borderRadius: '50%',
-            background: 'rgba(255,255,255,0.06)',
+            background: 'rgba(255,255,255,0.05)',
+            pointerEvents: 'none',
           }}
         />
-        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>{today}</div>
-        <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>
-          おはようございます 👋
-        </div>
-        <div style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.5 }}>
-          {company} の管制塔です。
-          <br />
-          今日も一日、サポートします。
-        </div>
-        {priorityACount > 0 && (
-          <div
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: 11, opacity: 0.65, marginBottom: 3 }}>
+              {todayBriefing.date} — 朝ブリーフィング
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.4, whiteSpace: 'pre-line' }}>
+              {todayBriefing.greeting}
+            </div>
+          </div>
+          <button
+            onClick={() => setBriefingExpanded(!briefingExpanded)}
             style={{
-              marginTop: 14,
-              background: 'rgba(239,68,68,0.9)',
-              borderRadius: 10,
-              padding: '8px 12px',
-              fontSize: 13,
-              fontWeight: 700,
-              display: 'inline-flex',
+              flexShrink: 0,
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.12)',
+              color: '#fff',
+              fontSize: 12,
+              display: 'flex',
               alignItems: 'center',
-              gap: 6,
+              justifyContent: 'center',
+              marginLeft: 10,
             }}
           >
-            <span>🔴</span> 優先度A が {priorityACount}件あります
-          </div>
+            {briefingExpanded ? '▲' : '▼'}
+          </button>
+        </div>
+
+        {briefingExpanded && (
+          <>
+            {/* 変化リスト */}
+            <div style={{ marginBottom: 12 }}>
+              {todayBriefing.changes.map((c, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '7px 10px',
+                    borderRadius: 10,
+                    background:
+                      c.type === 'danger'
+                        ? 'rgba(239,68,68,0.25)'
+                        : c.type === 'warning'
+                          ? 'rgba(245,158,11,0.25)'
+                          : 'rgba(255,255,255,0.12)',
+                    marginBottom: 5,
+                    fontSize: 13,
+                    fontWeight: 600,
+                  }}
+                >
+                  <span>{c.icon}</span>
+                  <span>{c.text}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* 今日最初にやること */}
+            <div
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                borderRadius: 12,
+                padding: '12px 14px',
+              }}
+            >
+              <div style={{ fontSize: 11, opacity: 0.75, marginBottom: 6, fontWeight: 700 }}>
+                今日最初にやること
+              </div>
+              {todayBriefing.topActions.map((a, i) => (
+                <div
+                  key={i}
+                  style={{ fontSize: 13, opacity: 0.92, padding: '3px 0', display: 'flex', gap: 6 }}
+                >
+                  <span style={{ opacity: 0.6 }}>{i + 1}.</span>
+                  <span>{a}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* ボタン列 */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button
+                onClick={() => onNavigate('chat')}
+                style={{
+                  flex: 1,
+                  minHeight: 40,
+                  borderRadius: 12,
+                  background: 'rgba(255,255,255,0.18)',
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 700,
+                }}
+              >
+                🤖 AIに相談
+              </button>
+              <button
+                onClick={() => onNavigate('actions')}
+                style={{
+                  flex: 1,
+                  minHeight: 40,
+                  borderRadius: 12,
+                  background: 'rgba(239,68,68,0.7)',
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 700,
+                }}
+              >
+                ⚡ 要対応へ
+              </button>
+              <button
+                onClick={onVoice}
+                style={{
+                  width: 40,
+                  minHeight: 40,
+                  borderRadius: 12,
+                  background: 'rgba(255,255,255,0.12)',
+                  color: '#fff',
+                  fontSize: 18,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                🎤
+              </button>
+            </div>
+          </>
         )}
       </div>
 
-      {/* クイックアクション */}
+      {/* ── クイックアクション ── */}
       <div className="section-label">クイックアクション</div>
       <div
         style={{
@@ -133,7 +236,7 @@ export default function Home({ onNavigate, company }: Props) {
               minHeight: 100,
             }}
           >
-            {card.badge && (
+            {card.badge != null && (
               <span
                 style={{
                   position: 'absolute',
@@ -156,9 +259,7 @@ export default function Home({ onNavigate, company }: Props) {
               </span>
             )}
             <span style={{ fontSize: 28 }}>{card.icon}</span>
-            <span style={{ fontSize: 14, fontWeight: 800, color: card.color }}>
-              {card.label}
-            </span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: card.color }}>{card.label}</span>
             <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 500 }}>
               {card.sub}
             </span>
@@ -166,7 +267,70 @@ export default function Home({ onNavigate, company }: Props) {
         ))}
       </div>
 
-      {/* 業務ポータル */}
+      {/* ── 状況カード ── */}
+      <div className="section-label">今日の状況</div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 8,
+          marginBottom: 18,
+        }}
+      >
+        {situationCards.map((card) => {
+          const isDanger = card.alertLevel === 'danger'
+          const isWarning = card.alertLevel === 'warning'
+          const bg = isDanger
+            ? 'var(--danger-light)'
+            : isWarning
+              ? 'var(--warning-light)'
+              : '#fff'
+          const border = isDanger
+            ? '#FCA5A5'
+            : isWarning
+              ? '#FDE68A'
+              : 'transparent'
+          const valueColor = isDanger
+            ? '#991B1B'
+            : isWarning
+              ? '#92400E'
+              : 'var(--navy)'
+
+          return (
+            <button
+              key={card.id}
+              onClick={() => card.screen && onNavigate(card.screen)}
+              style={{
+                background: bg,
+                border: `1.5px solid ${border}`,
+                borderRadius: 14,
+                padding: '12px 12px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: 4,
+                boxShadow: 'var(--shadow)',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ fontSize: 20 }}>{card.icon}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, lineHeight: 1.2 }}>
+                {card.label}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: valueColor }}>
+                {card.value}
+              </div>
+              {card.sub && (
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.3 }}>
+                  {card.sub}
+                </div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ── 業務ポータル ── */}
       <div className="section-label">業務ポータル</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
         {[
@@ -187,8 +351,8 @@ export default function Home({ onNavigate, company }: Props) {
               boxShadow: 'var(--shadow)',
             }}
           >
-            <span style={{ fontSize: 24 }}>{portal.icon}</span>
-            <span style={{ flex: 1, fontWeight: 700, fontSize: 15 }}>{portal.label}</span>
+            <span style={{ fontSize: 22 }}>{portal.icon}</span>
+            <span style={{ flex: 1, fontWeight: 700, fontSize: 14 }}>{portal.label}</span>
             <span className="pill pill-planned">{portal.tag}</span>
           </div>
         ))}
