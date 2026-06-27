@@ -5,6 +5,7 @@ import { aiModes, initialChatMessages, mockAiResponses } from '../../data/mockDa
 import DemoBanner from '../DemoBanner'
 import { runOrchestrator } from '../../core/ai-engine/aiOrchestrator'
 import type { OrchestratorResult } from '../../core/ai-engine/aiEngineTypes'
+import { buildMorningBriefing, formatMorningBriefing } from '../../core/ai-engine/morningBriefingEngine'
 import { mockCalendarEvents } from '../../services/calendar/mockCalendar'
 import { mapToCalendarDerivedEvent } from '../../services/calendar/calendarMapper'
 import { createCalendarSummary } from '../../services/calendar/calendarAnalyzer'
@@ -328,6 +329,22 @@ function getLineWorksShortcutResponse(input: string): string | null {
 }
 
 function getMockResponse(mode: AiMode, input: string, orchestratorData?: OrchestratorResult): string {
+  // Project SHOGUN 朝ブリーフィングを最優先（全Provider横断・3分類）
+  if (orchestratorData) {
+    if (
+      input.includes('ブリーフィング') ||
+      input.includes('今朝') ||
+      input.includes('おはよう') ||
+      input.includes('今日は何') ||
+      input.includes('今日のまとめ') ||
+      input.includes('今日はこれだけ') ||
+      input.includes('今日やること') ||
+      input.includes('今日の予定をまとめて全部')
+    ) {
+      return formatMorningBriefing(buildMorningBriefing(orchestratorData))
+    }
+  }
+
   // 統合AI ショートカット回答を最優先（Phase 10）
   if (orchestratorData) {
     const integratedResponse = getIntegratedShortcutResponse(input, orchestratorData)
@@ -366,11 +383,27 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
   const [isTyping, setIsTyping] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const tabBarRef = useRef<HTMLDivElement>(null)
+  const briefingShownRef = useRef(false)
   const orchestratorResult = useMemo(() => runOrchestrator(), [])
+  const morningBriefing = useMemo(() => buildMorningBriefing(orchestratorResult), [orchestratorResult])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isTyping])
+
+  // Project SHOGUN 標準UI: 起動時に朝ブリーフィングを自動表示
+  // 社長はチャットを開くだけで「今日やること」が全部分かる
+  useEffect(() => {
+    if (briefingShownRef.current) return
+    briefingShownRef.current = true
+    const briefingMsg: ChatMessage = {
+      id: `briefing-${Date.now()}`,
+      role: 'assistant',
+      content: formatMorningBriefing(morningBriefing),
+      timestamp: new Date(),
+    }
+    setMessages((prev) => [...prev, briefingMsg])
+  }, [morningBriefing])
 
   function sendMessage(text: string) {
     if (!text.trim()) return
@@ -428,6 +461,35 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
         overflow: 'hidden',
       }}
     >
+      {/* ── Project SHOGUN: 朝ブリーフィング（最上段・主役）── */}
+      <div
+        style={{
+          flexShrink: 0,
+          background: 'linear-gradient(135deg, #0f2647 0%, #1B3D6F 100%)',
+          padding: '8px 14px',
+        }}
+      >
+        <button
+          onClick={() => sendMessage('今朝のブリーフィングを見せて')}
+          style={{
+            width: '100%',
+            background: 'rgba(255,255,255,0.12)',
+            border: '1.5px solid rgba(255,255,255,0.3)',
+            borderRadius: 12,
+            padding: '10px 14px',
+            fontSize: 14,
+            fontWeight: 800,
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+          }}
+        >
+          ☀️ 今朝のブリーフィング（社長がやる {morningBriefing.ceoActions.length} / 任せる {morningBriefing.delegateActions.length} / AI監視 {morningBriefing.aiMonitorItems.length}）
+        </button>
+      </div>
+
       {/* ── AIモードタブバー ── */}
       <div
         ref={tabBarRef}
