@@ -152,10 +152,11 @@ client/src/services/gmail/
 `client/.env.example` を参照してください。
 
 ```env
-VITE_GMAIL_CLIENT_ID=（Google Cloud Console で取得）
-VITE_GMAIL_CLIENT_SECRET=（取得後に設定）
+# Gmail / Calendar / Drive 共通 Client ID（Phase 6以降は1つで全サービス対応）
+VITE_GOOGLE_CLIENT_ID=（Google Cloud Console で取得）
 VITE_GOOGLE_REDIRECT_URI=http://localhost:5173/
-VITE_GOOGLE_READONLY_SCOPE=https://www.googleapis.com/auth/gmail.readonly
+# Phase 6時点のスコープ（gmail.readonly + calendar.readonly）
+VITE_GOOGLE_SCOPES=https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly
 ```
 
 ### ログ記録
@@ -269,7 +270,7 @@ Phase 5.1 では、Phase 5 で構築した OAuth 基盤に対して**安全性�
 
 | チェック項目 | 内容 |
 |------------|------|
-| Client ID設定 | `VITE_GMAIL_CLIENT_ID` の設定有無（設定済みは末尾のみ表示） |
+| Client ID設定 | `VITE_GOOGLE_CLIENT_ID` の設定有無（設定済みは末尾のみ表示） |
 | Redirect URI設定 | `VITE_GOOGLE_REDIRECT_URI` の設定有無と現在値 |
 | スコープ | `gmail.readonly` のみであることを表示 |
 | 書き込みAPI | 未実装であることを表示 |
@@ -283,7 +284,7 @@ Phase 5.1 では、Phase 5 で構築した OAuth 基盤に対して**安全性�
 ⚠️ SPA（ブラウザのみ）での OAuth には以下の制約があります：
 
 1. client_secret をフロントエンドに含められない
-   → VITE_GMAIL_CLIENT_SECRET は設定禁止（ビルド後に公開される）
+   → client_secret は SPA に含めない（ビルド後に公開される）
    → Google Cloud Console で「ウェブ アプリケーション」タイプを選択し、
      SPA として登録することで client_secret なしで動作します
 
@@ -291,15 +292,15 @@ Phase 5.1 では、Phase 5 で構築した OAuth 基盤に対して**安全性�
    → XSS 攻撃を受けた場合にトークンが窃取されるリスクがある
 
 3. VITE_ 変数はビルド時にバンドルに含まれる
-   → VITE_GMAIL_CLIENT_ID は公開リポジトリの .env にコミット禁止
+   → VITE_GOOGLE_CLIENT_ID は公開リポジトリの .env にコミット禁止
 ```
 
 #### 絶対に行ってはいけないこと
 
 ```
 ❌ .env ファイルを Git にコミットしない（.gitignore に含まれています）
-❌ VITE_GMAIL_CLIENT_SECRET をコードや .env.example 以外に記載しない
-❌ VITE_GMAIL_CLIENT_ID を README やコードコメントに直書きしない
+❌ client_secret をコードや .env に記載しない（SPA では使用しない）
+❌ VITE_GOOGLE_CLIENT_ID を README やコードコメントに直書きしない
 ❌ client_secret をフロントエンドコードに埋め込まない
 ```
 

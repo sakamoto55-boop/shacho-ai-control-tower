@@ -67,7 +67,7 @@ interface ProviderDescriptor {
 | データ型 | `UnifiedInboxItem` |
 | Phase | 5（Gmail）/ 将来（LINE WORKS） |
 
-**現状**: mockGmailMessages を使用（`VITE_GMAIL_CLIENT_ID` 未設定）
+**現状**: mockGmailMessages を使用（`VITE_GOOGLE_CLIENT_ID` 未設定）
 
 ---
 

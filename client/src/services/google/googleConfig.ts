@@ -13,9 +13,9 @@ export interface OAuthPreConnectCheck {
 }
 
 export function getOAuthPreConnectCheck(): OAuthPreConnectCheck {
-  const clientId = import.meta.env.VITE_GMAIL_CLIENT_ID ?? ''
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
   const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI ?? window.location.origin + '/'
-  const scope = import.meta.env.VITE_GOOGLE_READONLY_SCOPE ?? 'https://www.googleapis.com/auth/gmail.readonly'
+  const scope = import.meta.env.VITE_GOOGLE_SCOPES ?? 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly'
 
   const hasClientId = typeof clientId === 'string' && clientId.trim().length > 0
   const hasRedirectUri = typeof redirectUri === 'string' && redirectUri.trim().length > 0

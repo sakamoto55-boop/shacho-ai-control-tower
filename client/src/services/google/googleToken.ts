@@ -59,7 +59,7 @@ export const googleToken = {
   // リフレッシュトークンでアクセストークンを更新
   async refresh(): Promise<boolean> {
     const refreshToken = googleStorage.getRefreshToken()
-    const clientId = import.meta.env.VITE_GMAIL_CLIENT_ID as string | undefined
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
     if (!refreshToken || !clientId) return false
 
     googleStorage.appendLog({

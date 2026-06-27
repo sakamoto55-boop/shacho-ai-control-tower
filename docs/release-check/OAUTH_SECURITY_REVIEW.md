@@ -91,7 +91,7 @@ Google アカウントそのものからログアウトするには、accounts.g
 
 | エラーコード | 意味 | ユーザー向けメッセージ |
 |-------------|------|---------------------|
-| `NOT_CONFIGURED` | Client ID 未設定 | VITE_GMAIL_CLIENT_ID が設定されていません |
+| `NOT_CONFIGURED` | Client ID 未設定 | VITE_GOOGLE_CLIENT_ID が設定されていません |
 | `AUTH_FAILED` | OAuth 失敗 | Google認証に失敗しました |
 | `STATE_MISMATCH` | CSRF 検証失敗 | セキュリティ検証に失敗しました |
 | `TOKEN_EXCHANGE_FAILED` | トークン交換失敗 | トークンの取得に失敗しました |
@@ -112,14 +112,14 @@ SPA の場合、以下のリスクが残ります：
 
 ```
 1. client_secret を使用しない（フロントエンドに埋め込めない）
-   → .env の VITE_GMAIL_CLIENT_SECRET は使用禁止
+   → client_secret は SPA に含めない（ビルド後に公開される）
    → Google Cloud Console で「ウェブアプリケーション（SPA）」タイプを選択すること
 
 2. アクセストークン・リフレッシュトークンが localStorage に存在する
    → XSS 攻撃でトークンが盗まれるリスクがある
 
 3. VITE_ 環境変数はビルド時にバンドルに含まれる
-   → VITE_GMAIL_CLIENT_ID は公開リポジトリに含まない
+   → VITE_GOOGLE_CLIENT_ID は公開リポジトリに含まない
    → .env ファイルは .gitignore に追加済み
 ```
 
@@ -139,8 +139,8 @@ SPA の場合、以下のリスクが残ります：
 ### 絶対に行ってはいけないこと
 
 - `.env` ファイルを Git にコミットしない（.gitignore に含まれていることを確認）
-- `VITE_GMAIL_CLIENT_SECRET` を .env.example 以外に記載しない
-- `VITE_GMAIL_CLIENT_ID` を公開 README やコードコメントに記載しない
+- `client_secret` を .env や .env.example に記載しない（SPA では不使用）
+- `VITE_GOOGLE_CLIENT_ID` を公開 README やコードコメントに記載しない
 - `client_secret` をフロントエンドコードに直書きしない
 
 ---

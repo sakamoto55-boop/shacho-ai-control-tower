@@ -1,6 +1,29 @@
 # FILES_CHANGED.md — 変更・追加・削除ファイル一覧
 
-> 最終更新: Phase 6 — v0.6.0（2026-06-27）
+> 最終更新: Phase 6.1 — v0.6.1（2026-06-27）
+
+---
+
+## Phase 6.1 変更ファイル（環境変数名統一）
+
+### 更新 (9ファイル)
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `client/src/services/google/googleConfig.ts` | `VITE_GMAIL_CLIENT_ID` → `VITE_GOOGLE_CLIENT_ID`、`VITE_GOOGLE_READONLY_SCOPE` → `VITE_GOOGLE_SCOPES` |
+| `client/src/services/google/googleAuth.ts` | `VITE_GMAIL_CLIENT_ID` → `VITE_GOOGLE_CLIENT_ID`（2箇所・エラーメッセージ含む） |
+| `client/src/services/google/googleToken.ts` | `VITE_GMAIL_CLIENT_ID` → `VITE_GOOGLE_CLIENT_ID` |
+| `client/src/services/google/googleErrors.ts` | コメント内 env 変数名を更新 |
+| `client/.env.example` | Phase 6 共通 OAuth 対応に全面更新（スコープ管理方針追記） |
+| `.env.example`（ルート） | コメント内 VITE_ 変数名を更新 |
+| `README.md` | env 変数名を全箇所更新・Google OAuth 共通化方針追記 |
+| `docs/release-check/GOOGLE_CONNECT_CHECKLIST.md` | Step 5 の env 設定例を更新 |
+| `docs/release-check/OAUTH_SECURITY_REVIEW.md` | エラーテーブル・リスク欄・禁止事項の env 変数名を更新 |
+| `docs/release-check/IMPLEMENTATION_REPORT.md` | .env.example 記載例・未実装表の env 変数名を更新 |
+| `docs/release-check/FILES_CHANGED.md` | Phase 6.1 セクション追加（本ファイル） |
+
+### 削除
+なし
 
 ---
 

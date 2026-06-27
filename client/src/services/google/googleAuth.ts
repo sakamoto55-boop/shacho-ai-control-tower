@@ -44,11 +44,11 @@ function getRedirectUri(): string {
 export const googleAuth = {
   // OAuth 認証フローを開始（Google ログイン画面へリダイレクト）
   async startOAuthFlow(): Promise<void> {
-    const clientId = import.meta.env.VITE_GMAIL_CLIENT_ID as string | undefined
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
     if (!clientId) {
       throw new GoogleAuthError(
         'NOT_CONFIGURED',
-        'VITE_GMAIL_CLIENT_ID が未設定です。client/.env を確認してください。',
+        'VITE_GOOGLE_CLIENT_ID が未設定です。client/.env を確認してください。',
       )
     }
 
@@ -96,9 +96,9 @@ export const googleAuth = {
       throw new GoogleAuthError('AUTH_FAILED', 'PKCE コードベリファイアが見つかりません')
     }
 
-    const clientId = import.meta.env.VITE_GMAIL_CLIENT_ID as string | undefined
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
     if (!clientId) {
-      throw new GoogleAuthError('NOT_CONFIGURED', 'VITE_GMAIL_CLIENT_ID が未設定です')
+      throw new GoogleAuthError('NOT_CONFIGURED', 'VITE_GOOGLE_CLIENT_ID が未設定です')
     }
 
     try {

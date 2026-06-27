@@ -141,7 +141,7 @@
 - [ ] 「calendar.readonly（Phase 6以降）」等が淡色で表示される
 - [ ] 「⚠️ 書き込み禁止」バナーが黄色で表示される
 - [ ] 「🔐 Googleアカウントで接続（Gmail ReadOnly）」ボタンが表示される
-- [ ] 接続ボタンをタップすると `VITE_GMAIL_CLIENT_ID` 未設定エラーが表示される（設定なしの場合）
+- [ ] 接続ボタンをタップすると `VITE_GOOGLE_CLIENT_ID` 未設定エラーが表示される（設定なしの場合）
 
 ### 設定画面 — OAuth接続後（ClientID設定後）
 

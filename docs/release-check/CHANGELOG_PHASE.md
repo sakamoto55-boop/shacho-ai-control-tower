@@ -4,6 +4,20 @@
 
 ---
 
+## Phase 6.1 — v0.6.1（2026-06-27）
+
+### 変更テーマ
+Google OAuth 環境変数名を Gmail 専用から共通化（Gmail / Calendar / Drive / Sheets 共通 Client ID に統一）。
+
+### 変更内容
+
+- `VITE_GMAIL_CLIENT_ID` → **`VITE_GOOGLE_CLIENT_ID`**（Gmail/Calendar/Drive共通）
+- `VITE_GOOGLE_READONLY_SCOPE` → **`VITE_GOOGLE_SCOPES`**（複数スコープ対応）
+- `VITE_GMAIL_CLIENT_SECRET` 廃止（SPA では使用しない方針を明文化）
+- 修正ファイル: `googleConfig.ts` / `googleAuth.ts` / `googleToken.ts` / `googleErrors.ts` / `client/.env.example` / `.env.example` / `README.md` / docs 7ファイル
+
+---
+
 ## Phase 6 — v0.6.0（2026-06-27）
 
 ### 変更テーマ
@@ -128,7 +142,7 @@ Gmail ReadOnly スコープのみ。書き込み処理はゼロ。
 - メールデータからブリーフィング生成する構造（`briefingGenerator.ts`）
 - 設定画面に Google 接続カード（接続・切断・ログ表示）
 - App.tsx で OAuth コールバック自動処理
-- `client/.env.example`（`VITE_GMAIL_CLIENT_ID` 等）
+- `client/.env.example`（`VITE_GOOGLE_CLIENT_ID` 等 ← Phase 6.1 で変数名統一）
 
 ### 変更した機能
 - `gmailClient.ts`: 認証済みなら本番 Gmail API、未認証なら mockGmail を使用

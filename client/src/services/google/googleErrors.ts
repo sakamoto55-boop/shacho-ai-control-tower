@@ -1,7 +1,7 @@
 // Google OAuth / API エラー定義
 
 export type GoogleAuthErrorCode =
-  | 'NOT_CONFIGURED'        // VITE_GMAIL_CLIENT_ID が未設定
+  | 'NOT_CONFIGURED'        // VITE_GOOGLE_CLIENT_ID が未設定
   | 'AUTH_FAILED'           // 認証失敗（ユーザーキャンセル等）
   | 'STATE_MISMATCH'        // CSRF対策 state 不一致
   | 'TOKEN_EXCHANGE_FAILED' // コードとトークンの交換失敗

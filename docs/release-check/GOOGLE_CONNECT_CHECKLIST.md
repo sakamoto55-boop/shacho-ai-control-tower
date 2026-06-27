@@ -88,12 +88,14 @@
 - [ ] 以下を記入：
 
 ```env
-VITE_GMAIL_CLIENT_ID=取得したクライアントID.apps.googleusercontent.com
+# Gmail / Calendar / Drive 共通 Client ID（Phase 6以降は1つで全サービス対応）
+VITE_GOOGLE_CLIENT_ID=取得したクライアントID.apps.googleusercontent.com
 VITE_GOOGLE_REDIRECT_URI=http://localhost:5173/
-VITE_GOOGLE_READONLY_SCOPE=https://www.googleapis.com/auth/gmail.readonly
+# Phase 6時点のスコープ（gmail.readonly + calendar.readonly）
+VITE_GOOGLE_SCOPES=https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly
 ```
 
-- [ ] `VITE_GMAIL_CLIENT_SECRET` は **設定しない**（SPAでは不要・セキュリティリスク）
+- [ ] `client_secret` は **設定しない**（SPAでは不要・セキュリティリスク）
 - [ ] `.env` を Git に追加していないことを確認（`git status` で確認）
 
 ---

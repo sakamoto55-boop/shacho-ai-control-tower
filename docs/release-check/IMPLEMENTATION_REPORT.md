@@ -110,7 +110,7 @@
 
 ```
 getOAuthPreConnectCheck() が返す情報：
-  hasClientId         VITE_GMAIL_CLIENT_ID の設定有無
+  hasClientId         VITE_GOOGLE_CLIENT_ID の設定有無
   hasRedirectUri      VITE_GOOGLE_REDIRECT_URI の設定有無と現在値
   scope               現在設定されているスコープ文字列
   isReadOnly          常に true（設計上）
@@ -247,10 +247,10 @@ googleAuth.startOAuthFlow()
 ### ⑩ .env.example ✅ 完了（client/.env.example）
 
 ```env
-VITE_GMAIL_CLIENT_ID=
-VITE_GMAIL_CLIENT_SECRET=
+# Phase 6.1 より VITE_GMAIL_CLIENT_ID → VITE_GOOGLE_CLIENT_ID に統一（Gmail/Calendar/Drive共通）
+VITE_GOOGLE_CLIENT_ID=
 VITE_GOOGLE_REDIRECT_URI=http://localhost:5173/
-VITE_GOOGLE_READONLY_SCOPE=https://www.googleapis.com/auth/gmail.readonly
+VITE_GOOGLE_SCOPES=https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly
 ```
 
 ### ⑪ README ✅ 完了
@@ -263,7 +263,7 @@ Phase 5 セクション追加（OAuth構造・フロー図・書き込みなし�
 
 | 項目 | 保留理由 |
 |------|---------|
-| 本番 Gmail API への実接続 | `VITE_GMAIL_CLIENT_ID` が未設定。設定後は即時動作。 |
+| 本番 Gmail / Calendar API への実接続 | `VITE_GOOGLE_CLIENT_ID` が未設定。設定後は即時動作。 |
 | バックエンド Proxy 経由のトークン交換 | SPA で直接トークン交換するため client_secret がフロントに露出する点の改善（Phase 6 以降） |
 | アクセストークンの自動リフレッシュ UI 表示 | 内部では `googleToken.refresh()` が実装済み。画面表示は未追加。 |
 | XSS 対策の完全実装 | CSP 設定・DOMPurify は本番化前に実施予定 |
