@@ -1,7 +1,7 @@
 # NO_SCREENSHOT_REQUIRED.md — スクリーンショット不要の検収フロー
 
 > このファイルは、スクリーンショットなしで変更点と安全性を確認できることを明記します。  
-> 最終更新: Phase 5.1 — v0.5.1（2026-06-27）
+> 最終更新: Phase 5.5 — v0.5.5（2026-06-27）
 
 ---
 
@@ -26,6 +26,9 @@
 | `DATA_FLOW.md` | データがどこから来てどこへ行くか |
 | `OAUTH_SECURITY_REVIEW.md` | OAuth安全設計・SPA リスク・本番化前注意事項（Phase 5.1追加） |
 | `GOOGLE_CONNECT_CHECKLIST.md` | Google Cloud Console 設定手順（Phase 5.1追加） |
+| `ARCHITECTURE_OVERVIEW.md` | AI社長室4層アーキテクチャ概要・設計原則（Phase 5.5追加） |
+| `PROVIDER_DESIGN.md` | Provider一覧・インターフェース・Unified型・追加手順（Phase 5.5追加） |
+| `AI_ENGINE_DESIGN.md` | AI Engine各エンジン入出力・承認ゲート設計（Phase 5.5追加） |
 
 ---
 

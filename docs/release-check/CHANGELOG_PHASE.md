@@ -4,6 +4,47 @@
 
 ---
 
+## Phase 5.5 — v0.5.5（2026-06-27）
+
+### 変更テーマ
+Provider設計 + AI Engine基盤構築（外部API接続なし・書き込みなし・アーキテクチャリファクタリング）
+
+### 追加した機能
+- `client/src/core/providers/providerTypes.ts`: 統一型定義（ProviderDescriptor / UnifiedInboxItem / UnifiedRisk 等 9型）
+- `client/src/core/providers/inboxProvider.ts`: Gmail → UnifiedInboxItem 変換（既存gmailサービス活用）
+- `client/src/core/providers/scheduleProvider.ts`: Calendar stub（Phase 6予定）
+- `client/src/core/providers/fileProvider.ts`: Drive stub（将来）
+- `client/src/core/providers/businessDataProvider.ts`: Sheets/freee/TKC stub（将来）
+- `client/src/core/providers/workflowProvider.ts`: 承認フロー stub（将来）
+- `client/src/core/providers/notificationProvider.ts`: 朝ブリーフィング stub（将来）
+- `client/src/core/providers/providerRegistry.ts`: 全Provider一覧・アクセス窓口
+- `client/src/core/providers/providerHealth.ts`: Provider健全性チェック
+- `client/src/core/ai-engine/aiEngineTypes.ts`: AI Engine共通型定義
+- `client/src/core/ai-engine/normalizer.ts`: サービスデータ → Unified型変換
+- `client/src/core/ai-engine/priorityEngine.ts`: 横断優先度スコアリング
+- `client/src/core/ai-engine/briefingEngine.ts`: 朝ブリーフィング生成
+- `client/src/core/ai-engine/riskEngine.ts`: 横断リスク検知
+- `client/src/core/ai-engine/actionEngine.ts`: 推奨アクション生成（提案のみ）
+- `client/src/core/ai-engine/searchEngine.ts`: 横断検索stub
+- `client/src/core/ai-engine/approvalEngine.ts`: 社長承認ゲート
+- `docs/release-check/ARCHITECTURE_OVERVIEW.md`: アーキテクチャ概要（新規）
+- `docs/release-check/PROVIDER_DESIGN.md`: Provider設計書（新規）
+- `docs/release-check/AI_ENGINE_DESIGN.md`: AI Engine設計書（新規）
+
+### 変更した機能
+- `client/src/components/screens/Settings.tsx`: AI社長室データ基盤カード追加（Provider一覧・健全性）
+- `client/src/components/screens/CockpitScreen.tsx`: AI Engine コメント追加（将来切り替えポイント明示）
+- `README.md`: Phase 5.5 セクション追加
+- `docs/release-check/` 8ファイル: Phase 5.5 内容に更新
+
+### 削除した機能
+- なし
+
+### 外部サービス追加
+- なし（アーキテクチャ設計のみ · 外部接続ゼロ）
+
+---
+
 ## Phase 5.1 — v0.5.1（2026-06-27）
 
 ### 変更テーマ

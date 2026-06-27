@@ -1,6 +1,54 @@
 # FILES_CHANGED.md — 変更・追加・削除ファイル一覧
 
-> 最終更新: Phase 5.1 — v0.5.1（2026-06-27）
+> 最終更新: Phase 5.5 — v0.5.5（2026-06-27）
+
+---
+
+## Phase 5.5 変更ファイル
+
+### 新規作成 (20ファイル)
+
+| ファイルパス | 役割 |
+|-------------|------|
+| `client/src/core/providers/providerTypes.ts` | Provider統一型・Unified型定義 |
+| `client/src/core/providers/inboxProvider.ts` | Gmail → UnifiedInboxItem（接続済み） |
+| `client/src/core/providers/scheduleProvider.ts` | Calendar stub（Phase 6予定） |
+| `client/src/core/providers/fileProvider.ts` | Drive stub（将来） |
+| `client/src/core/providers/businessDataProvider.ts` | Sheets/freee/TKC stub（将来） |
+| `client/src/core/providers/workflowProvider.ts` | 承認フロー stub（将来） |
+| `client/src/core/providers/notificationProvider.ts` | 朝ブリーフィング stub（将来） |
+| `client/src/core/providers/providerRegistry.ts` | 全Provider一覧・アクセス窓口 |
+| `client/src/core/providers/providerHealth.ts` | Provider健全性チェック |
+| `client/src/core/ai-engine/aiEngineTypes.ts` | AI Engine共通型 |
+| `client/src/core/ai-engine/normalizer.ts` | サービスデータ → Unified型変換 |
+| `client/src/core/ai-engine/priorityEngine.ts` | 横断優先度スコアリング |
+| `client/src/core/ai-engine/briefingEngine.ts` | 朝ブリーフィング生成 |
+| `client/src/core/ai-engine/riskEngine.ts` | 横断リスク検知 |
+| `client/src/core/ai-engine/actionEngine.ts` | 推奨アクション生成（提案のみ） |
+| `client/src/core/ai-engine/searchEngine.ts` | 横断検索stub |
+| `client/src/core/ai-engine/approvalEngine.ts` | 社長承認ゲート |
+| `docs/release-check/ARCHITECTURE_OVERVIEW.md` | アーキテクチャ概要（新規） |
+| `docs/release-check/PROVIDER_DESIGN.md` | Provider設計書（新規） |
+| `docs/release-check/AI_ENGINE_DESIGN.md` | AI Engine設計書（新規） |
+
+### 更新 (10ファイル)
+
+| ファイルパス | 変更内容 |
+|-------------|---------|
+| `client/src/components/screens/Settings.tsx` | AI社長室データ基盤カード追加、Provider一覧表示 |
+| `client/src/components/screens/CockpitScreen.tsx` | AI Engine コメント追加（将来切り替えポイント） |
+| `README.md` | Phase 5.5 セクション追加 |
+| `docs/release-check/CHANGELOG_PHASE.md` | Phase 5.5 変更履歴追加 |
+| `docs/release-check/FILES_CHANGED.md` | Phase 5.5 ファイル一覧追加（本ファイル） |
+| `docs/release-check/IMPLEMENTATION_REPORT.md` | Phase 5.5 実装内容追加 |
+| `docs/release-check/SAFETY_REPORT.md` | Phase 5.5 安全確認追加 |
+| `docs/release-check/TEST_CHECKLIST.md` | Phase 5.5 テスト項目追加 |
+| `docs/release-check/NO_SCREENSHOT_REQUIRED.md` | 3新規ドキュメント追加 |
+| `docs/release-check/DATA_FLOW.md` | Provider/AI Engine データフロー追加 |
+
+### 削除 (0ファイル)
+
+なし
 
 ---
 

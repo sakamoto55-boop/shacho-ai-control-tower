@@ -8,8 +8,8 @@
 
 `client/` ディレクトリに、**iPhone最優先のスマホ対応Webアプリ**が含まれています。
 
-> **現在のバージョン：v0.5.1 Phase 5.1**
-> すべての数値・メッセージは仮データです。Gmail読み取り専用連携の構造を追加しましたが、実際の認証情報は未設定のため mockGmail を使用しています。Gmailへの書き込み（送信・返信・削除・ラベル変更等）は未実装です。
+> **現在のバージョン：v0.5.5 Phase 5.5**
+> すべての数値・メッセージは仮データです。Gmail読み取り専用連携の構造を追加しましたが、実際の認証情報は未設定のため mockGmail を使用しています。Gmailへの書き込み（送信・返信・削除・ラベル変更等）は未実装です。Phase 5.5 では Provider / AI Engine アーキテクチャ基盤を追加しました（外部接続なし）。
 
 ### 検収ドキュメント
 
@@ -207,6 +207,43 @@ VITE_GOOGLE_READONLY_SCOPE=https://www.googleapis.com/auth/gmail.readonly
 - トークン: localStorage に保存（HttpOnly Cookie は SPA では使用不可）
 - リフレッシュトークン: `google.accounts.oauth2` を通じて取得
 - 本番運用推奨: バックエンド Proxy 経由でのトークン交換（Phase 6 以降で対応予定）
+
+---
+
+## Phase 5.5 で追加した内容（Provider設計 + AI Engine基盤構築）
+
+### 概要
+
+Phase 5.5 では、AI社長室の**アーキテクチャをリファクタリング**しました。  
+**外部API接続なし・書き込みなし** — すべて純粋な TypeScript 型とロジックスタブです。
+
+### 設計思想: Googleサービス単位ではなく Provider 単位
+
+| ❌ 旧来の考え方 | ✅ Phase 5.5 からの設計 |
+|------------|----------------------|
+| Gmail 画面 | Inbox Provider（受信トレイ） |
+| カレンダー画面 | Schedule Provider（予定） |
+| Drive 画面 | File Provider（ファイル） |
+
+これにより LINE WORKS を追加しても InboxProvider に吸収でき、画面コンポーネントは変更不要です。
+
+### 追加したもの
+
+| 追加内容 | ファイル |
+|---------|--------|
+| Provider統一型・Unified型（9種） | `client/src/core/providers/providerTypes.ts` |
+| Inbox Provider（Gmail → UnifiedInboxItem） | `client/src/core/providers/inboxProvider.ts` |
+| Schedule / File / BusinessData / Workflow / Notification stub | `client/src/core/providers/` |
+| Provider Registry + Health | `client/src/core/providers/providerRegistry.ts` / `providerHealth.ts` |
+| AI Engine 8種（Normalizer / Priority / Risk / Briefing / Action / Search / Approval） | `client/src/core/ai-engine/` |
+| Settings.tsx に AI社長室データ基盤カード | Provider一覧・健全性表示 |
+| アーキテクチャ / Provider / AI Engine 設計書（3ファイル） | `docs/release-check/` |
+
+### 外部API接続は？
+
+ゼロです。追加したファイルはすべてローカル TypeScript のみです。  
+Gmail サービスは既存の `services/gmail/` を引き続き使用（変更なし）。  
+`ActionEngine` が生成する提案はすべて `requiresApproval: true, writeEnabled: false`。
 
 ---
 

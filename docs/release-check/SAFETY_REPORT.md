@@ -1,7 +1,23 @@
 # SAFETY_REPORT.md — 外部API接続状況・安全設計確認書
 
-> 最終更新: Phase 5.1 — v0.5.1（2026-06-27）  
+> 最終更新: Phase 5.5 — v0.5.5（2026-06-27）  
 > このファイルは外部API接続・書き込み処理の有無を確認するための文書です。
+
+---
+
+## Phase 5.5 追加安全確認
+
+| チェック項目 | 状態 |
+|------------|------|
+| 新規外部サービス追加 | ❌ なし（アーキテクチャ設計のみ） |
+| 書き込み API 追加 | ❌ なし |
+| スコープ追加 | ❌ なし（gmail.readonly のみ継続） |
+| `core/providers/` のすべてのProvider | ✅ `writeEnabled: false` `readOnly: true` 固定 |
+| `core/ai-engine/` のActionEngine | ✅ `requiresApproval: true` `writeEnabled: false` 固定 |
+| ApprovalEngine のゲート | ✅ `canExecute()` が true の場合のみ実行可（現フェーズでは実行機能も未実装） |
+| 個人LINE接続 | ❌ 実装なし（CLAUDE.md 制約どおり） |
+| Claude API 接続 | ❌ 未接続（将来ポイントのみ記載） |
+| freee / TKC / kintone 接続 | ❌ 未接続（stub のみ） |
 
 ---
 

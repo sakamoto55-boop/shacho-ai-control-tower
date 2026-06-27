@@ -12,6 +12,13 @@ import { mapToGmailDerivedTask } from '../../services/gmail/gmailMapper'
 import { createGmailSummary } from '../../services/gmail/gmailAnalyzer'
 import DemoBanner from '../DemoBanner'
 
+// AI Engine: 将来的に以下のプロバイダーを横断して判断する
+// import { providerRegistry } from '../../core/providers/providerRegistry'
+// import { priorityEngine } from '../../core/ai-engine/priorityEngine'
+// import { briefingEngine } from '../../core/ai-engine/briefingEngine'
+// import { riskEngine } from '../../core/ai-engine/riskEngine'
+// 現時点: Gmail (Inbox Provider) のみを参照 — Phase 5.5 で基盤設計完了
+
 const IMPORTANCE_CONFIG = {
   critical: { label: '最優先', color: '#EF4444', bg: '#FEF2F2' },
   high:     { label: '重要',   color: '#F59E0B', bg: '#FFFBEB' },
@@ -43,6 +50,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   'タスク':'#DC2626',
 }
 
+// Inbox Provider 経由 (将来: providerRegistry.getInboxItems() に切り替え)
 const gmailDerivedTasks = mockGmailMessages.map(mapToGmailDerivedTask)
 const gmailSummary = createGmailSummary(mockGmailMessages)
 

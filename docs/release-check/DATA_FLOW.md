@@ -1,6 +1,70 @@
 # DATA_FLOW.md — データの流れ
 
-> 最終更新: Phase 5.1 — v0.5.1（2026-06-27）
+> 最終更新: Phase 5.5 — v0.5.5（2026-06-27）
+
+---
+
+## Phase 5.5 追加: Provider / AI Engine データフロー
+
+```
+─────────────── Provider層データフロー ───────────────
+
+mockGmailMessages（mockGmail.ts）
+  │
+  ▼ inboxProvider.getItems()
+  │   mapToGmailDerivedTask() [gmailMapper.ts]
+  │   → mapGmailDerivedTaskToUnifiedInboxItem()
+  ▼
+UnifiedInboxItem[]
+  │
+  ├── providerRegistry.getInboxItems()
+  │       ↓ Settings.tsx の AI社長室データ基盤カード
+  │
+  └── AI Engine へ（将来）
+          │
+          ├── normalizer.gmailToInboxItem()
+          ├── priorityEngine.rankItems()
+          ├── riskEngine.detectFromInbox()
+          ├── briefingEngine.generateSections()
+          ├── actionEngine.suggestFromInbox()
+          └── searchEngine.search()
+
+─────────────── Provider健全性フロー ───────────────
+
+providerRegistry.getAllDescriptors()
+  │ 全6 Provider の getDescriptor() を呼び出す
+  │   inboxProvider.getDescriptor()
+  │     → googleToken.hasToken() で connectionStatus を決定
+  │   scheduleProvider / fileProvider / businessDataProvider
+  │   workflowProvider / notificationProvider
+  │     → connectionStatus: 'planned'（固定）
+  │
+  ▼
+ProviderDescriptor[]
+  │
+  ▼ providerHealth.getSummary()
+  │   connected: 1（Gmailのみ、認証なしなら0）
+  │   planned: 5
+  │   total: 6
+  │   overallHealth: 'degraded'（inbox未接続時）or 'healthy'
+  │
+  ▼ Settings.tsx の AI社長室データ基盤カード
+      全体健全性バッジ + Provider一覧行
+
+─────────────── 承認ゲートフロー（将来） ───────────────
+
+actionEngine.suggestFromInbox(items)
+  │ → UnifiedActionSuggestion { requiresApproval: true, writeEnabled: false }
+  ▼
+approvalEngine.createApprovalRequest(suggestion, 'Gmail')
+  │ → UnifiedApprovalRequest { status: 'pending' }
+  ▼
+社長承認（将来: 承認UI実装後）
+  │ → status: 'approved'
+  ▼
+approvalEngine.canExecute(request) === true
+  └ 外部APIへの書き込みが解放される（将来フェーズ実装）
+```
 
 ---
 

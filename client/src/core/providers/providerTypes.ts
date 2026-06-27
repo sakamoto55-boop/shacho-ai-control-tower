@@ -1,0 +1,176 @@
+// ─── Provider接続・健全性ステータス ───────────────────────────
+// NOTE: ConnectionStatus / HealthStatus は types/index.ts に定義済みのため
+// Provider 専用の名前を使用する（名前衝突回避）
+
+export type ProviderConnectionStatus =
+  | 'connected'
+  | 'disconnected'
+  | 'connecting'
+  | 'error'
+  | 'planned'
+
+export type ProviderHealthStatus =
+  | 'healthy'
+  | 'degraded'
+  | 'unavailable'
+  | 'unknown'
+
+export type ProviderType =
+  | 'inbox'
+  | 'schedule'
+  | 'file'
+  | 'business-data'
+  | 'workflow'
+  | 'notification'
+
+// ─── Provider記述子 ──────────────────────────────────────────
+export interface ProviderDescriptor {
+  providerId: string
+  providerName: string
+  providerType: ProviderType
+  sourceService: string
+  connectionStatus: ProviderConnectionStatus
+  readOnly: boolean
+  writeEnabled: boolean
+  lastSyncAt: string | null
+  healthStatus: ProviderHealthStatus
+  errors: string[]
+  warnings: string[]
+  nextPhase: string | null
+}
+
+// ─── 統合受信トレイアイテム（Gmail / LINE WORKS） ────────────
+export interface UnifiedInboxItem {
+  id: string
+  source: string
+  providerType: 'inbox'
+  from: string
+  fromName: string
+  subject: string
+  bodyPreview: string
+  receivedAt: string // ISO 8601
+  isRead: boolean
+  hasAttachment: boolean
+  labels: string[]
+  priority: 'A' | 'B' | 'C'
+  taskType: string
+  deadline: string | null
+  replyDraftAvailable: boolean
+  writeProtected: true
+  requiresApproval: true
+}
+
+// ─── 統合スケジュールアイテム（Calendar） ────────────────────
+export interface UnifiedScheduleItem {
+  id: string
+  source: string
+  providerType: 'schedule'
+  title: string
+  startAt: string // ISO 8601
+  endAt: string | null
+  location: string | null
+  isAllDay: boolean
+  priority: 'A' | 'B' | 'C'
+  alertLevel: 'danger' | 'warning' | 'info' | null
+}
+
+// ─── 統合ファイルアイテム（Drive） ───────────────────────────
+export interface UnifiedFileItem {
+  id: string
+  source: string
+  providerType: 'file'
+  name: string
+  mimeType: string
+  modifiedAt: string // ISO 8601
+  owner: string | null
+  category: string
+  alertLevel: 'danger' | 'warning' | 'info' | null
+}
+
+// ─── 統合経営指標（Sheets / freee / TKC） ────────────────────
+export interface UnifiedBusinessMetric {
+  id: string
+  source: string
+  providerType: 'business-data'
+  category: '売上' | '粗利' | '資金繰り' | '請求' | '未回収' | '外注費' | 'その他'
+  label: string
+  value: number
+  unit: string
+  period: string
+  trend: 'up' | 'down' | 'neutral' | null
+  alertLevel: 'danger' | 'warning' | 'info' | null
+  alertReason: string | null
+}
+
+// ─── 統合ワークフローアイテム（承認・下書き） ─────────────────
+export interface UnifiedWorkflowItem {
+  id: string
+  source: string
+  providerType: 'workflow'
+  type: 'approval' | 'draft' | 'delegation' | 'review'
+  title: string
+  body: string | null
+  requestedAt: string // ISO 8601
+  status: 'pending' | 'approved' | 'rejected' | 'draft'
+  requiresApproval: true
+  approvedAt: string | null
+}
+
+// ─── 統合通知（アラート・ブリーフィング） ────────────────────
+export interface UnifiedNotification {
+  id: string
+  source: string
+  providerType: 'notification'
+  type: 'alert' | 'info' | 'warning' | 'morning-briefing'
+  title: string
+  body: string
+  receivedAt: string // ISO 8601
+  priority: 'A' | 'B' | 'C'
+  isRead: boolean
+  actionRequired: boolean
+}
+
+// ─── 統合リスク（横断サービスリスク） ───────────────────────
+export interface UnifiedRisk {
+  id: string
+  sources: string[]
+  riskType: '資金繰り' | '未回収' | '未請求' | '人員不足' | '事故' | '契約期限' | 'その他'
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  title: string
+  description: string
+  detectedAt: string // ISO 8601
+  deadline: string | null
+}
+
+// ─── 統合アクション提案（外部実行なし・提案のみ） ───────────
+export interface UnifiedActionSuggestion {
+  id: string
+  triggerSources: string[]
+  actionType:
+    | 'reply-draft'
+    | 'approval-request'
+    | 'schedule'
+    | 'delegate'
+    | 'document'
+    | 'alert'
+    | 'review'
+  title: string
+  description: string
+  priority: 'A' | 'B' | 'C'
+  estimatedImpact: string
+  requiresApproval: true
+  writeEnabled: false
+  suggestedAt: string // ISO 8601
+}
+
+// ─── 統合承認リクエスト（外部アクション実行前の承認） ─────────
+export interface UnifiedApprovalRequest {
+  id: string
+  requestType: 'send-email' | 'send-document' | 'external-action' | 'delegation'
+  title: string
+  description: string
+  targetService: string
+  requestedAt: string // ISO 8601
+  status: 'pending' | 'approved' | 'rejected'
+  executeAfterApproval: true
+}

@@ -1,6 +1,51 @@
 # IMPLEMENTATION_REPORT.md — 実装内容・未実装項目・注意点
 
-> 最終更新: Phase 5.1 — v0.5.1（2026-06-27）
+> 最終更新: Phase 5.5 — v0.5.5（2026-06-27）
+
+---
+
+## Phase 5.5 実装内容
+
+### ① Provider層 ✅ 完了（client/src/core/providers/ — 9ファイル）
+
+| Provider | ファイル | 状態 |
+|---------|---------|------|
+| 統合型定義 | `providerTypes.ts` | 完了（9統合型） |
+| Inbox Provider | `inboxProvider.ts` | 完了（Gmail → UnifiedInboxItem） |
+| Schedule Provider | `scheduleProvider.ts` | stub（Phase 6: Calendar） |
+| File Provider | `fileProvider.ts` | stub（将来: Drive） |
+| BusinessData Provider | `businessDataProvider.ts` | stub（将来: Sheets/freee/TKC） |
+| Workflow Provider | `workflowProvider.ts` | stub（将来: 承認フロー） |
+| Notification Provider | `notificationProvider.ts` | stub（将来: アラート） |
+| Provider Registry | `providerRegistry.ts` | 完了（全Provider管理窓口） |
+| Provider Health | `providerHealth.ts` | 完了（健全性チェック） |
+
+### ② AI Engine層 ✅ 完了（client/src/core/ai-engine/ — 8ファイル）
+
+| エンジン | ファイル | 状態 |
+|---------|---------|------|
+| 共通型 | `aiEngineTypes.ts` | 完了 |
+| Normalizer | `normalizer.ts` | 完了（Gmail → UnifiedInboxItem、将来プレースホルダーあり） |
+| PriorityEngine | `priorityEngine.ts` | 完了（スコアリング0-100・ランキング） |
+| BriefingEngine | `briefingEngine.ts` | 完了（受信・リスク・アクションセクション） |
+| RiskEngine | `riskEngine.ts` | 完了（キーワード検知・BusinessData検知） |
+| ActionEngine | `actionEngine.ts` | 完了（提案のみ・外部実行なし） |
+| SearchEngine | `searchEngine.ts` | 完了（インボックス検索・将来横断予定） |
+| ApprovalEngine | `approvalEngine.ts` | 完了（承認ゲート・書き込み禁止） |
+
+### ③ 設定画面 AI社長室データ基盤カード ✅ 完了
+
+- Provider一覧を表示（Inbox/Schedule/File/BusinessData/Workflow/Notification）
+- 各Providerの接続状態・読み取り専用・書き込み禁止・次フェーズを表示
+- `providerHealth.getSummary()` で全体健全性を表示
+
+### ④ ドキュメント ✅ 完了
+
+- `ARCHITECTURE_OVERVIEW.md`: 4レイヤー構成図・Provider別接続状況
+- `PROVIDER_DESIGN.md`: Provider設計仕様・統合型一覧・追加手順
+- `AI_ENGINE_DESIGN.md`: エンジン入出力・Claude API接続ポイント
+
+### ⑤ バージョン更新 ✅ 完了 → v0.5.5
 
 ---
 

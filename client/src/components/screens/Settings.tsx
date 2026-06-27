@@ -7,8 +7,11 @@ import { googleAuth } from '../../services/google/googleAuth'
 import { googleSession } from '../../services/google/googleSession'
 import { GOOGLE_SCOPES, getScopeLabel } from '../../services/google/googleScopes'
 import { getOAuthPreConnectCheck } from '../../services/google/googleConfig'
+import { providerRegistry } from '../../core/providers/providerRegistry'
+import { providerHealth } from '../../core/providers/providerHealth'
 import type { GoogleSession } from '../../services/google/googleSession'
 import type { GmailFetchRange, GmailDerivedTask } from '../../types'
+import type { ProviderDescriptor } from '../../core/providers/providerTypes'
 
 interface Props {
   company: string
@@ -50,10 +53,12 @@ export default function Settings({
   const [gSession, setGSession] = useState<GoogleSession>(googleSession.get())
   const [gConnecting, setGConnecting] = useState(false)
   const [gConnectError, setGConnectError] = useState<string | null>(null)
+  const [providerDescriptors, setProviderDescriptors] = useState<ProviderDescriptor[]>([])
 
   // OAuth コールバック後や再マウント時に最新セッション状態を反映
   useEffect(() => {
     setGSession(googleSession.get())
+    setProviderDescriptors(providerRegistry.getAllDescriptors())
   }, [])
 
   const selectedCompany = companies.find((c) => c.id === company)
@@ -435,6 +440,131 @@ export default function Settings({
           </div>
         )}
       </div>
+
+      {/* ── AI社長室データ基盤 ── */}
+      {providerDescriptors.length > 0 && (() => {
+        const summary = providerHealth.getSummary()
+        const healthColor =
+          summary.overallHealth === 'healthy' ? '#065F46' :
+          summary.overallHealth === 'degraded' ? '#92400E' : '#64748B'
+        const healthBg =
+          summary.overallHealth === 'healthy' ? '#D1FAE5' :
+          summary.overallHealth === 'degraded' ? '#FEF3C7' : '#F1F5F9'
+
+        return (
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 'var(--radius)',
+              padding: '14px 16px',
+              marginBottom: 14,
+              boxShadow: 'var(--shadow)',
+              border: '1.5px solid #E0E7FF',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 20 }}>🏗️</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--navy)' }}>AI社長室データ基盤</div>
+                <div style={{ fontSize: 10, color: '#6366F1', fontWeight: 600 }}>
+                  Provider設計 Phase 5.5 — 外部接続なし
+                </div>
+              </div>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  padding: '3px 10px',
+                  borderRadius: 999,
+                  background: healthBg,
+                  color: healthColor,
+                }}
+              >
+                {summary.overallHealth === 'healthy' ? '✓ 健全' :
+                 summary.overallHealth === 'degraded' ? '△ 一部未接続' : '○ 不明'}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+              {[
+                { label: '接続済み', value: `${summary.connected}件`, color: '#065F46', bg: '#D1FAE5' },
+                { label: '計画中', value: `${summary.planned}件`, color: '#1D4ED8', bg: '#DBEAFE' },
+                { label: '合計', value: `${summary.total}件`, color: '#64748B', bg: '#F1F5F9' },
+              ].map((s) => (
+                <div
+                  key={s.label}
+                  style={{
+                    display: 'flex', gap: 4, alignItems: 'center',
+                    background: s.bg, borderRadius: 8, padding: '4px 8px',
+                  }}
+                >
+                  <span style={{ fontSize: 10, color: s.color, fontWeight: 600 }}>{s.label}：</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: s.color }}>{s.value}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {providerDescriptors.map((desc) => {
+                const statusColor =
+                  desc.connectionStatus === 'connected' ? '#065F46' :
+                  desc.connectionStatus === 'planned' ? '#1D4ED8' : '#64748B'
+                const statusBg =
+                  desc.connectionStatus === 'connected' ? '#D1FAE5' :
+                  desc.connectionStatus === 'planned' ? '#DBEAFE' : '#F1F5F9'
+                const statusLabel =
+                  desc.connectionStatus === 'connected' ? '接続済み' :
+                  desc.connectionStatus === 'planned' ? '計画中' :
+                  desc.connectionStatus === 'disconnected' ? '未接続' :
+                  desc.connectionStatus === 'connecting' ? '接続中' : 'エラー'
+
+                return (
+                  <div
+                    key={desc.providerId}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '7px 10px',
+                      background: 'var(--bg)',
+                      borderRadius: 8,
+                    }}
+                  >
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', flex: 1 }}>
+                      {desc.providerName}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10, fontWeight: 800, padding: '2px 7px',
+                        borderRadius: 999, background: statusBg, color: statusColor,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {statusLabel}
+                    </span>
+                    {desc.readOnly && (
+                      <span
+                        style={{
+                          fontSize: 10, fontWeight: 700, padding: '2px 6px',
+                          borderRadius: 6, background: '#F0FDF4', color: '#166534',
+                          flexShrink: 0,
+                        }}
+                      >
+                        読取専用
+                      </span>
+                    )}
+                    {desc.nextPhase && (
+                      <span style={{ fontSize: 9, color: 'var(--text-muted)', flexShrink: 0, maxWidth: 90, textAlign: 'right' }}>
+                        {desc.nextPhase}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Gmail読み取りテスト（常時表示） ── */}
       <div
@@ -1027,7 +1157,7 @@ export default function Settings({
           lineHeight: 1.7,
         }}
       >
-        AI社長室 v0.5.1 Phase 5.1 — {selectedCompany?.name}
+        AI社長室 v0.5.5 Phase 5.5 — {selectedCompany?.name}
         <br />
         フロントエンドMVP（仮データのみ · 外部書き込みなし）
       </div>

@@ -1,7 +1,41 @@
 # TEST_CHECKLIST.md — 手動検収チェックリスト
 
-> 最終更新: Phase 5.1 — v0.5.1（2026-06-27）  
+> 最終更新: Phase 5.5 — v0.5.5（2026-06-27）  
 > 各項目を実際にブラウザで確認してチェックしてください。
+
+---
+
+## Phase 5.5 検収チェック
+
+### TypeScript ビルド確認
+- [ ] `cd client && npm run build` がゼロエラーで完了する
+- [ ] `noUnusedLocals` / `noUnusedParameters` エラーが出ない
+- [ ] 63モジュール変換完了を確認する
+
+### Settings 画面 — AI社長室データ基盤カード（新規）
+- [ ] 「AI社長室データ基盤」カードが表示される（絵文字🏗️）
+- [ ] 全体健全性バッジが表示される（△ 一部未接続 など）
+- [ ] 接続済み / 計画中 / 合計 の件数チップが表示される
+- [ ] 6つのProvider一覧が表示される（Gmail受信トレイ / Googleカレンダー / Google Drive / 経営データ / 社長承認フロー / 朝ブリーフィング）
+- [ ] Gmail受信トレイが「未接続」または「接続済み」バッジで表示される
+- [ ] 残り5Providerが「計画中」バッジで表示される
+- [ ] 各行に「読取専用」バッジが表示される
+- [ ] 次フェーズ名が各行に表示される
+
+### AIコックピット画面 — コメント確認（コード確認のみ）
+- [ ] `CockpitScreen.tsx` の `const gmailDerivedTasks` 行にコメントがある
+- [ ] ファイル冒頭に `providerRegistry / priorityEngine` のコメントアウトimportがある
+
+### core/providers/ ファイル確認（TypeScript型チェック）
+- [ ] `providerTypes.ts`: `ProviderConnectionStatus` / `ProviderHealthStatus` が定義されている（`ConnectionStatus` / `HealthStatus` と名前衝突がない）
+- [ ] `inboxProvider.ts`: `getDescriptor()` / `getItems()` / `refresh()` が実装されている
+- [ ] `providerRegistry.ts`: `getAllDescriptors()` が6件を返す
+- [ ] `providerHealth.ts`: `getSummary()` が正しいカウントを返す
+
+### core/ai-engine/ ファイル確認（TypeScript型チェック）
+- [ ] `approvalEngine.ts`: `GATE_MESSAGE` が export されている
+- [ ] `actionEngine.ts`: すべての提案が `requiresApproval: true` `writeEnabled: false`
+- [ ] `riskEngine.ts`: `aggregateRisks()` が重複排除して返す
 
 ---
 
