@@ -9,6 +9,14 @@ interface Props {
   onNavigate: (screen: Screen) => void
 }
 
+const GMAIL_SHORTCUTS = [
+  'Gmailの要対応をまとめて',
+  '返信が必要なメールを優先順にして',
+  '銀行からのメールだけ見せて',
+  '今日中に対応が必要なメールは？',
+  '返信文だけ作って',
+]
+
 function getMockResponse(mode: AiMode, input: string): string {
   const modeResponses = mockAiResponses[mode]
   if (!modeResponses) return mockAiResponses['secretary']['default']
@@ -129,6 +137,49 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
             </button>
           )
         })}
+      </div>
+
+      {/* ── Gmailショートカット ── */}
+      <div
+        style={{
+          flexShrink: 0,
+          background: '#EFF6FF',
+          borderBottom: '1px solid #BFDBFE',
+          padding: '6px 14px',
+        }}
+      >
+        <div style={{ fontSize: 10, fontWeight: 800, color: '#1D4ED8', marginBottom: 4 }}>
+          📧 Gmailショートカット
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            gap: 6,
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+          }}
+        >
+          {GMAIL_SHORTCUTS.map((s) => (
+            <button
+              key={s}
+              onClick={() => sendMessage(s)}
+              style={{
+                flexShrink: 0,
+                background: '#fff',
+                border: '1.5px solid #BFDBFE',
+                borderRadius: 999,
+                padding: '5px 12px',
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#1D4ED8',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── プロンプト例（横スクロール） ── */}

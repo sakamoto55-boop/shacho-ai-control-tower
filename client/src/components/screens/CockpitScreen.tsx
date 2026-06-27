@@ -7,6 +7,8 @@ import {
   aiJudgement,
   searchIndex,
 } from '../../data/mockData'
+import { mockGmailMessages } from '../../services/gmail/mockGmail'
+import { mapToGmailDerivedTask } from '../../services/gmail/gmailMapper'
 import DemoBanner from '../DemoBanner'
 
 const IMPORTANCE_CONFIG = {
@@ -40,7 +42,9 @@ const CATEGORY_COLORS: Record<string, string> = {
   'タスク':'#DC2626',
 }
 
-export default function CockpitScreen({ demoMode: _demoMode }: { demoMode?: boolean } = {}) {
+const gmailDerivedTasks = mockGmailMessages.map(mapToGmailDerivedTask)
+
+export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
   const [expandedActionId, setExpandedActionId] = useState<string | null>('pa1')
   const [activeSuggestion, setActiveSuggestion] = useState<ActionSuggestion | null>(null)
   const [activeTimeline, setActiveTimeline] = useState<TimelinePeriod>('today')
@@ -255,6 +259,99 @@ export default function CockpitScreen({ demoMode: _demoMode }: { demoMode?: bool
             onSuggestion={setActiveSuggestion}
           />
         ))}
+      </div>
+
+      {/* ── Gmailからの要対応 ── */}
+      <div className="section-label">
+        📧 Gmailからの要対応：{gmailDerivedTasks.length}件
+        {demoMode !== false && (
+          <span
+            style={{
+              marginLeft: 8,
+              background: '#DBEAFE',
+              color: '#1D4ED8',
+              borderRadius: 999,
+              padding: '2px 8px',
+              fontSize: 10,
+              fontWeight: 700,
+            }}
+          >
+            デモGmailデータ
+          </span>
+        )}
+      </div>
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 'var(--radius)',
+          boxShadow: 'var(--shadow)',
+          overflow: 'hidden',
+          marginBottom: 18,
+          border: '1.5px solid #BFDBFE',
+        }}
+      >
+        {gmailDerivedTasks.map((task, i) => {
+          const isLast = i === gmailDerivedTasks.length - 1
+          const priorityColor = task.priority === 'A' ? '#EF4444' : task.priority === 'B' ? '#F59E0B' : '#6B7280'
+          return (
+            <div
+              key={task.id}
+              style={{
+                padding: '11px 16px',
+                borderBottom: isLast ? 'none' : '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              <span
+                style={{
+                  flexShrink: 0,
+                  background: priorityColor + '20',
+                  color: priorityColor,
+                  borderRadius: 6,
+                  padding: '2px 8px',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  minWidth: 28,
+                  textAlign: 'center',
+                }}
+              >
+                {task.priority}
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: 'var(--text-primary)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {task.subject}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                  {task.from}
+                </div>
+              </div>
+              <span
+                style={{
+                  flexShrink: 0,
+                  background: '#F1F5F9',
+                  color: 'var(--text-secondary)',
+                  borderRadius: 6,
+                  padding: '2px 7px',
+                  fontSize: 10,
+                  fontWeight: 700,
+                }}
+              >
+                {task.taskType}
+              </span>
+            </div>
+          )
+        })}
       </div>
 
       {/* ── 時系列ビュー ── */}

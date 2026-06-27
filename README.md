@@ -8,8 +8,8 @@
 
 `client/` ディレクトリに、**iPhone最優先のスマホ対応Webアプリ**が含まれています。
 
-> **現在のバージョン：v0.3.5 Phase 3.5**
-> すべての数値・メッセージは仮データです。Gmail・LINE WORKS・freee・Google Drive・Googleカレンダー・スプレッドシート等の既存データへの読み取り・書き込みは一切行っていません。
+> **現在のバージョン：v0.4.0 Phase 4**
+> すべての数値・メッセージは仮データです。Gmail読み取り専用連携の構造を追加しましたが、実際の認証情報は未設定のため mockGmail を使用しています。Gmailへの書き込み（送信・返信・削除・ラベル変更等）は未実装です。
 
 ### 画面一覧
 
@@ -50,6 +50,70 @@ client/src/
 └── types/
     └── index.ts             # 型定義
 ```
+
+---
+
+## Phase 4 で追加した内容（Gmail読み取り専用連携）
+
+### Gmail安全設計ポリシー
+
+**Phase 4はGmail読み取り専用のみ。以下は未実装：**
+- 送信・返信
+- 下書き作成・更新
+- 削除・アーカイブ
+- 既読化・未読化
+- ラベル変更
+- スター付与・解除
+- メールの移動
+
+**社長承認前に外部へ送信されることはない。Gmailデータは画面表示とAI判定用にのみ使用。**
+
+### Gmailサービス層（新規追加）
+
+```
+client/src/services/gmail/
+├── types.ts        — GmailMessage / GmailDerivedTask / GmailConnectionStatus 型定義
+├── mockGmail.ts    — デモGmailデータ5件（本番認証情報未設定時に使用）
+├── gmailAnalyzer.ts— 件名・本文・送信者からタイプ・優先度・期限キーワード判定
+├── gmailMapper.ts  — GmailMessage → GmailDerivedTask 変換（返信文たたき台生成含む）
+└── gmailClient.ts  — 読み取り専用クライアント（書き込み系関数は存在しない）
+```
+
+**書き込み系処理はコードに存在しない。gmailClient.ts は読み取り関数のみを定義。**
+
+### 本番接続に必要な環境変数（実際の値は未設定・コードに書かない）
+
+```env
+# Gmail読み取り専用スコープのみ
+GMAIL_CLIENT_ID=（取得後に設定）
+GMAIL_CLIENT_SECRET=（取得後に設定）
+GMAIL_REDIRECT_URI=（取得後に設定）
+GMAIL_READONLY_SCOPE=https://www.googleapis.com/auth/gmail.readonly
+```
+
+### mockGmailを使用していること
+
+現時点では認証情報が未設定のため、`gmailClient.ts` は常に `mockGmail.ts` の仮データを返します。  
+実際のGmailアカウントには接続していません。
+
+### 画面への反映
+
+| 画面 | Phase 4の変更 |
+|------|-------------|
+| 今日の要対応 | 「Gmailからの要対応」セクション追加（優先度A/Bのみ）、Gmail詳細モーダル（送信ボタンなし、返信文たたき台コピーのみ） |
+| AIコックピット | TOP5の後に「Gmailからの要対応」シンプルリスト追加（デモバッジ付き） |
+| AI相談 | 「📧 Gmailショートカット」横スクロールバー追加（5件のGmail特化クイック質問） |
+| 設定 | デモモード/本番準備モードのインタラクティブトグル化、本番準備モードON時にGmail連携カード表示 |
+
+### 設定画面のモード管理
+
+- **デモモード ON（デフォルト）**: mockGmailデータを表示
+- **本番準備モード ON**: Gmail連携カードが表示される（認証情報未設定のため「未接続」表示）
+- Gmail連携カードでは読み取りテストが可能（認証情報なし時はmock結果を表示）
+
+### 次フェーズ予定
+
+**Phase 4-2**: Googleカレンダー読み取り専用連携
 
 ---
 

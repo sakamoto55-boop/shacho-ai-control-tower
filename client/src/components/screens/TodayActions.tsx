@@ -1,7 +1,13 @@
 import { useState } from 'react'
-import type { ActionItem, Priority } from '../../types'
+import type { ActionItem, Priority, GmailDerivedTask } from '../../types'
 import { actionItems } from '../../data/mockData'
+import { mockGmailMessages } from '../../services/gmail/mockGmail'
+import { mapToGmailDerivedTask } from '../../services/gmail/gmailMapper'
 import DemoBanner from '../DemoBanner'
+
+interface Props {
+  demoMode?: boolean
+}
 
 const SECTIONS: { priority: Priority; label: string; icon: string; color: string }[] = [
   { priority: 'A', label: '優先度A ― 今日必ず対応', icon: '🔴', color: '#EF4444' },
@@ -29,10 +35,14 @@ const STATUS_CONFIG: Record<string, { bg: string; color: string }> = {
   '完了': { bg: '#ECFDF5', color: '#065F46' },
 }
 
-export default function TodayActions({ demoMode: _demoMode }: { demoMode?: boolean } = {}) {
+const gmailTasks: GmailDerivedTask[] = mockGmailMessages.map(mapToGmailDerivedTask)
+
+export default function TodayActions({ demoMode }: Props) {
   const [expanded, setExpanded] = useState<Priority>('A')
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set())
   const [selectedItem, setSelectedItem] = useState<ActionItem | null>(null)
+  const [selectedGmailTask, setSelectedGmailTask] = useState<GmailDerivedTask | null>(null)
+  const [gmailExpanded, setGmailExpanded] = useState(true)
 
   function toggleDone(id: string) {
     setDoneIds((prev) => {
@@ -42,6 +52,8 @@ export default function TodayActions({ demoMode: _demoMode }: { demoMode?: boole
       return next
     })
   }
+
+  const priorityABTasks = gmailTasks.filter((t) => t.priority === 'A' || t.priority === 'B')
 
   return (
     <>
@@ -122,13 +134,490 @@ export default function TodayActions({ demoMode: _demoMode }: { demoMode?: boole
             </div>
           )
         })}
+
+        {/* ── Gmailからの要対応 ── */}
+        <div style={{ marginBottom: 12 }}>
+          <button
+            onClick={() => setGmailExpanded(!gmailExpanded)}
+            style={{
+              width: '100%',
+              background: '#EFF6FF',
+              borderRadius: gmailExpanded ? '16px 16px 0 0' : 16,
+              padding: '14px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              boxShadow: 'var(--shadow)',
+              borderBottom: gmailExpanded ? '1px solid #BFDBFE' : 'none',
+              border: '1.5px solid #BFDBFE',
+            }}
+          >
+            <span style={{ fontSize: 18 }}>📧</span>
+            <span
+              style={{
+                flex: 1,
+                fontWeight: 800,
+                fontSize: 14,
+                textAlign: 'left',
+                color: '#1D4ED8',
+              }}
+            >
+              Gmailからの要対応
+            </span>
+            {demoMode !== false && (
+              <span
+                style={{
+                  background: '#DBEAFE',
+                  color: '#1D4ED8',
+                  borderRadius: 999,
+                  padding: '2px 8px',
+                  fontSize: 10,
+                  fontWeight: 700,
+                }}
+              >
+                デモ
+              </span>
+            )}
+            <span
+              style={{
+                background: '#BFDBFE',
+                color: '#1D4ED8',
+                borderRadius: 999,
+                padding: '3px 10px',
+                fontSize: 12,
+                fontWeight: 800,
+              }}
+            >
+              {priorityABTasks.length}件
+            </span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 14 }}>
+              {gmailExpanded ? '▲' : '▼'}
+            </span>
+          </button>
+
+          {gmailExpanded && (
+            <div
+              style={{
+                background: '#fff',
+                borderRadius: '0 0 16px 16px',
+                boxShadow: 'var(--shadow)',
+                overflow: 'hidden',
+                border: '1.5px solid #BFDBFE',
+                borderTop: 'none',
+              }}
+            >
+              {priorityABTasks.map((task, idx) => (
+                <GmailTaskCard
+                  key={task.id}
+                  task={task}
+                  last={idx === priorityABTasks.length - 1}
+                  onDetail={() => setSelectedGmailTask(task)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* 詳細モーダル */}
+      {/* 既存タスク詳細モーダル */}
       {selectedItem && (
         <TaskDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
       )}
+
+      {/* Gmail詳細モーダル */}
+      {selectedGmailTask && (
+        <GmailTaskModal task={selectedGmailTask} onClose={() => setSelectedGmailTask(null)} />
+      )}
     </>
+  )
+}
+
+function GmailTaskCard({
+  task,
+  last,
+  onDetail,
+}: {
+  task: GmailDerivedTask
+  last: boolean
+  onDetail: () => void
+}) {
+  const priorityColor = task.priority === 'A' ? '#EF4444' : '#F59E0B'
+
+  return (
+    <div
+      style={{
+        padding: '14px 16px',
+        borderBottom: last ? 'none' : '1px solid var(--border)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5, flexWrap: 'wrap' }}>
+        <span
+          style={{
+            background: '#DBEAFE',
+            color: '#1D4ED8',
+            borderRadius: 6,
+            padding: '2px 7px',
+            fontSize: 10,
+            fontWeight: 800,
+          }}
+        >
+          📧 Gmail
+        </span>
+        <span
+          style={{
+            background: '#D1FAE5',
+            color: '#065F46',
+            borderRadius: 6,
+            padding: '2px 7px',
+            fontSize: 10,
+            fontWeight: 700,
+          }}
+        >
+          読み取り専用
+        </span>
+        <span
+          style={{
+            background: priorityColor + '20',
+            color: priorityColor,
+            borderRadius: 6,
+            padding: '2px 7px',
+            fontSize: 10,
+            fontWeight: 800,
+          }}
+        >
+          優先度{task.priority}
+        </span>
+        <span
+          style={{
+            background: '#FEF3C7',
+            color: '#92400E',
+            borderRadius: 6,
+            padding: '2px 7px',
+            fontSize: 10,
+            fontWeight: 700,
+          }}
+        >
+          社長承認待ち
+        </span>
+      </div>
+
+      <div
+        style={{
+          fontSize: 14,
+          fontWeight: 700,
+          color: 'var(--text-primary)',
+          lineHeight: 1.4,
+          marginBottom: 5,
+        }}
+      >
+        {task.subject}
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '3px 12px',
+          fontSize: 12,
+          color: 'var(--text-secondary)',
+          marginBottom: 8,
+        }}
+      >
+        <span>👤 {task.from}</span>
+        {task.estimatedDeadline && <span>⏰ {task.estimatedDeadline}</span>}
+      </div>
+
+      <div
+        style={{
+          background: '#EFF6FF',
+          borderRadius: 8,
+          padding: '7px 10px',
+          fontSize: 12,
+          fontWeight: 600,
+          color: '#1D4ED8',
+          marginBottom: 8,
+        }}
+      >
+        → {task.recommendedAction}
+      </div>
+
+      <button
+        onClick={onDetail}
+        style={{
+          background: 'var(--blue-light)',
+          color: 'var(--navy)',
+          borderRadius: 8,
+          padding: '6px 12px',
+          fontSize: 12,
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+        }}
+      >
+        📋 詳細・返信文たたき台を見る
+      </button>
+    </div>
+  )
+}
+
+function GmailTaskModal({
+  task,
+  onClose,
+}: {
+  task: GmailDerivedTask
+  onClose: () => void
+}) {
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    navigator.clipboard?.writeText(task.replyDraft)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 200,
+        display: 'flex',
+        alignItems: 'flex-end',
+        background: 'rgba(0,0,0,0.5)',
+        backdropFilter: 'blur(3px)',
+        WebkitBackdropFilter: 'blur(3px)',
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%',
+          maxWidth: 480,
+          margin: '0 auto',
+          background: '#fff',
+          borderRadius: '24px 24px 0 0',
+          maxHeight: '88vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ padding: '12px 18px 0', flexShrink: 0 }}>
+          <div
+            style={{
+              width: 40,
+              height: 4,
+              background: '#E2E8F0',
+              borderRadius: 4,
+              margin: '0 auto 14px',
+            }}
+          />
+
+          {/* 送信禁止バナー */}
+          <div
+            style={{
+              background: '#FEF3C7',
+              border: '1px solid #FDE68A',
+              borderRadius: 10,
+              padding: '8px 12px',
+              fontSize: 12,
+              color: '#92400E',
+              fontWeight: 700,
+              marginBottom: 12,
+              lineHeight: 1.5,
+            }}
+          >
+            ⚠️ 送信はPhase後工程 — 社長確認後、手動で送信してください
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', gap: 5, marginBottom: 6, flexWrap: 'wrap' }}>
+                <span
+                  style={{
+                    background: '#DBEAFE',
+                    color: '#1D4ED8',
+                    borderRadius: 6,
+                    padding: '2px 8px',
+                    fontSize: 11,
+                    fontWeight: 800,
+                  }}
+                >
+                  📧 Gmail
+                </span>
+                <span
+                  style={{
+                    background: '#D1FAE5',
+                    color: '#065F46',
+                    borderRadius: 6,
+                    padding: '2px 8px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  読み取り専用
+                </span>
+                {task.estimatedDeadline && (
+                  <span
+                    style={{
+                      background: '#FEE2E2',
+                      color: '#B91C1C',
+                      borderRadius: 6,
+                      padding: '2px 8px',
+                      fontSize: 11,
+                      fontWeight: 700,
+                    }}
+                  >
+                    ⏰ {task.estimatedDeadline}
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.4, color: 'var(--text-primary)' }}>
+                {task.subject}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>
+                👤 {task.from}
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: '50%',
+                background: 'var(--bg)',
+                color: 'var(--text-secondary)',
+                fontSize: 18,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '16px 18px calc(env(safe-area-inset-bottom, 0px) + 24px)',
+            scrollbarWidth: 'none',
+          }}
+        >
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', marginBottom: 6 }}>
+              📋 要約
+            </div>
+            <div
+              style={{
+                background: 'var(--bg)',
+                borderRadius: 10,
+                padding: '10px 12px',
+                fontSize: 14,
+                lineHeight: 1.7,
+                color: 'var(--text-primary)',
+              }}
+            >
+              {task.summary}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', marginBottom: 6 }}>
+              ✅ 推奨アクション
+            </div>
+            <div
+              style={{
+                background: '#EFF6FF',
+                borderRadius: 10,
+                padding: '10px 12px',
+                fontSize: 14,
+                color: '#1D4ED8',
+                fontWeight: 600,
+              }}
+            >
+              {task.recommendedAction}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', marginBottom: 6 }}>
+              ✉️ 返信文たたき台
+            </div>
+            <div
+              style={{
+                background: '#F8FAFC',
+                border: '1px solid var(--border)',
+                borderRadius: 14,
+                padding: '16px',
+                fontSize: 14,
+                lineHeight: 1.8,
+                color: 'var(--text-primary)',
+                whiteSpace: 'pre-wrap',
+                marginBottom: 10,
+              }}
+            >
+              {task.replyDraft}
+            </div>
+            <button
+              onClick={handleCopy}
+              style={{
+                width: '100%',
+                minHeight: 44,
+                borderRadius: 12,
+                background: copied ? '#10B981' : 'var(--navy)',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 700,
+              }}
+            >
+              {copied ? '✅ コピーしました' : '📋 返信文をコピー'}
+            </button>
+            <div
+              style={{
+                marginTop: 8,
+                fontSize: 11,
+                color: 'var(--text-muted)',
+                textAlign: 'center',
+                lineHeight: 1.5,
+              }}
+            >
+              ※ 送信ボタンはありません。コピーして手動で送信してください。
+            </div>
+          </div>
+
+          {task.relatedKeywords.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                🏷️ 関連キーワード
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {task.relatedKeywords.map((kw) => (
+                  <span
+                    key={kw}
+                    style={{
+                      background: 'var(--blue-light)',
+                      color: 'var(--navy)',
+                      borderRadius: 999,
+                      padding: '3px 10px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {kw}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -160,7 +649,6 @@ function ActionCard({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        {/* チェックボックス */}
         <button
           onClick={onToggleDone}
           style={{
@@ -183,7 +671,6 @@ function ActionCard({
         </button>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* バッジ行 */}
           <div
             style={{
               display: 'flex',
@@ -233,7 +720,6 @@ function ActionCard({
             )}
           </div>
 
-          {/* 件名 */}
           <div
             style={{
               fontSize: 14,
@@ -247,7 +733,6 @@ function ActionCard({
             {item.subject}
           </div>
 
-          {/* 詳細情報 */}
           <div
             style={{
               display: 'flex',
@@ -262,7 +747,6 @@ function ActionCard({
             <span>⏰ {item.deadline}</span>
           </div>
 
-          {/* 推奨アクション */}
           <div
             style={{
               background: accentColor + '0d',
@@ -277,7 +761,6 @@ function ActionCard({
             → 推奨: {item.action}
           </div>
 
-          {/* 詳細ボタン */}
           <button
             onClick={onDetail}
             style={{
@@ -332,7 +815,6 @@ function TaskDetailModal({ item, onClose }: { item: ActionItem; onClose: () => v
           overflow: 'hidden',
         }}
       >
-        {/* ハンドル + ヘッダー */}
         <div style={{ padding: '12px 18px 0', flexShrink: 0 }}>
           <div
             style={{
@@ -397,7 +879,6 @@ function TaskDetailModal({ item, onClose }: { item: ActionItem; onClose: () => v
             </button>
           </div>
 
-          {/* タブ */}
           <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)' }}>
             {(
               [
@@ -425,7 +906,6 @@ function TaskDetailModal({ item, onClose }: { item: ActionItem; onClose: () => v
           </div>
         </div>
 
-        {/* コンテンツ */}
         <div
           style={{
             flex: 1,
@@ -508,12 +988,7 @@ function TaskDetailModal({ item, onClose }: { item: ActionItem; onClose: () => v
                   >
                     {item.detail.replyDraft}
                   </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: 8,
-                    }}
-                  >
+                  <div style={{ display: 'flex', gap: 8 }}>
                     <button
                       onClick={() => navigator.clipboard?.writeText(item.detail.replyDraft)}
                       style={{
