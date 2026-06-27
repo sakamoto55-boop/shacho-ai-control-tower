@@ -8,6 +8,8 @@ import { mockCalendarEvents } from '../../services/calendar/mockCalendar'
 import { createCalendarSummary } from '../../services/calendar/calendarAnalyzer'
 import { mockDriveFiles } from '../../services/drive/mockDrive'
 import { createDriveSummary } from '../../services/drive/driveAnalyzer'
+import { mockBusinessDataset } from '../../services/sheets/mockSheets'
+import { createBusinessSummary, detectBusinessRisks } from '../../services/sheets/sheetsAnalyzer'
 
 interface Props {
   onNavigate: (screen: Screen) => void
@@ -28,6 +30,8 @@ export default function Home({ onNavigate, onVoice }: Props) {
     : null
   const driveSummary = useMemo(() => createDriveSummary(mockDriveFiles.filter((f) => !f.trashed)), [])
   const latestFile = mockDriveFiles.filter((f) => !f.trashed)[0]
+  const businessSummary = useMemo(() => createBusinessSummary(mockBusinessDataset), [])
+  const businessRisks = useMemo(() => detectBusinessRisks(mockBusinessDataset.metrics), [])
   const latestModified = latestFile?.modifiedTime
     ? new Date(latestFile.modifiedTime).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : null
@@ -186,6 +190,62 @@ export default function Home({ onNavigate, onVoice }: Props) {
           }}
         >
           全ファイルを見る →
+        </button>
+      </div>
+
+      {/* ── BusinessData カード（Phase 8）── */}
+      <div
+        style={{
+          background: '#F5F3FF',
+          border: '1.5px solid #DDD6FE',
+          borderRadius: 'var(--radius)',
+          padding: '14px',
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+          <span style={{ fontSize: 18 }}>📊</span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#5B21B6' }}>
+            経営数字：{mockBusinessDataset.metrics.length}指標
+          </span>
+          <span style={{ marginLeft: 'auto', fontSize: 10, color: '#6D28D9', fontWeight: 600 }}>
+            デモSheets
+          </span>
+        </div>
+        {businessRisks.length > 0 && (
+          <div style={{ background: '#FEE2E2', borderRadius: 8, padding: '6px 10px', marginBottom: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#DC2626' }}>
+              🔴 要対応 {businessRisks.filter((r) => r.severity === 'critical' || r.severity === 'high').length}件
+            </span>
+            {businessRisks.slice(0, 2).map((r) => (
+              <div key={r.metricId} style={{ fontSize: 11, color: '#991B1B', marginTop: 2 }}>
+                • {r.description}
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+          {[
+            { label: '粗利率', value: businessSummary.grossProfitRate !== null ? `${businessSummary.grossProfitRate}%` : '—', alert: (businessSummary.grossProfitRate ?? 100) < 30 },
+            { label: '現金残高', value: businessSummary.cashBalance !== null ? `¥${((businessSummary.cashBalance ?? 0) / 10000).toFixed(0)}万` : '—', alert: (businessSummary.cashBalance ?? 999999999) < 5000000 },
+            { label: '未請求', value: businessSummary.unbilledAmount !== null ? `¥${((businessSummary.unbilledAmount ?? 0) / 10000).toFixed(0)}万` : '—', alert: (businessSummary.unbilledAmount ?? 0) > 5000000 },
+            { label: '未回収', value: businessSummary.uncollectedAmount !== null ? `¥${((businessSummary.uncollectedAmount ?? 0) / 10000).toFixed(0)}万` : '—', alert: (businessSummary.uncollectedAmount ?? 0) > 3000000 },
+          ].map((s) => (
+            <div key={s.label} style={{ background: s.alert ? '#FEE2E2' : '#EDE9FE', borderRadius: 8, padding: '3px 8px', display: 'flex', gap: 3, alignItems: 'center' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: s.alert ? '#DC2626' : '#5B21B6' }}>{s.label}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: s.alert ? '#991B1B' : '#3B0764' }}>{s.value}</span>
+            </div>
+          ))}
+        </div>
+        <button
+          onClick={() => onNavigate('dashboard')}
+          style={{
+            background: '#7C3AED', color: '#fff', border: 'none',
+            borderRadius: 8, padding: '7px 14px', fontSize: 12,
+            fontWeight: 700, cursor: 'pointer', width: '100%',
+          }}
+        >
+          経営数字を詳しく見る →
         </button>
       </div>
 

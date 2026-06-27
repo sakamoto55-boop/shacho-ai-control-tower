@@ -1,7 +1,7 @@
 # NO_SCREENSHOT_REQUIRED.md — スクリーンショット不要の検収フロー
 
 > このファイルは、スクリーンショットなしで変更点と安全性を確認できることを明記します。  
-> 最終更新: Phase 7 — v0.7.0（2026-06-27）
+> 最終更新: Phase 8 — v0.8.0（2026-06-27）
 
 ---
 
@@ -31,6 +31,7 @@
 | `AI_ENGINE_DESIGN.md` | AI Engine各エンジン入出力・承認ゲート設計（Phase 5.5追加） |
 | `CALENDAR_READONLY_DESIGN.md` | Google Calendar ReadOnly 設計・フロー・書き込み禁止確認（Phase 6追加） |
 | `DRIVE_READONLY_DESIGN.md` | Google Drive ReadOnly 設計・カテゴリ・三元横断分析・書き込み禁止確認（Phase 7追加） |
+| `SHEETS_READONLY_DESIGN.md` | Google Sheets ReadOnly 設計・経営指標・四元横断分析・書き込み禁止確認（Phase 8追加） |
 
 ---
 

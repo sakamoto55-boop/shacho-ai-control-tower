@@ -4,6 +4,52 @@
 
 ---
 
+## Phase 8 — v0.8.0（2026-06-27）
+
+### 変更テーマ
+Google Sheets を読み取り専用で接続し、AI社長室の BusinessData Provider に経営数字・資金繰り・案件粗利・部署別指標を流し込む構造を作る。Inbox × Schedule × File × BusinessData の四元横断分析を開始。
+
+### 追加した機能
+
+**Sheets サービス層（8ファイル）**
+- `client/src/services/sheets/types.ts`: GoogleSpreadsheet / GoogleSheet / GoogleSheetValues / SheetMetricKey 型定義
+- `client/src/services/sheets/mockSheets.ts`: デモ経営数字データ（8指標・13週資金繰り・5案件粗利・4部署）
+- `client/src/services/sheets/sheetsRegistry.ts`: スプレッドシートID管理（5ターゲット）
+- `client/src/services/sheets/sheetsFetcher.ts`: GET 専用フェッチャー（書き込みAPI未実装・8関数コメント明記）
+- `client/src/services/sheets/sheetsMapper.ts`: シートデータ → UnifiedBusinessMetric 変換
+- `client/src/services/sheets/sheetsAnalyzer.ts`: BusinessRiskItem・detectBusinessRisks()・createBusinessSummary()
+- `client/src/services/sheets/sheetsCache.ts`: ローカルキャッシュ（5分 TTL）
+- `client/src/services/sheets/sheetsClient.ts`: Sheets ReadOnly 入口（認証なし→mock、認証済み→API）
+
+**docs（新規）**
+- `docs/release-check/SHEETS_READONLY_DESIGN.md`: Sheets ReadOnly 設計書
+
+### 変更した機能
+
+- `googleScopes.ts`: SHEETS_READONLY をアクティブスコープへ昇格。PHASE8_SCOPES 追加。
+- `providerTypes.ts`: `UnifiedBusinessMetric` を 30フィールドに拡張（metricKey / status / riskLevel / readOnly: true / writeEnabled: false 等）。`UnifiedCashflowWeek` / `UnifiedProjectProfit` / `UnifiedDepartmentMetric` / `UnifiedBusinessDataset` 追加。
+- `businessDataProvider.ts`: stub → Google Sheets 接続実装（認証なし→デモ）
+- `aiEngineTypes.ts`: BriefingSection.sectionType に `'business-data'` 追加
+- `priorityEngine.ts`: Inbox × BusinessData 横断スコアリング追加（未請求+請求 +20、資金繰り+銀行 +15、事故 +25）
+- `briefingEngine.ts`: business-data セクション追加・BusinessData × File 横断アクション生成
+- `riskEngine.ts`: detectFromBusinessData() を metricName ベースに更新、請求・事故・粗利悪化リスク追加
+- `searchEngine.ts`: `searchMetrics()` / `searchAll()` metrics 対応追加（SearchResults 型更新）
+- `CockpitScreen.tsx`: 「経営数字サマリー（Phase 8）」セクション追加（パープルテーマ）
+- `Home.tsx`: BusinessData カード追加（パープル #F5F3FF）
+- `Dashboard.tsx`: 注記を Phase 8 フッター表記に更新
+- `AiChat.tsx`: Sheetsショートカット5種追加・Sheets回答ロジック追加（経営数字/現金/未請求/粗利率/リスク）
+- `Settings.tsx`: Phase 8 表記・v0.8.0 バージョン更新・sheets.readonly スコープ表示追加・接続ボタン更新
+- `client/.env.example`: VITE_GOOGLE_SHEETS_*_ID 5変数追加・VITE_GOOGLE_SCOPES に spreadsheets.readonly 追加
+- `docs/release-check/` 各ファイル: Phase 8 内容に更新
+
+### 削除した機能
+- なし
+
+### 外部サービス追加
+- Google Sheets ReadOnly（`spreadsheets.readonly` スコープのみ。書き込みなし。）
+
+---
+
 ## Phase 7 — v0.7.0（2026-06-27）
 
 ### 変更テーマ

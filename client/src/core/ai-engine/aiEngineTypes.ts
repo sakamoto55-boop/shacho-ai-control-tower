@@ -40,7 +40,7 @@ export interface PriorityScore {
 
 // ─── ブリーフィングセクション ─────────────────────────────────
 export interface BriefingSection {
-  sectionType: 'inbox' | 'schedule' | 'files' | 'risk' | 'action'
+  sectionType: 'inbox' | 'schedule' | 'files' | 'business-data' | 'risk' | 'action'
   title: string
   items: string[]
   alertLevel: 'danger' | 'warning' | 'info' | null

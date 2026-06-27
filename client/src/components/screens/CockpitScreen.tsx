@@ -18,10 +18,12 @@ import { mockDriveFiles } from '../../services/drive/mockDrive'
 import { mapGoogleDriveFileToUnifiedFileItem } from '../../services/drive/driveMapper'
 import { createDriveSummary } from '../../services/drive/driveAnalyzer'
 import { driveClient } from '../../services/drive/driveClient'
+import { mockBusinessDataset } from '../../services/sheets/mockSheets'
+import { createBusinessSummary, detectBusinessRisks } from '../../services/sheets/sheetsAnalyzer'
 import type { UnifiedScheduleItem, UnifiedFileItem } from '../../core/providers/providerTypes'
 import DemoBanner from '../DemoBanner'
 
-// AI Engine: Schedule Provider (Phase 6) + File Provider (Phase 7) + Inbox Provider 横断参照
+// AI Engine: Schedule Provider (Phase 6) + File Provider (Phase 7) + BusinessData Provider (Phase 8) + Inbox Provider 横断参照
 
 const IMPORTANCE_CONFIG = {
   critical: { label: '最優先', color: '#EF4444', bg: '#FEF2F2' },
@@ -80,6 +82,11 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
   const [scheduleSource, setScheduleSource] = useState<'demo' | 'api'>('demo')
   const [fileItems, setFileItems] = useState<UnifiedFileItem[]>(demoFileItems)
   const [fileSource, setFileSource] = useState<'demo' | 'api'>('demo')
+
+  // BusinessData Provider（Phase 8）
+  const businessDataset = mockBusinessDataset
+  const businessSummary = createBusinessSummary(businessDataset)
+  const businessRisks = detectBusinessRisks(businessDataset.metrics)
 
   useEffect(() => {
     calendarClient.fetchEvents().then((result) => {
@@ -433,6 +440,55 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
 
         <div style={{ marginTop: 8, fontSize: 10, color: '#166534', fontWeight: 600 }}>
           元データ：{scheduleSource === 'api' ? 'Google Calendar ReadOnly' : 'デモCalendar'} · 予定作成・変更なし · 社長確認のみ
+        </div>
+      </div>
+
+      {/* ── 経営数字サマリー（Phase 8）── */}
+      <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 14, padding: '14px 16px', marginBottom: 14 }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: '#5B21B6', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>📊 経営数字サマリー</span>
+          <span style={{ fontSize: 10, background: '#EDE9FE', color: '#6D28D9', borderRadius: 999, padding: '2px 8px' }}>デモSheets</span>
+        </div>
+
+        {/* 危険指標チップ */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+          {[
+            { label: `🔴 危険 ${businessSummary.dangerCount}件`, show: businessSummary.dangerCount > 0, color: '#991B1B', bg: '#FEE2E2' },
+            { label: `⚠️ 注意 ${businessSummary.warningCount}件`, show: businessSummary.warningCount > 0, color: '#92400E', bg: '#FEF3C7' },
+          ].filter(c => c.show).map((c) => (
+            <span key={c.label} style={{ fontSize: 11, fontWeight: 700, background: c.bg, color: c.color, borderRadius: 999, padding: '3px 10px' }}>{c.label}</span>
+          ))}
+        </div>
+
+        {/* 主要指標グリッド */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+          {[
+            { label: '現金残高', value: businessSummary.cashBalance !== null ? `¥${(businessSummary.cashBalance / 10000).toFixed(0)}万` : '—', alert: (businessSummary.cashBalance ?? 999999999) < 5000000 },
+            { label: '未請求', value: businessSummary.unbilledAmount !== null ? `¥${(businessSummary.unbilledAmount / 10000).toFixed(0)}万` : '—', alert: (businessSummary.unbilledAmount ?? 0) > 5000000 },
+            { label: '未回収', value: businessSummary.uncollectedAmount !== null ? `¥${(businessSummary.uncollectedAmount / 10000).toFixed(0)}万` : '—', alert: (businessSummary.uncollectedAmount ?? 0) > 3000000 },
+            { label: '今月粗利率', value: businessSummary.grossProfitRate !== null ? `${businessSummary.grossProfitRate}%` : '—', alert: (businessSummary.grossProfitRate ?? 100) < 30 },
+          ].map((item) => (
+            <div key={item.label} style={{ background: item.alert ? '#FEF2F2' : '#fff', borderRadius: 8, padding: '8px 10px', border: `1px solid ${item.alert ? '#FCA5A5' : '#E9D5FF'}` }}>
+              <div style={{ fontSize: 10, color: '#6B7280', fontWeight: 600 }}>{item.label}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: item.alert ? '#991B1B' : '#1F2937' }}>{item.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* リスク一覧（最大3件） */}
+        {businessRisks.slice(0, 3).map((risk) => (
+          <div key={risk.metricId} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 0', borderTop: '1px solid #EDE9FE' }}>
+            <span style={{ fontSize: 10, fontWeight: 800, background: risk.severity === 'critical' || risk.severity === 'high' ? '#FEE2E2' : '#FEF3C7', color: risk.severity === 'critical' || risk.severity === 'high' ? '#991B1B' : '#92400E', borderRadius: 6, padding: '2px 6px', flexShrink: 0 }}>
+              {risk.severity === 'critical' ? '最重要' : risk.severity === 'high' ? '重要' : '注意'}
+            </span>
+            <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5 }}>
+              <strong>{risk.label}</strong>{risk.description ? `：${risk.description}` : ''}
+            </div>
+          </div>
+        ))}
+
+        <div style={{ fontSize: 10, color: '#7C3AED', marginTop: 8, fontWeight: 600 }}>
+          データ元：デモSheets · 読み取り専用 · セル更新・行追加・削除なし
         </div>
       </div>
 

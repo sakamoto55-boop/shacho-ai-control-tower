@@ -1,11 +1,12 @@
-// 横断検索エンジン — inbox + schedule + file を横断して検索する
+// 横断検索エンジン — inbox + schedule + file + metrics を横断して検索する
 
-import type { UnifiedInboxItem, UnifiedFileItem } from '../providers/providerTypes'
+import type { UnifiedInboxItem, UnifiedFileItem, UnifiedBusinessMetric } from '../providers/providerTypes'
 import { searchDriveFiles } from '../../services/drive/driveSearch'
 
 export interface SearchResults {
   inbox: UnifiedInboxItem[]
   files: UnifiedFileItem[]
+  metrics: UnifiedBusinessMetric[]
   totalCount: number
 }
 
@@ -28,15 +29,37 @@ export const searchEngine = {
     return searchDriveFiles(query, files).map((r) => r.item)
   },
 
-  // Inbox + Drive 横断検索
-  searchAll(query: string, inbox: UnifiedInboxItem[], files: UnifiedFileItem[]): SearchResults {
-    if (!query.trim()) return { inbox: [], files: [], totalCount: 0 }
+  // BusinessData 経営指標検索（Phase 8 追加）
+  searchMetrics(query: string, metrics: UnifiedBusinessMetric[]): UnifiedBusinessMetric[] {
+    if (!query.trim()) return []
+    const q = query.toLowerCase()
+    return metrics.filter(
+      (m) =>
+        m.metricName.toLowerCase().includes(q) ||
+        m.category.toLowerCase().includes(q) ||
+        (m.relatedCompany?.toLowerCase().includes(q) ?? false) ||
+        (m.relatedDepartment?.toLowerCase().includes(q) ?? false) ||
+        (m.relatedProject?.toLowerCase().includes(q) ?? false) ||
+        (m.alertReason?.toLowerCase().includes(q) ?? false)
+    )
+  },
+
+  // Inbox + Drive + BusinessData 横断検索
+  searchAll(
+    query: string,
+    inbox: UnifiedInboxItem[],
+    files: UnifiedFileItem[],
+    metrics: UnifiedBusinessMetric[] = []
+  ): SearchResults {
+    if (!query.trim()) return { inbox: [], files: [], metrics: [], totalCount: 0 }
     const inboxResults = this.search(query, inbox)
     const fileResults = this.searchFiles(query, files)
+    const metricResults = this.searchMetrics(query, metrics)
     return {
       inbox: inboxResults,
       files: fileResults,
-      totalCount: inboxResults.length + fileResults.length,
+      metrics: metricResults,
+      totalCount: inboxResults.length + fileResults.length + metricResults.length,
     }
   },
 }

@@ -407,6 +407,47 @@ Phase 6 スコープ（PHASE6_SCOPES）:
 
 ---
 
+## Phase 8 で追加した内容（Google Sheets ReadOnly / BusinessData Provider 接続）
+
+### 概要
+
+Google Sheets を **読み取り専用** で接続し、AI社長室の BusinessData Provider に経営数字を流し込む。  
+Inbox × Schedule × File × BusinessData の **四元横断分析** を開始。
+
+- 売上・粗利・資金繰り・未請求・未回収・稼働率・事故件数の 8指標をデモ表示
+- 13週資金繰り・案件粗利ランキング・部署別指標も対応
+- セル更新・行追加・削除・シート作成は **一切実装していません**
+
+### 追加スコープ
+
+| スコープ | 説明 | 書き込み |
+|---------|------|---------|
+| `spreadsheets.readonly` | Sheets 読み取り専用 | **なし** |
+
+### 追加したファイル（9ファイル）
+
+| ファイル | 役割 |
+|---------|------|
+| `client/src/services/sheets/types.ts` | Sheets API 型定義 |
+| `client/src/services/sheets/mockSheets.ts` | デモ経営数字データ（8指標・13週資金繰り等） |
+| `client/src/services/sheets/sheetsRegistry.ts` | スプレッドシートID管理（5ターゲット） |
+| `client/src/services/sheets/sheetsFetcher.ts` | GET 専用フェッチャー（書き込みAPI未実装） |
+| `client/src/services/sheets/sheetsMapper.ts` | シートデータ → UnifiedBusinessMetric 変換 |
+| `client/src/services/sheets/sheetsAnalyzer.ts` | リスク検知・経営サマリー生成 |
+| `client/src/services/sheets/sheetsCache.ts` | ローカルキャッシュ（5分 TTL） |
+| `client/src/services/sheets/sheetsClient.ts` | Sheets ReadOnly 入口 |
+| `docs/release-check/SHEETS_READONLY_DESIGN.md` | Sheets ReadOnly 設計書 |
+
+### 環境変数（本番接続時）
+
+```env
+VITE_GOOGLE_SHEETS_SALES_ID=<スプレッドシートID>
+VITE_GOOGLE_SHEETS_CASHFLOW_ID=<スプレッドシートID>
+VITE_GOOGLE_SHEETS_PROJECT_PROFIT_ID=<スプレッドシートID>
+VITE_GOOGLE_SHEETS_RECEIVABLE_ID=<スプレッドシートID>
+VITE_GOOGLE_SHEETS_PAYABLE_ID=<スプレッドシートID>
+```
+
 ## Phase 7 で追加した内容（Google Drive ReadOnly / File Provider 接続）
 
 ### 概要

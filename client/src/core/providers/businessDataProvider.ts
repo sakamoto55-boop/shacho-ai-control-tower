@@ -1,31 +1,41 @@
-// Stub for Google Sheets / freee / TKC（将来）
-// 将来: 経営指標データソースを接続する
-
-import type { ProviderDescriptor, UnifiedBusinessMetric } from './providerTypes'
+import { googleToken } from '../../services/google/googleToken'
+import { sheetsClient } from '../../services/sheets/sheetsClient'
+import type { ProviderDescriptor, UnifiedBusinessMetric, UnifiedBusinessDataset } from './providerTypes'
 
 export const businessDataProvider = {
   getDescriptor(): ProviderDescriptor {
+    const hasToken = googleToken.hasToken()
     return {
-      providerId: 'business-data',
-      providerName: '経営データ（Sheets / freee / TKC）',
+      providerId: 'google-sheets',
+      providerName: 'Google Sheets（経営データ）',
       providerType: 'business-data',
-      sourceService: 'Google Sheets / freee / TKC',
-      connectionStatus: 'planned',
+      sourceService: 'Google Sheets',
+      connectionStatus: hasToken ? 'connected' : 'disconnected',
       readOnly: true,
       writeEnabled: false,
       lastSyncAt: null,
-      healthStatus: 'unknown',
+      healthStatus: hasToken ? 'healthy' : 'degraded',
       errors: [],
-      warnings: [],
-      nextPhase: 'Google Sheets / freee / TKC（将来）',
+      warnings: hasToken ? [] : ['未認証のためデモデータを表示中'],
+      nextPhase: '経営数字をAI判断へ反映（Phase 8完了済）',
     }
   },
 
   async getItems(): Promise<UnifiedBusinessMetric[]> {
-    return []
+    const result = await sheetsClient.fetchDataset()
+    return result.dataset.metrics
+  },
+
+  async getDataset(): Promise<UnifiedBusinessDataset> {
+    const result = await sheetsClient.fetchDataset()
+    return result.dataset
   },
 
   async refresh(): Promise<void> {
-    // stub
+    await sheetsClient.refreshDataset()
+  },
+
+  isUsingDemo(): boolean {
+    return sheetsClient.isUsingMock()
   },
 }

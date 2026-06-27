@@ -1,7 +1,62 @@
 # TEST_CHECKLIST.md — 手動検収チェックリスト
 
-> 最終更新: Phase 7 — v0.7.0（2026-06-27）  
+> 最終更新: Phase 8 — v0.8.0（2026-06-27）  
 > 各項目を実際にブラウザで確認してチェックしてください。
+
+---
+
+## Phase 8 検収チェック
+
+### TypeScript ビルド確認
+- [ ] `cd client && npm run build` がゼロエラーで完了する
+- [ ] `noUnusedLocals` / `noUnusedParameters` エラーが出ない
+
+### ホーム画面 — BusinessData カード（新規）
+- [ ] 「経営数字：8指標」カード（パープル #F5F3FF）が表示される
+- [ ] 要対応件数（危険🔴）と上位2件のリスク説明が表示される
+- [ ] 粗利率 / 現金残高 / 未請求 / 未回収 チップが表示される
+- [ ] 「経営数字を詳しく見る →」ボタンで Dashboard へ遷移する
+
+### AIコックピット — 経営数字サマリーセクション（新規）
+- [ ] 「経営数字サマリー（Phase 8）」セクション（パープル #F5F3FF）が表示される
+- [ ] 危険 / 警告 カウントチップが表示される
+- [ ] 現金残高 / 未請求 / 未回収 / 今月粗利率 の 2×2 グリッドが表示される
+- [ ] 上位3件のリスクが重大度付きで表示される
+- [ ] フッターに「データ元：デモSheets · 読み取り専用 · セル更新・行追加・削除なし」が表示される
+
+### AI相談画面 — Sheetsショートカット（新規）
+- [ ] 「📊 経営数字ショートカット」バーがDriveショートカットの下に表示される（パープル背景）
+- [ ] 「経営数字をまとめて」をタップすると現金残高・粗利率・未請求・未回収の回答が返る
+- [ ] 「現金残高はいくら？」をタップすると現金残高とステータスが返る
+- [ ] 「未請求・未回収を教えて」をタップすると金額が返る
+- [ ] 「粗利率は何%？」をタップすると粗利率とステータスが返る
+- [ ] 「資金繰りリスクはある？」をタップするとリスク一覧が返る
+- [ ] 各回答に「デモSheets · 読み取り専用 · セル更新なし」が含まれる
+
+### Settings — Phase 8 更新
+- [ ] 「Phase 8 — Sheets ReadOnly 接続 · 書き込みなし」のサブタイトルが表示される
+- [ ] Google Sheets Provider が表示される
+- [ ] スコープ表示に sheets.readonly が追加されている（CALENDAR / DRIVE / SHEETS の3スコープがループ表示）
+- [ ] 接続ボタンに「Gmail / Calendar / Drive / Sheets ReadOnly」と表示される
+- [ ] バージョン「v0.8.0 Phase 8」が設定画面最下部に表示される
+- [ ] ロードマップで Phase 4（Sheets）が「実装済」になっている
+
+### Dashboard — Phase 8 フッター更新
+- [ ] 注記に「Phase 8 — BusinessData Provider（デモSheets）由来のデータです。セル更新・行追加・削除は行っていません。」が表示される
+
+### Sheets サービス層 確認（TypeScript型チェック）
+- [ ] `mockBusinessDataset.metrics.length` が 8 を返す
+- [ ] `createBusinessSummary()` が grossProfitRate / cashBalance / unbilledAmount を返す
+- [ ] `detectBusinessRisks()` が riskType / severity / description を含む配列を返す
+- [ ] `UnifiedBusinessMetric.readOnly` が true を返す
+- [ ] `UnifiedBusinessMetric.writeEnabled` が false を返す
+- [ ] `sheetsClient.isUsingMock()` が認証なし時に true を返す
+
+### 書き込みなし確認（安全性検証）
+- [ ] Google Sheets にセルが更新されていない
+- [ ] 行が追加・削除されていない
+- [ ] シートが作成・削除されていない
+- [ ] 権限・共有設定が変更されていない
 
 ---
 

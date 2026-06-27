@@ -10,6 +10,8 @@ import { mockDriveFiles } from '../../services/drive/mockDrive'
 import { mapGoogleDriveFileToUnifiedFileItem } from '../../services/drive/driveMapper'
 import { createDriveSummary } from '../../services/drive/driveAnalyzer'
 import { searchDriveFiles } from '../../services/drive/driveSearch'
+import { mockBusinessDataset } from '../../services/sheets/mockSheets'
+import { createBusinessSummary, detectBusinessRisks } from '../../services/sheets/sheetsAnalyzer'
 
 interface Props {
   onVoice: () => void
@@ -132,8 +134,67 @@ function getDriveShortcutResponse(input: string): string | null {
   return null
 }
 
+const SHEETS_SHORTCUTS = [
+  '経営数字をまとめて',
+  '現金残高はいくら？',
+  '未請求・未回収を教えて',
+  '粗利率は何%？',
+  '資金繰りリスクはある？',
+]
+
+// Sheets ショートカット回答（BusinessData Provider 参照）
+function getSheetsShortcutResponse(input: string): string | null {
+  const summary = createBusinessSummary(mockBusinessDataset)
+  const risks = detectBusinessRisks(mockBusinessDataset.metrics)
+
+  if (input.includes('経営数字をまとめて') || input.includes('経営数字')) {
+    const dangerCount = mockBusinessDataset.metrics.filter((m) => m.status === 'danger').length
+    const warningCount = mockBusinessDataset.metrics.filter((m) => m.status === 'warning').length
+    const cashStr = summary.cashBalance !== null ? `¥${((summary.cashBalance) / 10000).toFixed(0)}万` : '—'
+    const grossStr = summary.grossProfitRate !== null ? `${summary.grossProfitRate}%` : '—'
+    const unbilledStr = summary.unbilledAmount !== null ? `¥${((summary.unbilledAmount) / 10000).toFixed(0)}万` : '—'
+    const uncollectedStr = summary.uncollectedAmount !== null ? `¥${((summary.uncollectedAmount) / 10000).toFixed(0)}万` : '—'
+    return `経営数字サマリーです（Phase 8）。\n\n現金残高：${cashStr}\n今月粗利率：${grossStr}\n未請求：${unbilledStr}\n未回収：${uncollectedStr}\n\n要注意：${dangerCount}件、警告：${warningCount}件\n\nデータ元：デモSheets · 読み取り専用 · セル更新なし`
+  }
+
+  if (input.includes('現金残高')) {
+    const cashStr = summary.cashBalance !== null ? `¥${((summary.cashBalance) / 10000).toFixed(0)}万` : '—'
+    const cashMetric = mockBusinessDataset.metrics.find((m) => m.metricKey === 'cash_balance')
+    const statusStr = cashMetric?.status === 'danger' ? '🔴 危険水準' : cashMetric?.status === 'warning' ? '🟡 注意水準' : '🟢 正常'
+    return `現金残高：${cashStr}（${statusStr}）\n\n${cashMetric?.alertReason ?? '特段のアラートはありません。'}\n\nデータ元：デモSheets · 読み取り専用`
+  }
+
+  if (input.includes('未請求') || input.includes('未回収')) {
+    const unbilledStr = summary.unbilledAmount !== null ? `¥${((summary.unbilledAmount) / 10000).toFixed(0)}万` : '—'
+    const uncollectedStr = summary.uncollectedAmount !== null ? `¥${((summary.uncollectedAmount) / 10000).toFixed(0)}万` : '—'
+    return `未請求：${unbilledStr}\n未回収：${uncollectedStr}\n\n速やかに請求書を発行し、入金確認を行ってください。\n\nデータ元：デモSheets · 読み取り専用 · セル更新なし`
+  }
+
+  if (input.includes('粗利率')) {
+    const grossStr = summary.grossProfitRate !== null ? `${summary.grossProfitRate}%` : '—'
+    const grossMetric = mockBusinessDataset.metrics.find((m) => m.metricKey === 'gross_profit_rate')
+    const statusStr = grossMetric?.status === 'danger' ? '🔴 危険水準' : grossMetric?.status === 'warning' ? '🟡 注意水準' : '🟢 正常'
+    return `今月粗利率：${grossStr}（${statusStr}）\n\n${grossMetric?.alertReason ?? '特段のアラートはありません。'}\n\nデータ元：デモSheets · 読み取り専用`
+  }
+
+  if (input.includes('資金繰りリスク') || input.includes('リスク')) {
+    if (risks.length === 0) return '現時点で経営上の重大リスクは検出されていません。\n\nデータ元：デモSheets · 読み取り専用'
+    const lines = risks.slice(0, 4).map((r) => {
+      const icon = r.severity === 'critical' ? '🔴' : r.severity === 'high' ? '🟠' : r.severity === 'medium' ? '🟡' : '🟢'
+      return `${icon} ${r.riskType}：${r.description}`
+    }).join('\n')
+    return `経営リスク ${risks.length}件を検出しました。\n\n${lines}\n\nデータ元：デモSheets · 読み取り専用 · 自動対応なし`
+  }
+
+  return null
+}
+
 function getMockResponse(mode: AiMode, input: string): string {
-  // Drive ショートカット回答を最優先
+  // Sheets ショートカット回答を最優先
+  const sheetsResponse = getSheetsShortcutResponse(input)
+  if (sheetsResponse) return sheetsResponse
+
+  // Drive ショートカット回答
   const driveResponse = getDriveShortcutResponse(input)
   if (driveResponse) return driveResponse
 
@@ -382,6 +443,49 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
                 fontSize: 11,
                 fontWeight: 600,
                 color: '#92400E',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Sheetsショートカット（Phase 8）── */}
+      <div
+        style={{
+          flexShrink: 0,
+          background: '#F5F3FF',
+          borderBottom: '1px solid #DDD6FE',
+          padding: '6px 14px',
+        }}
+      >
+        <div style={{ fontSize: 10, fontWeight: 800, color: '#5B21B6', marginBottom: 4 }}>
+          📊 経営数字ショートカット
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            gap: 6,
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+          }}
+        >
+          {SHEETS_SHORTCUTS.map((s) => (
+            <button
+              key={s}
+              onClick={() => sendMessage(s)}
+              style={{
+                flexShrink: 0,
+                background: '#fff',
+                border: '1.5px solid #DDD6FE',
+                borderRadius: 999,
+                padding: '5px 12px',
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#5B21B6',
                 whiteSpace: 'nowrap',
               }}
             >

@@ -6,10 +6,13 @@ import {
   departmentMetrics,
 } from '../../data/mockData'
 import type { DashboardMetric, CashflowWeek, ProjectMetric } from '../../types'
+import { mockBusinessDataset } from '../../services/sheets/mockSheets'
+import { detectBusinessRisks } from '../../services/sheets/sheetsAnalyzer'
 import DemoBanner from '../DemoBanner'
 
 const TODAY = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' })
 const MAX_BALANCE = Math.max(...cashflowWeeks.map((w) => w.balance))
+const businessRisks = detectBusinessRisks(mockBusinessDataset.metrics)
 
 export default function Dashboard() {
   const [cfExpanded, setCfExpanded] = useState(true)
@@ -54,6 +57,32 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+
+      {/* ── BusinessData Provider リスクサマリー（Phase 8）── */}
+      {businessRisks.length > 0 && (
+        <div
+          style={{
+            background: '#F5F3FF',
+            border: '1.5px solid #DDD6FE',
+            borderRadius: 'var(--radius)',
+            padding: '12px 14px',
+            marginBottom: 14,
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#5B21B6', marginBottom: 6 }}>
+            📊 Sheets経営データ — {businessRisks.filter((r) => r.severity === 'critical' || r.severity === 'high').length}件要対応
+            <span style={{ marginLeft: 8, fontSize: 10, color: '#6D28D9', fontWeight: 600 }}>デモSheets · 読み取り専用</span>
+          </div>
+          {businessRisks.slice(0, 3).map((r) => (
+            <div key={r.metricId} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 11, color: r.severity === 'critical' ? '#DC2626' : '#D97706', fontWeight: 700, flexShrink: 0 }}>
+                {r.severity === 'critical' ? '🔴' : '⚠️'}
+              </span>
+              <span style={{ fontSize: 11, color: '#3B0764' }}>{r.description}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── 要注意項目 ── */}
       <div className="section-label" style={{ color: '#EF4444' }}>⚠️ 要注意項目</div>
@@ -269,7 +298,7 @@ export default function Dashboard() {
           marginBottom: 8,
         }}
       >
-        📌 数値はすべて仮データです。freee / Google Sheets / TKC 連携後にリアルタイム反映されます。既存データへの書き込みは行っていません。
+        📌 Phase 8 — BusinessData Provider（デモSheets）由来のデータです。セル更新・行追加・削除は行っていません。freee / TKC 連携後にリアルタイム反映されます。
       </div>
     </div>
   )

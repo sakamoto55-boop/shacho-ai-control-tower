@@ -1,6 +1,48 @@
 # FILES_CHANGED.md — 変更・追加・削除ファイル一覧
 
-> 最終更新: Phase 7 — v0.7.0（2026-06-27）
+> 最終更新: Phase 8 — v0.8.0（2026-06-27）
+
+---
+
+## Phase 8 変更ファイル
+
+### 新規作成 (9ファイル)
+
+| ファイルパス | 役割 |
+|-------------|------|
+| `client/src/services/sheets/types.ts` | Sheets API 型 / GoogleSpreadsheet / SheetMetricKey |
+| `client/src/services/sheets/mockSheets.ts` | デモ経営数字データ（8指標・13週資金繰り・5案件・4部署） |
+| `client/src/services/sheets/sheetsRegistry.ts` | スプレッドシートID管理（5ターゲット） |
+| `client/src/services/sheets/sheetsFetcher.ts` | GET 専用フェッチャー（書き込みAPI未実装） |
+| `client/src/services/sheets/sheetsMapper.ts` | シートデータ → UnifiedBusinessMetric 変換 |
+| `client/src/services/sheets/sheetsAnalyzer.ts` | BusinessRiskItem・detectBusinessRisks()・createBusinessSummary() |
+| `client/src/services/sheets/sheetsCache.ts` | ローカルキャッシュ（5分 TTL） |
+| `client/src/services/sheets/sheetsClient.ts` | Sheets ReadOnly 入口（mock/cache/api 切り替え） |
+| `docs/release-check/SHEETS_READONLY_DESIGN.md` | Sheets ReadOnly 設計書（新規） |
+
+### 更新 (15ファイル)
+
+| ファイルパス | 変更内容 |
+|-------------|---------|
+| `client/src/services/google/googleScopes.ts` | SHEETS_READONLY 昇格・PHASE8_SCOPES 追加 |
+| `client/src/core/providers/providerTypes.ts` | UnifiedBusinessMetric 30フィールド拡張・4新型追加 |
+| `client/src/core/providers/businessDataProvider.ts` | stub → Sheets 接続実装 |
+| `client/src/core/ai-engine/aiEngineTypes.ts` | BriefingSection.sectionType に 'business-data' 追加 |
+| `client/src/core/ai-engine/priorityEngine.ts` | Inbox × BusinessData 横断スコアリング追加 |
+| `client/src/core/ai-engine/briefingEngine.ts` | business-data セクション追加・四元横断アクション生成 |
+| `client/src/core/ai-engine/riskEngine.ts` | detectFromBusinessData() metricName ベース更新・3リスクタイプ追加 |
+| `client/src/core/ai-engine/searchEngine.ts` | searchMetrics() / searchAll() metrics 対応（SearchResults 更新） |
+| `client/src/components/screens/CockpitScreen.tsx` | 「経営数字サマリー（Phase 8）」セクション追加（パープルテーマ） |
+| `client/src/components/screens/Home.tsx` | BusinessData カード追加（パープル） |
+| `client/src/components/screens/Dashboard.tsx` | 注記を Phase 8 フッター表記に更新 |
+| `client/src/components/screens/AiChat.tsx` | Sheetsショートカット5種追加・Sheets回答ロジック追加 |
+| `client/src/components/screens/Settings.tsx` | v0.8.0・Phase 8 表記・sheets.readonly スコープ・接続ボタン更新 |
+| `client/.env.example` | VITE_GOOGLE_SHEETS_*_ID 5変数追加・スコープ更新 |
+| `README.md` | Phase 8 セクション追加 |
+
+### 削除 (0ファイル)
+
+なし
 
 ---
 

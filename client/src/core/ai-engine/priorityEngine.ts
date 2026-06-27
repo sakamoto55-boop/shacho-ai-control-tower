@@ -1,10 +1,11 @@
-import type { UnifiedInboxItem, UnifiedScheduleItem, UnifiedFileItem, UnifiedRisk } from '../providers/providerTypes'
+import type { UnifiedInboxItem, UnifiedScheduleItem, UnifiedFileItem, UnifiedRisk, UnifiedBusinessMetric } from '../providers/providerTypes'
 import type { PriorityScore } from './aiEngineTypes'
 
 function scoreInboxItemInternal(
   item: UnifiedInboxItem,
   schedule: UnifiedScheduleItem[] = [],
-  files: UnifiedFileItem[] = []
+  files: UnifiedFileItem[] = [],
+  metrics: UnifiedBusinessMetric[] = []
 ): PriorityScore {
   let baseScore = 50
   const modifiers: { reason: string; delta: number }[] = []
@@ -60,6 +61,25 @@ function scoreInboxItemInternal(
     }
   }
 
+  // ── 横断スコアリング（Inbox × BusinessData）────────────────
+  if (metrics.length > 0) {
+    // 未請求が多い + 関連メールがある
+    const unbilled = metrics.find((m) => m.metricKey === 'unbilled' && m.status === 'danger')
+    if (unbilled && (item.taskType === '請求' || item.subject.includes('請求'))) {
+      modifiers.push({ reason: `未請求リスクとの関連（${unbilled.label}）`, delta: 20 })
+    }
+    // 資金繰り注意 + 銀行メール
+    const cashRisk = metrics.find((m) => m.metricKey === 'cash_balance' && m.status !== 'normal')
+    if (cashRisk && (item.taskType === '銀行' || item.subject.includes('資金'))) {
+      modifiers.push({ reason: `資金繰りリスクとの関連（${cashRisk.label}）`, delta: 15 })
+    }
+    // 事故 + 事故関連メール
+    const accidentMetric = metrics.find((m) => m.metricKey === 'accident_count' && m.value > 0)
+    if (accidentMetric && (item.taskType === '事故' || item.subject.includes('事故'))) {
+      modifiers.push({ reason: '事故指標と関連', delta: 25 })
+    }
+  }
+
   const totalDelta = modifiers.reduce((sum, m) => sum + m.delta, 0)
   const finalScore = Math.min(100, Math.max(0, baseScore + totalDelta))
 
@@ -97,19 +117,21 @@ export const priorityEngine = {
   scoreInboxItem(
     item: UnifiedInboxItem,
     schedule: UnifiedScheduleItem[] = [],
-    files: UnifiedFileItem[] = []
+    files: UnifiedFileItem[] = [],
+    metrics: UnifiedBusinessMetric[] = []
   ): PriorityScore {
-    return scoreInboxItemInternal(item, schedule, files)
+    return scoreInboxItemInternal(item, schedule, files, metrics)
   },
 
   rankItems(
     items: UnifiedInboxItem[],
     schedule: UnifiedScheduleItem[] = [],
-    files: UnifiedFileItem[] = []
+    files: UnifiedFileItem[] = [],
+    metrics: UnifiedBusinessMetric[] = []
   ): UnifiedInboxItem[] {
     const scored = items.map((item) => ({
       item,
-      score: scoreInboxItemInternal(item, schedule, files),
+      score: scoreInboxItemInternal(item, schedule, files, metrics),
     }))
     scored.sort((a, b) => b.score.finalScore - a.score.finalScore)
     return scored.map((s) => s.item)
@@ -135,12 +157,13 @@ export const priorityEngine = {
     return Math.min(100, Math.max(0, score))
   },
 
-  // Inbox + Schedule + File 横断 TOP アイテム生成
+  // Inbox + Schedule + File + BusinessData 横断 TOP アイテム生成
   getCrossServiceTopItems(
     inbox: UnifiedInboxItem[],
     schedule: UnifiedScheduleItem[],
     risks: UnifiedRisk[],
-    files: UnifiedFileItem[] = []
+    files: UnifiedFileItem[] = [],
+    metrics: UnifiedBusinessMetric[] = []
   ): string[] {
     const topActions: string[] = []
 
@@ -153,8 +176,8 @@ export const priorityEngine = {
       topActions.push(`【予定】${timeStr} ${event.title}（${event.category}）`)
     }
 
-    // Inbox + Schedule + File 横断スコアで上位インボックスアイテム
-    const rankedInbox = this.rankItems(inbox, schedule, files)
+    // Inbox + Schedule + File + BusinessData 横断スコアで上位インボックスアイテム
+    const rankedInbox = this.rankItems(inbox, schedule, files, metrics)
     for (const item of rankedInbox.slice(0, 3)) {
       topActions.push(`【${item.priority}】${item.subject}（${item.from}）`)
     }
@@ -163,6 +186,12 @@ export const priorityEngine = {
     const riskFile = files.find((f) => f.riskFlag && f.importance === 'A')
     if (riskFile) {
       topActions.push(`【資料】${riskFile.name}（${riskFile.category}）要確認`)
+    }
+
+    // 経営データの危険指標（最大1件）
+    const dangerMetric = metrics.find((m) => m.status === 'danger' && m.riskLevel === 'critical')
+    if (dangerMetric) {
+      topActions.push(`【経営】${dangerMetric.metricName}：${dangerMetric.alertReason ?? dangerMetric.label}`)
     }
 
     // 重大リスク

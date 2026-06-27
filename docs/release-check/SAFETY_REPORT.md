@@ -1,7 +1,45 @@
 # SAFETY_REPORT.md — 外部API接続状況・安全設計確認書
 
-> 最終更新: Phase 7 — v0.7.0（2026-06-27）  
+> 最終更新: Phase 8 — v0.8.0（2026-06-27）  
 > このファイルは外部API接続・書き込み処理の有無を確認するための文書です。
+
+---
+
+## Phase 8 追加安全確認
+
+| チェック項目 | 状態 |
+|------------|------|
+| 新規外部サービス追加 | ✅ Google Sheets ReadOnly のみ（`spreadsheets.readonly` スコープ） |
+| Sheets 書き込み API 追加 | ❌ なし（updateCell/appendRow/deleteRow/createSheet/deleteSheet/shareSheet/changePermission/formatCell 未実装） |
+| Sheets スコープ | ✅ `spreadsheets.readonly` のみ（`spreadsheets` フルアクセスは取得しない） |
+| Gmail / Calendar / Drive スコープ変更 | ❌ なし（既存スコープを継続） |
+| `sheetsFetcher.ts` の HTTP メソッド | ✅ GET のみ（POST/PATCH/PUT/DELETE なし） |
+| `UnifiedBusinessMetric` の書き込みフラグ | ✅ `readOnly: true as const` / `writeEnabled: false as const` |
+| PHASE8_SCOPES 定義 | ✅ gmail.readonly + calendar.readonly + drive.readonly + spreadsheets.readonly のみ |
+| 個人LINE接続 | ❌ 実装なし（CLAUDE.md 制約どおり） |
+| LINE WORKS / freee / kintone 接続 | ❌ 未接続（stub のみ） |
+
+## Sheets 書き込み禁止の確認
+
+### 禁止されている処理と実装状態
+
+| 処理 | 関数名 | 実装状態 | 証拠ファイル |
+|------|--------|---------|------------|
+| セル更新 | `updateCell` | **未実装** | `sheetsFetcher.ts`: GET のみ・コメント明記 |
+| 行追加 | `appendRow` | **未実装** | `sheetsFetcher.ts`: GET のみ・コメント明記 |
+| 行削除 | `deleteRow` | **未実装** | `sheetsFetcher.ts`: GET のみ・コメント明記 |
+| シート作成 | `createSheet` | **未実装** | `sheetsFetcher.ts`: GET のみ・コメント明記 |
+| シート削除 | `deleteSheet` | **未実装** | `sheetsFetcher.ts`: GET のみ・コメント明記 |
+| 共有設定変更 | `shareSheet` | **未実装** | `sheetsFetcher.ts`: GET のみ・コメント明記 |
+| 権限変更 | `changePermission` | **未実装** | `sheetsFetcher.ts`: GET のみ・コメント明記 |
+| セル書式変更 | `formatCell` | **未実装** | `sheetsFetcher.ts`: GET のみ・コメント明記 |
+
+### HTTP メソッドの使用状況（Sheets）
+
+| ファイル | GET | POST | PATCH | PUT | DELETE |
+|---------|-----|------|-------|-----|--------|
+| `sheetsFetcher.ts` | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `sheetsClient.ts` | ✅（fetch委譲） | ❌ | ❌ | ❌ | ❌ |
 
 ---
 
@@ -46,7 +84,7 @@
 
 ---
 
-## 現在の外部API接続状況（Phase 7 更新）
+## 現在の外部API接続状況（Phase 8 更新）
 
 | サービス | 接続状態 | スコープ | 書き込み |
 |---------|---------|---------|---------|

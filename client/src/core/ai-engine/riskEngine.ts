@@ -57,7 +57,7 @@ export const riskEngine = {
           sources: [metric.source],
           riskType: '資金繰り',
           severity: 'critical',
-          title: `資金繰りリスク: ${metric.label}`,
+          title: `資金繰りリスク: ${metric.metricName}`,
           description: metric.alertReason ?? '資金繰りに注意が必要です',
           detectedAt: now,
           deadline: null,
@@ -68,8 +68,41 @@ export const riskEngine = {
           sources: [metric.source],
           riskType: '未回収',
           severity: 'high',
-          title: `未回収リスク: ${metric.label}`,
+          title: `未回収リスク: ${metric.metricName}`,
           description: metric.alertReason ?? '未回収金額が発生しています',
+          detectedAt: now,
+          deadline: null,
+        })
+      } else if (metric.category === '請求' && (metric.status === 'danger' || metric.status === 'warning')) {
+        risks.push({
+          id: `risk-business-${metric.id}-billing`,
+          sources: [metric.source],
+          riskType: '未請求',
+          severity: metric.status === 'danger' ? 'high' : 'medium',
+          title: `未請求リスク: ${metric.metricName}`,
+          description: metric.alertReason ?? '未請求金額が発生しています',
+          detectedAt: now,
+          deadline: null,
+        })
+      } else if (metric.category === '事故' && metric.value > 0) {
+        risks.push({
+          id: `risk-business-${metric.id}-accident`,
+          sources: [metric.source],
+          riskType: '事故',
+          severity: 'critical',
+          title: `事故リスク: ${metric.metricName}`,
+          description: metric.alertReason ?? '事故が発生しています。報告書を確認してください',
+          detectedAt: now,
+          deadline: null,
+        })
+      } else if (metric.category === '粗利' && metric.trend === 'down' && metric.status !== 'normal') {
+        risks.push({
+          id: `risk-business-${metric.id}-profit`,
+          sources: [metric.source],
+          riskType: 'その他',
+          severity: 'medium',
+          title: `粗利悪化リスク: ${metric.metricName}`,
+          description: metric.alertReason ?? '粗利率が低下しています',
           detectedAt: now,
           deadline: null,
         })

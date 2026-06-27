@@ -1,4 +1,4 @@
-import type { UnifiedInboxItem, UnifiedScheduleItem, UnifiedFileItem, UnifiedRisk } from '../providers/providerTypes'
+import type { UnifiedInboxItem, UnifiedScheduleItem, UnifiedFileItem, UnifiedRisk, UnifiedBusinessMetric } from '../providers/providerTypes'
 import type { BriefingSection } from './aiEngineTypes'
 
 export const briefingEngine = {
@@ -6,7 +6,8 @@ export const briefingEngine = {
     inbox: UnifiedInboxItem[],
     risks: UnifiedRisk[],
     schedule: UnifiedScheduleItem[] = [],
-    files: UnifiedFileItem[] = []
+    files: UnifiedFileItem[] = [],
+    metrics: UnifiedBusinessMetric[] = []
   ): BriefingSection[] {
     const sections: BriefingSection[] = []
 
@@ -35,6 +36,24 @@ export const briefingEngine = {
       alertLevel: priorityAItems.length > 0 ? 'warning' : null,
     })
 
+    // BusinessData セクション（Phase 8 追加）
+    if (metrics.length > 0) {
+      const dangerMetrics = metrics.filter((m) => m.status === 'danger' || m.status === 'warning')
+      const metricItems = dangerMetrics.slice(0, 5).map((m) => {
+        const mark = m.status === 'danger' ? '🔴 ' : '⚠️ '
+        const valStr = m.unit === '円'
+          ? `¥${(m.value / 10000).toFixed(0)}万`
+          : `${m.value}${m.unit}`
+        return `${mark}${m.metricName}：${valStr}${m.alertReason ? ` — ${m.alertReason}` : ''}`
+      })
+      sections.push({
+        sectionType: 'business-data' as BriefingSection['sectionType'],
+        title: `経営数字アラート ${dangerMetrics.length}件`,
+        items: metricItems,
+        alertLevel: dangerMetrics.some((m) => m.status === 'danger') ? 'danger' : 'warning',
+      })
+    }
+
     // リスクセクション
     const criticalRisks = risks.filter((r) => r.severity === 'critical' || r.severity === 'high')
     sections.push({
@@ -59,8 +78,8 @@ export const briefingEngine = {
       })
     }
 
-    // Inbox × Schedule × File 横断アクションセクション
-    const crossItems = generateCrossItems(inbox, schedule, files)
+    // Inbox × Schedule × File × BusinessData 横断アクションセクション
+    const crossItems = generateCrossItems(inbox, schedule, files, metrics)
     const deadlineItems = inbox
       .filter((i) => i.deadline !== null)
       .slice(0, 3)
@@ -87,11 +106,12 @@ export const briefingEngine = {
   },
 }
 
-// Gmail × Calendar × Drive 横断で優先アクションを生成
+// Gmail × Calendar × Drive × BusinessData 横断で優先アクションを生成
 function generateCrossItems(
   inbox: UnifiedInboxItem[],
   schedule: UnifiedScheduleItem[],
-  files: UnifiedFileItem[] = []
+  files: UnifiedFileItem[] = [],
+  metrics: UnifiedBusinessMetric[] = []
 ): string[] {
   const result: string[] = []
 
@@ -117,7 +137,18 @@ function generateCrossItems(
     }
   }
 
-  return result.slice(0, 3)
+  // BusinessData × File 横断（未請求 + 未請求一覧ファイル）
+  const unbilledMetric = metrics.find((m) => m.metricKey === 'unbilled' && m.status === 'danger')
+  if (unbilledMetric) {
+    const unbilledFile = files.find((f) => f.category === '請求' && f.name.includes('未請求'))
+    if (unbilledFile) {
+      result.push(
+        `未請求${(unbilledMetric.value / 10000).toFixed(0)}万円 — 関連資料「${unbilledFile.name}」を確認してください`
+      )
+    }
+  }
+
+  return result.slice(0, 5)
 }
 
 function formatEventTime(isoString: string): string {
