@@ -14,13 +14,14 @@ import { mockCalendarEvents } from '../../services/calendar/mockCalendar'
 import { mapGoogleCalendarEventToUnifiedScheduleItem } from '../../services/calendar/calendarMapper'
 import { createCalendarSummary } from '../../services/calendar/calendarAnalyzer'
 import { calendarClient } from '../../services/calendar/calendarClient'
-import type { UnifiedScheduleItem } from '../../core/providers/providerTypes'
+import { mockDriveFiles } from '../../services/drive/mockDrive'
+import { mapGoogleDriveFileToUnifiedFileItem } from '../../services/drive/driveMapper'
+import { createDriveSummary } from '../../services/drive/driveAnalyzer'
+import { driveClient } from '../../services/drive/driveClient'
+import type { UnifiedScheduleItem, UnifiedFileItem } from '../../core/providers/providerTypes'
 import DemoBanner from '../DemoBanner'
 
-// AI Engine: Schedule Provider (Phase 6) + Inbox Provider (Phase 5.5) 横断参照
-// import { priorityEngine } from '../../core/ai-engine/priorityEngine'
-// import { briefingEngine } from '../../core/ai-engine/briefingEngine'
-// 現時点: ローカルデータで参照 — Claude API接続後にリアルタイム生成へ切り替え予定
+// AI Engine: Schedule Provider (Phase 6) + File Provider (Phase 7) + Inbox Provider 横断参照
 
 const IMPORTANCE_CONFIG = {
   critical: { label: '最優先', color: '#EF4444', bg: '#FEF2F2' },
@@ -63,6 +64,12 @@ const demoScheduleItems = mockCalendarEvents
   .map((e) => mapGoogleCalendarEventToUnifiedScheduleItem(e, 'demo'))
 const demoCalendarSummary = createCalendarSummary(mockCalendarEvents)
 
+// File Provider 経由 (Phase 7: デモDriveまたは Google Drive ReadOnly)
+const demoFileItems = mockDriveFiles
+  .filter((f) => !f.trashed)
+  .map((f) => mapGoogleDriveFileToUnifiedFileItem(f, 'デモDrive'))
+const demoDriveSummary = createDriveSummary(mockDriveFiles)
+
 export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
   const [expandedActionId, setExpandedActionId] = useState<string | null>('pa1')
   const [activeSuggestion, setActiveSuggestion] = useState<ActionSuggestion | null>(null)
@@ -71,6 +78,8 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
   const [healthExpanded, setHealthExpanded] = useState(true)
   const [scheduleItems, setScheduleItems] = useState<UnifiedScheduleItem[]>(demoScheduleItems)
   const [scheduleSource, setScheduleSource] = useState<'demo' | 'api'>('demo')
+  const [fileItems, setFileItems] = useState<UnifiedFileItem[]>(demoFileItems)
+  const [fileSource, setFileSource] = useState<'demo' | 'api'>('demo')
 
   useEffect(() => {
     calendarClient.fetchEvents().then((result) => {
@@ -81,11 +90,34 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
         setScheduleSource('api')
       }
     }).catch(() => { /* デモデータを維持 */ })
+
+    driveClient.fetchFiles().then((result) => {
+      if (result.source !== 'mock') {
+        setFileItems(result.files
+          .filter((f) => !f.trashed)
+          .map((f) => mapGoogleDriveFileToUnifiedFileItem(f, 'Google Drive')))
+        setFileSource('api')
+      }
+    }).catch(() => { /* デモデータを維持 */ })
   }, [])
 
   const calendarSummary = scheduleSource === 'api'
     ? { totalCount: scheduleItems.length, importanceACount: scheduleItems.filter((e) => e.priority === 'A').length, deadlineRiskCount: scheduleItems.filter((e) => e.deadlineRisk).length, travelRequiredCount: scheduleItems.filter((e) => e.location && !e.location.includes('会議室')).length }
     : demoCalendarSummary
+
+  const driveSummary = useMemo(() => fileSource === 'api'
+    ? {
+        totalCount: fileItems.length,
+        importanceACount: fileItems.filter((f) => f.importance === 'A').length,
+        riskFlagCount: fileItems.filter((f) => f.riskFlag).length,
+        bankCount: fileItems.filter((f) => f.category === '銀行').length,
+        contractCount: fileItems.filter((f) => f.category === '契約').length,
+        invoiceCount: fileItems.filter((f) => f.category === '請求').length,
+        accidentCount: fileItems.filter((f) => f.category === '事故').length,
+        auditCount: fileItems.filter((f) => f.category === '監査').length,
+        lastModifiedAt: fileItems.length > 0 ? fileItems[0].modifiedAt : null,
+      }
+    : demoDriveSummary, [fileItems, fileSource, demoDriveSummary])
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return []
@@ -401,6 +433,115 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
 
         <div style={{ marginTop: 8, fontSize: 10, color: '#166534', fontWeight: 600 }}>
           元データ：{scheduleSource === 'api' ? 'Google Calendar ReadOnly' : 'デモCalendar'} · 予定作成・変更なし · 社長確認のみ
+        </div>
+      </div>
+
+      {/* ── File Provider — 最近の重要ファイル ── */}
+      <div
+        style={{
+          background: '#FFFBEB',
+          border: '1.5px solid #FDE68A',
+          borderRadius: 'var(--radius)',
+          padding: '14px',
+          marginBottom: 14,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 18 }}>📁</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#92400E' }}>
+              最近の重要ファイル：{driveSummary.totalCount}件
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {fileSource === 'demo' && demoMode !== false && (
+              <span style={{ background: '#FEF3C7', color: '#92400E', borderRadius: 999, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+                デモDrive
+              </span>
+            )}
+            <span style={{ background: '#D1FAE5', color: '#065F46', borderRadius: 999, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+              読み取り専用
+            </span>
+            <span style={{ background: '#FEE2E2', color: '#991B1B', borderRadius: 999, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+              変更・削除なし
+            </span>
+          </div>
+        </div>
+
+        {/* カウント行 */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+          {[
+            { label: '重要A', v: driveSummary.importanceACount, c: '#EF4444', bg: '#FEE2E2' },
+            { label: 'リスク', v: driveSummary.riskFlagCount, c: '#DC2626', bg: '#FEF2F2' },
+            { label: '銀行', v: driveSummary.bankCount, c: '#1B3D6F', bg: '#DBEAFE' },
+            { label: '契約', v: driveSummary.contractCount, c: '#7C3AED', bg: '#EDE9FE' },
+            { label: '請求', v: driveSummary.invoiceCount, c: '#D97706', bg: '#FEF3C7' },
+          ].map((s) => (
+            <div key={s.label} style={{ background: s.bg, borderRadius: 8, padding: '3px 8px', display: 'flex', gap: 3, alignItems: 'center' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: s.c }}>{s.label}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: s.c }}>{s.v}件</span>
+            </div>
+          ))}
+        </div>
+
+        {/* ファイルリスト */}
+        <div style={{ background: '#fff', borderRadius: 10, overflow: 'hidden', border: '1px solid #FDE68A' }}>
+          {fileItems.slice(0, 5).map((file, i) => {
+            const alertColor = file.alertLevel === 'danger' ? '#EF4444' : file.alertLevel === 'warning' ? '#F59E0B' : '#92400E'
+            const modifiedStr = (() => {
+              try { return new Date(file.modifiedAt).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }) } catch { return '' }
+            })()
+            return (
+              <div
+                key={file.id}
+                style={{
+                  padding: '10px 12px',
+                  borderBottom: i < fileItems.length - 1 && i < 4 ? '1px solid #FDE68A' : 'none',
+                  background: file.riskFlag ? '#FFFBEB' : '#fff',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: '#9CA3AF', minWidth: 30 }}>
+                    {file.fileType}
+                  </span>
+                  <span style={{ background: alertColor + '20', color: alertColor, borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 800 }}>
+                    {file.importance}
+                  </span>
+                  <span style={{ background: '#F1F5F9', color: '#475569', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>
+                    {file.category}
+                  </span>
+                  {file.riskFlag && (
+                    <span style={{ background: '#FEE2E2', color: '#991B1B', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>
+                      ⚠️ 要確認
+                    </span>
+                  )}
+                  <span style={{ fontSize: 10, color: '#9CA3AF', marginLeft: 'auto' }}>{modifiedStr}</span>
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 1, wordBreak: 'break-all' }}>
+                  {file.name}
+                </div>
+                {file.folderName && (
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                    📂 {file.folderName}
+                  </div>
+                )}
+                {file.suggestedAction && (
+                  <div style={{ fontSize: 11, color: '#92400E', marginTop: 2, fontWeight: 600 }}>
+                    💡 {file.suggestedAction}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {fileItems.length === 0 && (
+            <div style={{ padding: '16px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
+              ファイルが見つかりません
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginTop: 8, fontSize: 10, color: '#92400E', fontWeight: 600 }}>
+          元データ：{fileSource === 'api' ? 'Google Drive ReadOnly' : 'デモDrive'} · ファイル作成・変更・削除なし · 社長確認のみ
         </div>
       </div>
 

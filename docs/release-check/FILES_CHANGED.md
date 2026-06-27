@@ -1,6 +1,45 @@
 # FILES_CHANGED.md — 変更・追加・削除ファイル一覧
 
-> 最終更新: Phase 6.1 — v0.6.1（2026-06-27）
+> 最終更新: Phase 7 — v0.7.0（2026-06-27）
+
+---
+
+## Phase 7 変更ファイル
+
+### 新規作成 (9ファイル)
+
+| ファイルパス | 役割 |
+|-------------|------|
+| `client/src/services/drive/types.ts` | Drive API 型 / DriveDerivedFile / DriveSummary / DriveFileCategory |
+| `client/src/services/drive/mockDrive.ts` | デモファイルデータ（銀行・契約・請求・監査・事故・資金繰り・見積 7件） |
+| `client/src/services/drive/driveClient.ts` | Drive ReadOnly 入口（mock/cache/api 切り替え） |
+| `client/src/services/drive/driveFetcher.ts` | GET 専用フェッチャー（書き込みAPI未実装） |
+| `client/src/services/drive/driveMapper.ts` | GoogleDriveFile → UnifiedFileItem 変換 |
+| `client/src/services/drive/driveAnalyzer.ts` | カテゴリ・重要度・リスクフラグ・推奨アクション判定 |
+| `client/src/services/drive/driveCache.ts` | ローカルキャッシュ（5分 TTL） |
+| `client/src/services/drive/driveSearch.ts` | 関連度スコアリング付きファイル検索 |
+| `docs/release-check/DRIVE_READONLY_DESIGN.md` | Drive ReadOnly 設計書（新規） |
+
+### 更新 (12ファイル)
+
+| ファイルパス | 変更内容 |
+|-------------|---------|
+| `client/src/services/google/googleScopes.ts` | DRIVE_READONLY 昇格・PHASE7_SCOPES 追加 |
+| `client/src/core/providers/providerTypes.ts` | UnifiedFileItem 拡張（readOnly / writeEnabled 等 11フィールド追加） |
+| `client/src/core/providers/fileProvider.ts` | stub → Google Drive 接続実装 |
+| `client/src/core/ai-engine/aiEngineTypes.ts` | BriefingSection.sectionType に 'files' 追加 |
+| `client/src/core/ai-engine/priorityEngine.ts` | Inbox × File 横断スコアリング追加 |
+| `client/src/core/ai-engine/briefingEngine.ts` | Drive ファイルセクション追加・三元横断アクション生成 |
+| `client/src/core/ai-engine/searchEngine.ts` | searchFiles() / searchAll() 追加（SearchResults 型） |
+| `client/src/components/screens/CockpitScreen.tsx` | 「最近の重要ファイル」セクション追加（アンバーテーマ） |
+| `client/src/components/screens/Home.tsx` | Drive ファイルカード追加 |
+| `client/src/components/screens/AiChat.tsx` | Driveショートカット5種追加・Drive回答ロジック |
+| `client/src/components/screens/Settings.tsx` | v0.7.0・Phase 7 表記・drive.readonly スコープ表示 |
+| `README.md` | Phase 7 セクション追加 |
+
+### 削除 (0ファイル)
+
+なし
 
 ---
 

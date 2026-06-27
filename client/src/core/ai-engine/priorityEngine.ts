@@ -1,7 +1,11 @@
-import type { UnifiedInboxItem, UnifiedScheduleItem, UnifiedRisk } from '../providers/providerTypes'
+import type { UnifiedInboxItem, UnifiedScheduleItem, UnifiedFileItem, UnifiedRisk } from '../providers/providerTypes'
 import type { PriorityScore } from './aiEngineTypes'
 
-function scoreInboxItemInternal(item: UnifiedInboxItem, schedule: UnifiedScheduleItem[] = []): PriorityScore {
+function scoreInboxItemInternal(
+  item: UnifiedInboxItem,
+  schedule: UnifiedScheduleItem[] = [],
+  files: UnifiedFileItem[] = []
+): PriorityScore {
   let baseScore = 50
   const modifiers: { reason: string; delta: number }[] = []
 
@@ -32,15 +36,26 @@ function scoreInboxItemInternal(item: UnifiedInboxItem, schedule: UnifiedSchedul
   }
 
   // ── 横断スコアリング（Inbox × Schedule）────────────────────────
-  // Gmailタイプとカレンダー予定が一致する場合は優先度を上げる
   if (schedule.length > 0) {
     const relatedEvent = findRelatedScheduleEvent(item, schedule)
     if (relatedEvent) {
       modifiers.push({ reason: `本日予定と関連（${relatedEvent.category}）`, delta: 20 })
-
-      // 予定の重要度がAの場合はさらに加算
       if (relatedEvent.priority === 'A') {
         modifiers.push({ reason: '関連予定が最重要', delta: 10 })
+      }
+    }
+  }
+
+  // ── 横断スコアリング（Inbox × File）─────────────────────────
+  // GmailタスクタイプとDriveファイルカテゴリが一致する場合は優先度を上げる
+  if (files.length > 0) {
+    const relatedFile = files.find(
+      (f) => f.category === item.taskType || f.relatedCompany === item.from
+    )
+    if (relatedFile) {
+      modifiers.push({ reason: `関連Drive資料あり（${relatedFile.category}）`, delta: 15 })
+      if (relatedFile.riskFlag) {
+        modifiers.push({ reason: '関連資料にリスクフラグ', delta: 10 })
       }
     }
   }
@@ -79,14 +94,22 @@ function findRelatedScheduleEvent(item: UnifiedInboxItem, schedule: UnifiedSched
 }
 
 export const priorityEngine = {
-  scoreInboxItem(item: UnifiedInboxItem, schedule: UnifiedScheduleItem[] = []): PriorityScore {
-    return scoreInboxItemInternal(item, schedule)
+  scoreInboxItem(
+    item: UnifiedInboxItem,
+    schedule: UnifiedScheduleItem[] = [],
+    files: UnifiedFileItem[] = []
+  ): PriorityScore {
+    return scoreInboxItemInternal(item, schedule, files)
   },
 
-  rankItems(items: UnifiedInboxItem[], schedule: UnifiedScheduleItem[] = []): UnifiedInboxItem[] {
+  rankItems(
+    items: UnifiedInboxItem[],
+    schedule: UnifiedScheduleItem[] = [],
+    files: UnifiedFileItem[] = []
+  ): UnifiedInboxItem[] {
     const scored = items.map((item) => ({
       item,
-      score: scoreInboxItemInternal(item, schedule),
+      score: scoreInboxItemInternal(item, schedule, files),
     }))
     scored.sort((a, b) => b.score.finalScore - a.score.finalScore)
     return scored.map((s) => s.item)
@@ -112,11 +135,12 @@ export const priorityEngine = {
     return Math.min(100, Math.max(0, score))
   },
 
-  // Inbox + Schedule 横断 TOP アイテム生成
+  // Inbox + Schedule + File 横断 TOP アイテム生成
   getCrossServiceTopItems(
     inbox: UnifiedInboxItem[],
     schedule: UnifiedScheduleItem[],
-    risks: UnifiedRisk[]
+    risks: UnifiedRisk[],
+    files: UnifiedFileItem[] = []
   ): string[] {
     const topActions: string[] = []
 
@@ -129,10 +153,16 @@ export const priorityEngine = {
       topActions.push(`【予定】${timeStr} ${event.title}（${event.category}）`)
     }
 
-    // Inbox + Schedule 横断スコアで上位インボックスアイテム
-    const rankedInbox = this.rankItems(inbox, schedule)
+    // Inbox + Schedule + File 横断スコアで上位インボックスアイテム
+    const rankedInbox = this.rankItems(inbox, schedule, files)
     for (const item of rankedInbox.slice(0, 3)) {
       topActions.push(`【${item.priority}】${item.subject}（${item.from}）`)
+    }
+
+    // 重大リスクフラグのあるDriveファイル（最大1件）
+    const riskFile = files.find((f) => f.riskFlag && f.importance === 'A')
+    if (riskFile) {
+      topActions.push(`【資料】${riskFile.name}（${riskFile.category}）要確認`)
     }
 
     // 重大リスク

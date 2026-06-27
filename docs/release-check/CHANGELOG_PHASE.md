@@ -4,6 +4,49 @@
 
 ---
 
+## Phase 7 — v0.7.0（2026-06-27）
+
+### 変更テーマ
+Google Drive を読み取り専用で接続し、AI社長室の File Provider にファイル情報を流し込む構造を作る。Inbox × Schedule × File の三元横断分析を開始。
+
+### 追加した機能
+
+**Drive サービス層（8ファイル）**
+- `client/src/services/drive/types.ts`: GoogleDriveFile / DriveDerivedFile / DriveSummary / DriveFileCategory 型定義
+- `client/src/services/drive/mockDrive.ts`: デモファイルデータ（銀行/契約/請求/監査/事故/資金繰り/見積 7件）
+- `client/src/services/drive/driveClient.ts`: Drive ReadOnly 入口（認証なし→mock、認証済み→API）
+- `client/src/services/drive/driveFetcher.ts`: GET 専用フェッチャー（書き込みAPI未実装）
+- `client/src/services/drive/driveMapper.ts`: GoogleDriveFile → DriveDerivedFile → UnifiedFileItem 変換
+- `client/src/services/drive/driveAnalyzer.ts`: カテゴリ・重要度・リスクフラグ・推奨アクション・DriveSummary 判定
+- `client/src/services/drive/driveCache.ts`: ローカルキャッシュ（5分 TTL）
+- `client/src/services/drive/driveSearch.ts`: 関連度スコアリング付きファイル検索
+
+**docs（新規）**
+- `docs/release-check/DRIVE_READONLY_DESIGN.md`: Drive ReadOnly 設計書
+
+### 変更した機能
+
+- `googleScopes.ts`: DRIVE_READONLY をアクティブスコープへ昇格（FUTURE_SCOPES → GOOGLE_SCOPES）。PHASE7_SCOPES 追加。
+- `providerTypes.ts`: `UnifiedFileItem` を拡張（18フィールド: relatedCompany / relatedPerson / relatedProject / riskFlag / suggestedAction / readOnly: true / writeEnabled: false 等）
+- `fileProvider.ts`: stub → Google Drive 接続実装（認証なし→デモ）
+- `aiEngineTypes.ts`: BriefingSection.sectionType に `'files'` 追加
+- `priorityEngine.ts`: Inbox × File 横断スコアリング追加（同カテゴリ +15、riskFlag +10）
+- `briefingEngine.ts`: Drive ファイルセクション追加・Inbox × Schedule × File 三元横断アクション生成
+- `searchEngine.ts`: `searchFiles()` / `searchAll()` 追加（SearchResults 型）
+- `CockpitScreen.tsx`: 「最近の重要ファイル」セクション追加（アンバーテーマ）
+- `Home.tsx`: Drive ファイルカード追加（アンバー #FFFBEB）
+- `AiChat.tsx`: Driveショートカット5種追加・Drive回答ロジック追加
+- `Settings.tsx`: Phase 7 表記・v0.7.0 バージョン更新・drive.readonly スコープ表示追加
+- `docs/release-check/` 11ファイル: Phase 7 内容に更新
+
+### 削除した機能
+- なし
+
+### 外部サービス追加
+- Google Drive ReadOnly（`drive.readonly` スコープのみ。書き込みなし。）
+
+---
+
 ## Phase 6.1 — v0.6.1（2026-06-27）
 
 ### 変更テーマ

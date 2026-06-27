@@ -26,12 +26,12 @@ const ROLES = ['社長専用', '管理者', '事務', '現場']
 
 const INTEGRATION_PHASES = [
   { phase: 1, label: 'Gmail読み取り', status: '実装済' },
-  { phase: 2, label: 'Googleカレンダー読み取り', status: '未接続' },
-  { phase: 3, label: 'Google Drive検索', status: '未接続' },
+  { phase: 2, label: 'Googleカレンダー読み取り', status: '実装済' },
+  { phase: 3, label: 'Google Drive検索', status: '実装済' },
   { phase: 4, label: 'Googleスプレッドシート読み取り', status: '未接続' },
   { phase: 5, label: 'LINE WORKS通知', status: '未接続' },
   { phase: 6, label: 'Gmail下書き作成', status: '計画中' },
-  { phase: 7, label: 'Google Drive保存', status: '計画中' },
+  { phase: 7, label: 'Google Sheets保存', status: '計画中' },
   { phase: 8, label: '各種書き込み処理', status: '将来' },
 ]
 
@@ -237,21 +237,39 @@ export default function Settings({
               {gSession.grantedScopes.includes(GOOGLE_SCOPES.GMAIL_READONLY) ? '✓' : '○'}
               {' '}{getScopeLabel(GOOGLE_SCOPES.GMAIL_READONLY)}
             </span>
-            {(['calendar.readonly', 'drive.readonly', 'sheets.readonly'] as const).map((s) => (
+            {([GOOGLE_SCOPES.CALENDAR_READONLY, GOOGLE_SCOPES.DRIVE_READONLY] as const).map((scope) => (
               <span
-                key={s}
+                key={scope}
                 style={{
-                  background: '#F1F5F9',
-                  color: '#CBD5E1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  background: gSession.grantedScopes.includes(scope)
+                    ? '#D1FAE5' : '#F1F5F9',
+                  color: gSession.grantedScopes.includes(scope)
+                    ? '#065F46' : '#94A3B8',
                   borderRadius: 8,
                   padding: '4px 10px',
-                  fontSize: 11,
-                  fontWeight: 600,
+                  fontSize: 12,
+                  fontWeight: 700,
                 }}
               >
-                — {s}（Phase 6以降）
+                {gSession.grantedScopes.includes(scope) ? '✓' : '○'}
+                {' '}{getScopeLabel(scope)}
               </span>
             ))}
+            <span
+              style={{
+                background: '#F1F5F9',
+                color: '#CBD5E1',
+                borderRadius: 8,
+                padding: '4px 10px',
+                fontSize: 11,
+                fontWeight: 600,
+              }}
+            >
+              — sheets.readonly（Phase 8以降）
+            </span>
           </div>
         </div>
 
@@ -294,7 +312,7 @@ export default function Settings({
           const rows = [
             { label: 'Client ID設定', ok: check.hasClientId, value: check.hasClientId ? (check.clientIdMasked ?? '設定済み') : '未設定' },
             { label: 'Redirect URI設定', ok: check.hasRedirectUri, value: check.hasRedirectUri ? check.redirectUri : '未設定' },
-            { label: 'スコープ', ok: true, value: 'gmail.readonly のみ' },
+            { label: 'スコープ', ok: true, value: 'gmail / calendar / drive .readonly' },
             { label: '書き込みAPI', ok: true, value: '未実装' },
             { label: '本番接続準備', ok: check.isReadyToConnect, value: check.isReadyToConnect ? '完了' : '未完了' },
           ]
@@ -394,7 +412,7 @@ export default function Settings({
               fontWeight: 800,
             }}
           >
-            {gConnecting ? '⏳ Googleへ接続中...' : '🔐 Googleアカウントで接続（Gmail ReadOnly）'}
+            {gConnecting ? '⏳ Googleへ接続中...' : '🔐 Googleアカウントで接続（Gmail / Calendar / Drive ReadOnly）'}
           </button>
         )}
 
@@ -467,7 +485,7 @@ export default function Settings({
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--navy)' }}>AI社長室データ基盤</div>
                 <div style={{ fontSize: 10, color: '#6366F1', fontWeight: 600 }}>
-                  Phase 6 — Calendar ReadOnly 接続 · 書き込みなし
+                  Phase 7 — Drive ReadOnly 接続 · 書き込みなし
                 </div>
               </div>
               <span
@@ -1157,7 +1175,7 @@ export default function Settings({
           lineHeight: 1.7,
         }}
       >
-        AI社長室 v0.6.0 Phase 6 — {selectedCompany?.name}
+        AI社長室 v0.7.0 Phase 7 — {selectedCompany?.name}
         <br />
         フロントエンドMVP（仮データのみ · 外部書き込みなし）
       </div>

@@ -6,6 +6,10 @@ import DemoBanner from '../DemoBanner'
 import { mockCalendarEvents } from '../../services/calendar/mockCalendar'
 import { mapToCalendarDerivedEvent } from '../../services/calendar/calendarMapper'
 import { createCalendarSummary } from '../../services/calendar/calendarAnalyzer'
+import { mockDriveFiles } from '../../services/drive/mockDrive'
+import { mapGoogleDriveFileToUnifiedFileItem } from '../../services/drive/driveMapper'
+import { createDriveSummary } from '../../services/drive/driveAnalyzer'
+import { searchDriveFiles } from '../../services/drive/driveSearch'
 
 interface Props {
   onVoice: () => void
@@ -81,7 +85,58 @@ function getCalendarShortcutResponse(input: string): string | null {
   return null
 }
 
+const DRIVE_SHORTCUTS = [
+  '銀行資料を探して',
+  '契約書を探して',
+  '未請求一覧はどこ？',
+  '監査資料を探して',
+  '事故報告書を探して',
+]
+
+// Drive ショートカット回答（File Provider 参照）
+function getDriveShortcutResponse(input: string): string | null {
+  const allFiles = mockDriveFiles
+    .filter((f) => !f.trashed)
+    .map((f) => mapGoogleDriveFileToUnifiedFileItem(f, 'デモDrive'))
+  const summary = createDriveSummary(mockDriveFiles.filter((f) => !f.trashed))
+
+  // 汎用キーワード検索
+  const keywords = ['銀行', '契約', '未請求', '請求', '監査', '事故', '資金', '見積', '車両', '福祉']
+  const matchedKeyword = keywords.find((k) => input.includes(k))
+
+  if (matchedKeyword) {
+    const results = searchDriveFiles(matchedKeyword, allFiles)
+    if (results.length === 0) return `「${matchedKeyword}」に関連するファイルは見つかりませんでした。`
+    const lines = results.slice(0, 5).map((r) => {
+      const modified = (() => {
+        try { return new Date(r.item.modifiedAt).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }) } catch { return '' }
+      })()
+      return `・[${r.item.fileType}] ${r.item.name}（${r.item.category} / 更新:${modified}）`
+    }).join('\n')
+    return `「${matchedKeyword}」関連ファイル ${results.length}件見つかりました。\n\n${lines}\n\nデータ元：デモDrive · 読み取り専用 · ファイル変更なし`
+  }
+
+  if (input.includes('ファイル') || input.includes('資料') || input.includes('書類')) {
+    const lines = allFiles.slice(0, 5).map((f) => `・[${f.fileType}] ${f.name}（${f.category}）`).join('\n')
+    return `最近の重要ファイル ${summary.totalCount}件です。\n\n${lines}\n\n銀行:${summary.bankCount}件 / 契約:${summary.contractCount}件 / 請求:${summary.invoiceCount}件 / 監査:${summary.auditCount}件\n\nデータ元：デモDrive · 読み取り専用`
+  }
+
+  if (input.includes('今日の予定') && input.includes('関係する資料')) {
+    const bankFiles = allFiles.filter((f) => f.category === '銀行')
+    if (bankFiles.length > 0) {
+      return `今日の銀行打合せに関連する資料を見つけました。\n\n${bankFiles.map((f) => `・${f.name}`).join('\n')}\n\n事前に内容をご確認ください。\n\nInbox × Schedule × File 横断分析（Phase 7）`
+    }
+    return '今日の予定に関連する資料は見つかりませんでした。'
+  }
+
+  return null
+}
+
 function getMockResponse(mode: AiMode, input: string): string {
+  // Drive ショートカット回答を最優先
+  const driveResponse = getDriveShortcutResponse(input)
+  if (driveResponse) return driveResponse
+
   // カレンダーショートカット回答を優先
   const calendarResponse = getCalendarShortcutResponse(input)
   if (calendarResponse) return calendarResponse
@@ -284,6 +339,49 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
                 fontSize: 11,
                 fontWeight: 600,
                 color: '#166534',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Driveショートカット（Phase 7）── */}
+      <div
+        style={{
+          flexShrink: 0,
+          background: '#FFFBEB',
+          borderBottom: '1px solid #FDE68A',
+          padding: '6px 14px',
+        }}
+      >
+        <div style={{ fontSize: 10, fontWeight: 800, color: '#92400E', marginBottom: 4 }}>
+          📁 Driveショートカット
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            gap: 6,
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+          }}
+        >
+          {DRIVE_SHORTCUTS.map((s) => (
+            <button
+              key={s}
+              onClick={() => sendMessage(s)}
+              style={{
+                flexShrink: 0,
+                background: '#fff',
+                border: '1.5px solid #FDE68A',
+                borderRadius: 999,
+                padding: '5px 12px',
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#92400E',
                 whiteSpace: 'nowrap',
               }}
             >

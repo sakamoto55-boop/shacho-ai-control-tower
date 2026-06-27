@@ -6,6 +6,8 @@ import { mockGmailMessages } from '../../services/gmail/mockGmail'
 import { createGmailSummary } from '../../services/gmail/gmailAnalyzer'
 import { mockCalendarEvents } from '../../services/calendar/mockCalendar'
 import { createCalendarSummary } from '../../services/calendar/calendarAnalyzer'
+import { mockDriveFiles } from '../../services/drive/mockDrive'
+import { createDriveSummary } from '../../services/drive/driveAnalyzer'
 
 interface Props {
   onNavigate: (screen: Screen) => void
@@ -23,6 +25,11 @@ export default function Home({ onNavigate, onVoice }: Props) {
   const nextEvent = mockCalendarEvents.find((e) => e.status !== 'cancelled' && e.start.dateTime)
   const nextEventTime = nextEvent?.start.dateTime
     ? new Date(nextEvent.start.dateTime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+    : null
+  const driveSummary = useMemo(() => createDriveSummary(mockDriveFiles.filter((f) => !f.trashed)), [])
+  const latestFile = mockDriveFiles.filter((f) => !f.trashed)[0]
+  const latestModified = latestFile?.modifiedTime
+    ? new Date(latestFile.modifiedTime).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : null
 
   const quickCards = [
@@ -126,6 +133,60 @@ export default function Home({ onNavigate, onVoice }: Props) {
             全予定を見る →
           </button>
         </div>
+      </div>
+
+      {/* ── Drive ファイルカード（Phase 7） ── */}
+      <div
+        style={{
+          background: '#FFFBEB',
+          border: '1.5px solid #FDE68A',
+          borderRadius: 'var(--radius)',
+          padding: '14px',
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+          <span style={{ fontSize: 18 }}>📁</span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#92400E' }}>
+            最近の重要ファイル：{driveSummary.totalCount}件
+          </span>
+          <span style={{ marginLeft: 'auto', fontSize: 10, color: '#B45309', fontWeight: 600 }}>
+            デモDrive
+          </span>
+        </div>
+        {latestModified && (
+          <div style={{ fontSize: 11, color: '#B45309', marginBottom: 8 }}>
+            最終更新：{latestModified}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+          {[
+            { label: '重要A', v: driveSummary.importanceACount, c: '#EF4444', bg: '#FEE2E2' },
+            { label: '銀行', v: driveSummary.bankCount, c: '#1B3D6F', bg: '#DBEAFE' },
+            { label: '請求', v: driveSummary.invoiceCount, c: '#D97706', bg: '#FEF3C7' },
+            { label: '監査', v: driveSummary.auditCount, c: '#7C3AED', bg: '#EDE9FE' },
+          ].map((s) => (
+            <div key={s.label} style={{ background: s.bg, borderRadius: 8, padding: '3px 8px', display: 'flex', gap: 3, alignItems: 'center' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: s.c }}>{s.label}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: s.c }}>{s.v}件</span>
+            </div>
+          ))}
+        </div>
+        {latestFile && (
+          <div style={{ fontSize: 12, color: '#92400E', fontWeight: 700, marginBottom: 8, wordBreak: 'break-all' }}>
+            📄 {latestFile.name}
+          </div>
+        )}
+        <button
+          onClick={() => onNavigate('cockpit')}
+          style={{
+            background: '#F59E0B', color: '#fff', border: 'none',
+            borderRadius: 8, padding: '7px 14px', fontSize: 12,
+            fontWeight: 700, cursor: 'pointer', width: '100%',
+          }}
+        >
+          全ファイルを見る →
+        </button>
       </div>
 
       {/* ── Gmail要対応サマリー ── */}

@@ -1,7 +1,8 @@
 // Google OAuth スコープ定義
 // Phase 5: Gmail ReadOnly
 // Phase 6: Calendar ReadOnly を追加
-// Drive / Sheets / LINE WORKS は未接続
+// Phase 7: Drive ReadOnly を追加
+// Sheets / LINE WORKS は未接続
 //
 // 書き込みスコープは絶対に追加しない
 // gmail.modify / gmail.send / calendar.events / drive / sheets は禁止
@@ -9,6 +10,7 @@
 export const GOOGLE_SCOPES = {
   GMAIL_READONLY: 'https://www.googleapis.com/auth/gmail.readonly',
   CALENDAR_READONLY: 'https://www.googleapis.com/auth/calendar.readonly',
+  DRIVE_READONLY: 'https://www.googleapis.com/auth/drive.readonly',
 } as const
 
 export type GoogleScope = (typeof GOOGLE_SCOPES)[keyof typeof GOOGLE_SCOPES]
@@ -23,10 +25,17 @@ export const PHASE6_SCOPES: GoogleScope[] = [
   GOOGLE_SCOPES.CALENDAR_READONLY,
 ]
 
+// Phase 7 で使用するスコープ（Gmail + Calendar + Drive ReadOnly）
+// 書き込みスコープは含まない
+export const PHASE7_SCOPES: GoogleScope[] = [
+  GOOGLE_SCOPES.GMAIL_READONLY,
+  GOOGLE_SCOPES.CALENDAR_READONLY,
+  GOOGLE_SCOPES.DRIVE_READONLY,
+]
+
 // 将来フェーズ予定スコープ（現時点では使用しない）
 export const FUTURE_SCOPES = {
-  DRIVE_READONLY: 'https://www.googleapis.com/auth/drive.readonly',        // Phase 7予定
-  SHEETS_READONLY: 'https://www.googleapis.com/auth/spreadsheets.readonly', // 未定
+  SHEETS_READONLY: 'https://www.googleapis.com/auth/spreadsheets.readonly', // Phase 8予定
 } as const
 
 // 絶対に使用してはいけないスコープ（書き込み禁止）
@@ -47,8 +56,8 @@ export function getScopeLabel(scope: string): string {
       return 'Gmail 読み取り専用'
     case GOOGLE_SCOPES.CALENDAR_READONLY:
       return 'Googleカレンダー 読み取り専用'
-    case FUTURE_SCOPES.DRIVE_READONLY:
-      return 'Google Drive 読み取り専用（未取得）'
+    case GOOGLE_SCOPES.DRIVE_READONLY:
+      return 'Google Drive 読み取り専用'
     default:
       return scope
   }

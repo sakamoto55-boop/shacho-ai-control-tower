@@ -1,11 +1,12 @@
-import type { UnifiedInboxItem, UnifiedScheduleItem, UnifiedRisk } from '../providers/providerTypes'
+import type { UnifiedInboxItem, UnifiedScheduleItem, UnifiedFileItem, UnifiedRisk } from '../providers/providerTypes'
 import type { BriefingSection } from './aiEngineTypes'
 
 export const briefingEngine = {
   generateSections(
     inbox: UnifiedInboxItem[],
     risks: UnifiedRisk[],
-    schedule: UnifiedScheduleItem[] = []
+    schedule: UnifiedScheduleItem[] = [],
+    files: UnifiedFileItem[] = []
   ): BriefingSection[] {
     const sections: BriefingSection[] = []
 
@@ -43,8 +44,23 @@ export const briefingEngine = {
       alertLevel: criticalRisks.length > 0 ? 'danger' : null,
     })
 
-    // Inbox × Schedule 横断アクションセクション
-    const crossItems = generateCrossItems(inbox, schedule)
+    // Drive ファイルセクション（Phase 7 追加）
+    if (files.length > 0) {
+      const importantFiles = files.filter((f) => f.importance === 'A' || f.riskFlag)
+      const fileItems = files.slice(0, 5).map((f) => {
+        const mark = f.riskFlag ? '⚠️ ' : f.importance === 'A' ? '📌 ' : ''
+        return `${mark}${f.name}（${f.category}）`
+      })
+      sections.push({
+        sectionType: 'files' as BriefingSection['sectionType'],
+        title: `最近の重要ファイル ${files.length}件`,
+        items: fileItems,
+        alertLevel: importantFiles.length > 0 ? 'warning' : 'info',
+      })
+    }
+
+    // Inbox × Schedule × File 横断アクションセクション
+    const crossItems = generateCrossItems(inbox, schedule, files)
     const deadlineItems = inbox
       .filter((i) => i.deadline !== null)
       .slice(0, 3)
@@ -71,16 +87,32 @@ export const briefingEngine = {
   },
 }
 
-// Gmail × Calendar 横断で優先アクションを生成
-function generateCrossItems(inbox: UnifiedInboxItem[], schedule: UnifiedScheduleItem[]): string[] {
+// Gmail × Calendar × Drive 横断で優先アクションを生成
+function generateCrossItems(
+  inbox: UnifiedInboxItem[],
+  schedule: UnifiedScheduleItem[],
+  files: UnifiedFileItem[] = []
+): string[] {
   const result: string[] = []
 
   for (const event of schedule.filter((e) => e.priority === 'A' || e.deadlineRisk)) {
     const relatedMail = inbox.find((i) => i.taskType === event.category)
-    if (relatedMail) {
+    const relatedFile = files.find((f) => f.category === event.category)
+
+    if (relatedMail && relatedFile) {
+      const timeStr = event.isAllDay ? '本日' : formatEventTime(event.startAt)
+      result.push(
+        `${timeStr} ${event.title}は、${relatedMail.subject}と「${relatedFile.name}」が関連 → 先に資料確認`
+      )
+    } else if (relatedMail) {
       const timeStr = event.isAllDay ? '本日' : formatEventTime(event.startAt)
       result.push(
         `${timeStr} ${event.title}は、${relatedMail.subject}（${relatedMail.from}）と関連 → 先に資料確認`
+      )
+    } else if (relatedFile) {
+      const timeStr = event.isAllDay ? '本日' : formatEventTime(event.startAt)
+      result.push(
+        `${timeStr} ${event.title}の関連資料「${relatedFile.name}」を事前確認してください`
       )
     }
   }

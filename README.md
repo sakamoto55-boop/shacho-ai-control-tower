@@ -402,8 +402,100 @@ Phase 6 スコープ（PHASE6_SCOPES）:
 
 ### 次フェーズ
 
-**Phase 7**: Google Drive ReadOnly / File Provider 接続  
-スコープ: `drive.readonly`（現時点では未取得）
+**Phase 8**: Google Sheets ReadOnly / BusinessData Provider 接続  
+スコープ: `spreadsheets.readonly`（現時点では未取得）
+
+---
+
+## Phase 7 で追加した内容（Google Drive ReadOnly / File Provider 接続）
+
+### 概要
+
+Phase 7 では **Google Drive ReadOnly を File Provider へ接続** しました。  
+取得スコープは `drive.readonly` のみ。**ファイル作成・更新・削除・移動・権限変更・共有設定変更・コメント追加は未実装です。**
+
+### Driveサービス層（新規追加）
+
+```
+client/src/services/drive/
+├── types.ts           — GoogleDriveFile / DriveDerivedFile / DriveSummary / DriveFileCategory 型定義
+├── mockDrive.ts       — デモファイルデータ（銀行・契約・請求・監査・事故・資金繰り・見積 7件）
+├── driveClient.ts     — Drive ReadOnly 入口（認証なし → mock、認証済み → API）
+├── driveFetcher.ts    — GET 専用フェッチャー（createFile/updateFile/deleteFile 未実装）
+├── driveMapper.ts     — GoogleDriveFile → UnifiedFileItem 変換
+├── driveAnalyzer.ts   — カテゴリ・重要度・リスクフラグ・推奨アクション・DriveSummary 判定
+├── driveCache.ts      — ローカルキャッシュ（5分 TTL）
+└── driveSearch.ts     — 関連度スコアリング付きファイル検索
+```
+
+### File Provider への接続
+
+```
+Google Drive API ReadOnly (GET /drive/v3/files)
+  ↓ driveFetcher.fetchDriveFiles(accessToken)
+  ↓ 認証なし → mockDriveFiles
+GoogleDriveFile[]
+  ↓ driveMapper.mapGoogleDriveFileToUnifiedFileItem()
+  ↓ driveAnalyzer.analyzeCategory/analyzeImportance/hasRiskFlag
+UnifiedFileItem[]  (readOnly: true, writeEnabled: false)
+  ↓ fileProvider.getItems()
+AIコックピット / ホーム / AI相談 / Briefing Engine / Search Engine
+```
+
+### AI Engine 三元横断連携（Phase 7 強化）
+
+```
+Inbox Provider（Gmail）× Schedule Provider（Calendar）× File Provider（Drive）
+  ↓ priorityEngine.rankItems(inbox, schedule, files)
+  → Gmail '銀行' タスク + Drive '銀行提出資料' ファイル同カテゴリ → +15
+  → Drive riskFlag ありのファイルが関連 → +10
+
+  ↓ briefingEngine.generateSections(inbox, risks, schedule, files)
+  → Drive ファイルセクション追加（重要A・リスクファイル）
+  → Inbox × Schedule × File 三元横断アクション
+  　（「10:00 銀行打合せは資料メールと「銀行提出資料.xlsx」が関連 → 先に資料確認」）
+
+  ↓ searchEngine.searchAll(query, inbox, files)
+  → Inbox + Drive 横断検索（SearchResults 型）
+```
+
+### 書き込みAPIを実装していない証拠（Drive）
+
+`client/src/services/drive/driveFetcher.ts` には以下の関数は**存在しない**:
+
+| 禁止処理 | 関数名 | 状態 |
+|---------|--------|------|
+| ファイル作成 | `createFile` | 未実装 |
+| ファイル更新 | `updateFile` | 未実装 |
+| ファイル削除 | `deleteFile` | 未実装 |
+| ファイル移動 | `moveFile` | 未実装 |
+| 権限変更 | `changePermission` | 未実装 |
+| 共有設定変更 | `shareFile` | 未実装 |
+| アップロード | `uploadFile` | 未実装 |
+| コピー作成 | `copyFile` | 未実装 |
+| コメント追加 | `addComment` | 未実装 |
+
+`driveFetcher.ts` は `GET` リクエストのみ。`POST`/`PATCH`/`PUT`/`DELETE` は一切存在しない。
+
+### 使用スコープ
+
+```
+Phase 7 スコープ（PHASE7_SCOPES）:
+  https://www.googleapis.com/auth/gmail.readonly       ← Phase 5 から継続
+  https://www.googleapis.com/auth/calendar.readonly    ← Phase 6 から継続
+  https://www.googleapis.com/auth/drive.readonly       ← Phase 7 で追加
+
+禁止スコープ（FORBIDDEN_SCOPES — 絶対に追加しない）:
+  gmail.modify / gmail.send / gmail.compose
+  calendar / calendar.events（書き込み可能）
+  drive（フルアクセス） / drive.file / drive.appdata
+  spreadsheets（書き込み可能）
+```
+
+### 次フェーズ
+
+**Phase 8**: Google Sheets ReadOnly / BusinessData Provider 接続  
+スコープ: `spreadsheets.readonly`（現時点では未取得）
 
 ---
 

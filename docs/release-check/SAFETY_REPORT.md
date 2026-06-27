@@ -1,7 +1,64 @@
 # SAFETY_REPORT.md — 外部API接続状況・安全設計確認書
 
-> 最終更新: Phase 6 — v0.6.0（2026-06-27）  
+> 最終更新: Phase 7 — v0.7.0（2026-06-27）  
 > このファイルは外部API接続・書き込み処理の有無を確認するための文書です。
+
+---
+
+## Phase 7 追加安全確認
+
+| チェック項目 | 状態 |
+|------------|------|
+| 新規外部サービス追加 | ✅ Google Drive ReadOnly のみ（`drive.readonly` スコープ） |
+| Drive 書き込み API 追加 | ❌ なし（createFile/updateFile/deleteFile/moveFile/shareFile/changePermission/uploadFile/copyFile/addComment 未実装） |
+| Drive スコープ | ✅ `drive.readonly` のみ（`drive` / `drive.file` は取得しない） |
+| Gmail / Calendar スコープ変更 | ❌ なし（既存スコープを継続） |
+| `driveFetcher.ts` の HTTP メソッド | ✅ GET のみ（POST/PATCH/PUT/DELETE なし） |
+| `UnifiedFileItem` の書き込みフラグ | ✅ `readOnly: true as const` / `writeEnabled: false as const` |
+| PHASE7_SCOPES 定義 | ✅ gmail.readonly + calendar.readonly + drive.readonly のみ |
+| FORBIDDEN_SCOPES に `drive` を含む | ✅ フルアクセス drive スコープを禁止リストに追加 |
+| 個人LINE接続 | ❌ 実装なし（CLAUDE.md 制約どおり） |
+| Sheets / LINE WORKS / freee 接続 | ❌ 未接続（stub のみ） |
+
+## Drive 書き込み禁止の確認
+
+### 禁止されている処理と実装状態
+
+| 処理 | 関数名 | 実装状態 | 証拠ファイル |
+|------|--------|---------|------------|
+| ファイル作成 | `createFile` | **未実装** | `driveFetcher.ts`: GET のみ |
+| ファイル更新 | `updateFile` | **未実装** | `driveFetcher.ts`: GET のみ |
+| ファイル削除 | `deleteFile` | **未実装** | `driveFetcher.ts`: GET のみ |
+| ファイル移動 | `moveFile` | **未実装** | `driveFetcher.ts`: GET のみ |
+| 権限変更 | `changePermission` | **未実装** | `driveFetcher.ts`: GET のみ |
+| 共有設定変更 | `shareFile` | **未実装** | `driveFetcher.ts`: GET のみ |
+| フォルダ作成 | `createFolder` | **未実装** | `driveFetcher.ts`: GET のみ |
+| アップロード | `uploadFile` | **未実装** | `driveFetcher.ts`: GET のみ |
+| コピー作成 | `copyFile` | **未実装** | `driveFetcher.ts`: GET のみ |
+| コメント追加 | `addComment` | **未実装** | `driveFetcher.ts`: GET のみ |
+
+### HTTP メソッドの使用状況（Drive）
+
+| ファイル | GET | POST | PATCH | PUT | DELETE |
+|---------|-----|------|-------|-----|--------|
+| `driveFetcher.ts` | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `driveClient.ts` | ✅（fetchFiles委譲） | ❌ | ❌ | ❌ | ❌ |
+
+---
+
+## 現在の外部API接続状況（Phase 7 更新）
+
+| サービス | 接続状態 | スコープ | 書き込み |
+|---------|---------|---------|---------|
+| Google OAuth | ✅ 構造実装済み（ClientID未設定なら未接続） | — | なし |
+| Gmail API | 🔧 ClientID設定後に有効 | `gmail.readonly` のみ | **なし** |
+| Google Calendar | 🔧 ClientID + calendar.readonly 設定後に有効 | `calendar.readonly` のみ | **なし** |
+| Google Drive | 🔧 ClientID + drive.readonly 設定後に有効 | `drive.readonly` のみ | **なし** |
+| Google Sheets | ❌ 未接続 | 未取得 | なし |
+| LINE WORKS | ❌ 未接続 | 未取得 | なし |
+| Claude API | ❌ 未接続 | — | なし |
+| freee | ❌ 未接続 | — | なし |
+| kintone | ❌ 未接続 | — | なし |
 
 ---
 
