@@ -1,8 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { companies, integrations, apiIntegrationPoints } from '../../data/mockData'
 import { getConnectionStatus, fetchInboxMessages } from '../../services/gmail/gmailClient'
 import { mockGmailMessages } from '../../services/gmail/mockGmail'
 import { createGmailSummary } from '../../services/gmail/gmailAnalyzer'
+import { googleAuth } from '../../services/google/googleAuth'
+import { googleSession } from '../../services/google/googleSession'
+import { GOOGLE_SCOPES, getScopeLabel } from '../../services/google/googleScopes'
+import type { GoogleSession } from '../../services/google/googleSession'
 import type { GmailFetchRange, GmailDerivedTask } from '../../types'
 
 interface Props {
@@ -38,9 +42,18 @@ export default function Settings({
   const [activeRole, setActiveRole] = useState('社長専用')
   const [showApiPoints, setShowApiPoints] = useState(false)
   const [showPhaseRoadmap, setShowPhaseRoadmap] = useState(false)
+  const [showAuthLog, setShowAuthLog] = useState(false)
   const [gmailRange, setGmailRange] = useState<GmailFetchRange>('24h')
   const [gmailTestResult, setGmailTestResult] = useState<GmailDerivedTask[] | null>(null)
   const [gmailTesting, setGmailTesting] = useState(false)
+  const [gSession, setGSession] = useState<GoogleSession>(googleSession.get())
+  const [gConnecting, setGConnecting] = useState(false)
+  const [gConnectError, setGConnectError] = useState<string | null>(null)
+
+  // OAuth コールバック後や再マウント時に最新セッション状態を反映
+  useEffect(() => {
+    setGSession(googleSession.get())
+  }, [])
 
   const selectedCompany = companies.find((c) => c.id === company)
   const connectionStatus = getConnectionStatus()
@@ -54,10 +67,30 @@ export default function Settings({
     setGmailTesting(false)
   }
 
+  async function handleGoogleConnect() {
+    setGConnectError(null)
+    setGConnecting(true)
+    try {
+      await googleAuth.startOAuthFlow()
+      // startOAuthFlow() はページ遷移するため、ここには戻らない
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Google接続の開始に失敗しました'
+      setGConnectError(msg)
+      setGConnecting(false)
+    }
+  }
+
+  function handleGoogleDisconnect() {
+    googleAuth.disconnect()
+    googleSession.clear()
+    setGSession(googleSession.get())
+    setGConnectError(null)
+  }
+
   const MODE_ROWS = [
     { label: 'デモモード',     value: demoMode ? 'ON' : 'OFF',  on: demoMode,     toggle: () => onDemoModeChange(!demoMode) },
     { label: '本番準備モード', value: productionReady ? 'ON' : 'OFF', on: productionReady, toggle: () => onProductionReadyChange(!productionReady) },
-    { label: '外部接続',       value: '未接続', on: false, toggle: undefined },
+    { label: 'Google接続',    value: gSession.status === 'connected' ? '接続済' : '未接続', on: gSession.status === 'connected', toggle: undefined },
     { label: '読み取り専用予定', value: 'ON', on: true, toggle: undefined },
     { label: '書き込み禁止',   value: 'ON', on: true, toggle: undefined },
   ]
@@ -121,6 +154,226 @@ export default function Settings({
             )}
           </div>
         ))}
+      </div>
+
+      {/* ── Google アカウント接続 ── */}
+      <div className="section-label">Google アカウント連携（Phase 5）</div>
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 'var(--radius)',
+          padding: '16px',
+          marginBottom: 14,
+          boxShadow: 'var(--shadow)',
+          border: gSession.status === 'connected'
+            ? '1.5px solid #86EFAC'
+            : gSession.status === 'error'
+              ? '1.5px solid #FCA5A5'
+              : '1.5px solid #BFDBFE',
+        }}
+      >
+        {/* ヘッダー */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 22 }}>🔐</span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--navy)' }}>
+                Google 接続
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {gSession.connectedEmail ?? 'Gmail 読み取り専用スコープのみ'}
+              </div>
+            </div>
+          </div>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 800,
+              padding: '3px 10px',
+              borderRadius: 999,
+              background:
+                gSession.status === 'connected' ? '#D1FAE5' :
+                gSession.status === 'connecting' ? '#DBEAFE' :
+                gSession.status === 'error' ? '#FEE2E2' : '#F1F5F9',
+              color:
+                gSession.status === 'connected' ? '#065F46' :
+                gSession.status === 'connecting' ? '#1D4ED8' :
+                gSession.status === 'error' ? '#991B1B' : '#64748B',
+            }}
+          >
+            {gSession.status === 'connected' ? '✓ 接続済み' :
+             gSession.status === 'connecting' ? '⏳ 接続中...' :
+             gSession.status === 'error' ? '✗ エラー' : '□ 未接続'}
+          </span>
+        </div>
+
+        {/* 取得権限 */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+            現在取得している権限
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <span
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                background: gSession.grantedScopes.includes(GOOGLE_SCOPES.GMAIL_READONLY)
+                  ? '#D1FAE5' : '#F1F5F9',
+                color: gSession.grantedScopes.includes(GOOGLE_SCOPES.GMAIL_READONLY)
+                  ? '#065F46' : '#94A3B8',
+                borderRadius: 8,
+                padding: '4px 10px',
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              {gSession.grantedScopes.includes(GOOGLE_SCOPES.GMAIL_READONLY) ? '✓' : '○'}
+              {' '}{getScopeLabel(GOOGLE_SCOPES.GMAIL_READONLY)}
+            </span>
+            {(['calendar.readonly', 'drive.readonly', 'sheets.readonly'] as const).map((s) => (
+              <span
+                key={s}
+                style={{
+                  background: '#F1F5F9',
+                  color: '#CBD5E1',
+                  borderRadius: 8,
+                  padding: '4px 10px',
+                  fontSize: 11,
+                  fontWeight: 600,
+                }}
+              >
+                — {s}（Phase 6以降）
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* 書き込み禁止表示 */}
+        <div
+          style={{
+            background: '#FEF9C3',
+            borderRadius: 8,
+            padding: '6px 10px',
+            fontSize: 11,
+            color: '#92400E',
+            fontWeight: 600,
+            marginBottom: 12,
+            lineHeight: 1.5,
+          }}
+        >
+          ⚠️ 書き込み禁止 — 送信・返信・下書き・削除・ラベル変更・既読化は実装していません
+        </div>
+
+        {/* エラー表示 */}
+        {(gSession.status === 'error' || gConnectError) && (
+          <div
+            style={{
+              background: '#FEE2E2',
+              borderRadius: 8,
+              padding: '8px 10px',
+              fontSize: 12,
+              color: '#991B1B',
+              fontWeight: 600,
+              marginBottom: 12,
+            }}
+          >
+            {gConnectError ?? gSession.lastError}
+          </div>
+        )}
+
+        {/* 接続・切断ボタン */}
+        {gSession.status === 'connected' ? (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => setGSession(googleSession.get())}
+              style={{
+                flex: 1,
+                padding: '10px',
+                borderRadius: 10,
+                background: 'var(--bg)',
+                color: 'var(--text-secondary)',
+                fontSize: 13,
+                fontWeight: 700,
+                border: '1.5px solid var(--border)',
+              }}
+            >
+              🔄 状態を更新
+            </button>
+            <button
+              onClick={handleGoogleDisconnect}
+              style={{
+                flex: 1,
+                padding: '10px',
+                borderRadius: 10,
+                background: '#FEE2E2',
+                color: '#991B1B',
+                fontSize: 13,
+                fontWeight: 700,
+              }}
+            >
+              🔌 切断する
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleGoogleConnect}
+            disabled={gConnecting}
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: 12,
+              background: gConnecting ? 'var(--border)' : '#1B3D6F',
+              color: '#fff',
+              fontSize: 14,
+              fontWeight: 800,
+            }}
+          >
+            {gConnecting ? '⏳ Googleへ接続中...' : '🔐 Googleアカウントで接続（Gmail ReadOnly）'}
+          </button>
+        )}
+
+        {/* 認証ログ（折りたたみ） */}
+        {gSession.recentLogs.length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            <button
+              onClick={() => setShowAuthLog(!showAuthLog)}
+              style={{
+                fontSize: 11,
+                color: 'var(--text-muted)',
+                fontWeight: 600,
+                textDecoration: 'underline',
+              }}
+            >
+              {showAuthLog ? '▲ ログを閉じる' : '▼ 認証ログを見る'}
+            </button>
+            {showAuthLog && (
+              <div
+                style={{
+                  marginTop: 8,
+                  background: '#0F172A',
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  maxHeight: 160,
+                  overflow: 'auto',
+                }}
+              >
+                {gSession.recentLogs.map((log, i) => (
+                  <div key={i} style={{ fontSize: 10, color: '#94A3B8', lineHeight: 1.6, fontFamily: 'monospace' }}>
+                    <span style={{ color: '#64748B' }}>
+                      {new Date(log.timestamp).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </span>
+                    {' '}
+                    <span style={{ color: log.event.includes('error') ? '#F87171' : log.event.includes('success') ? '#4ADE80' : '#60A5FA' }}>
+                      [{log.event}]
+                    </span>
+                    {' '}{log.detail}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Gmail読み取りテスト（常時表示） ── */}
@@ -714,7 +967,7 @@ export default function Settings({
           lineHeight: 1.7,
         }}
       >
-        AI社長室 v0.4.1 Phase 4.1 — {selectedCompany?.name}
+        AI社長室 v0.5.0 Phase 5 — {selectedCompany?.name}
         <br />
         フロントエンドMVP（仮データのみ · 外部書き込みなし）
       </div>

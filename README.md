@@ -8,7 +8,7 @@
 
 `client/` ディレクトリに、**iPhone最優先のスマホ対応Webアプリ**が含まれています。
 
-> **現在のバージョン：v0.4.1 Phase 4.1**
+> **現在のバージョン：v0.5.0 Phase 5**
 > すべての数値・メッセージは仮データです。Gmail読み取り専用連携の構造を追加しましたが、実際の認証情報は未設定のため mockGmail を使用しています。Gmailへの書き込み（送信・返信・削除・ラベル変更等）は未実装です。
 
 ### 画面一覧
@@ -50,6 +50,150 @@ client/src/
 └── types/
     └── index.ts             # 型定義
 ```
+
+---
+
+## Phase 5 で追加した内容（Google OAuth 認証基盤）
+
+### 概要
+
+Phase 5 では「実データ連携基盤」を構築しました。  
+**Google OAuth Authorization Code + PKCE フロー**により、Googleアカウントへ安全に接続できる構造を実装しています。  
+**取得スコープは `gmail.readonly` のみ。書き込み系 API は一切実装していません。**
+
+---
+
+### OAuth 取得フロー図
+
+```
+ユーザー（設定画面）
+     │
+     ▼「Googleアカウントで接続」ボタン
+googleAuth.startOAuthFlow()
+     │ PKCE: code_verifier生成 → SHA256 → code_challenge
+     │ state生成（CSRF対策）
+     │ sessionStorageに保存
+     ▼
+Google 認証画面（accounts.google.com）
+     │ ユーザーが Gmail ReadOnly を承認
+     ▼
+アプリへリダイレクト（?code=...&state=...）
+     │
+     ▼ App.tsx useEffect が検知
+googleAuth.handleCallback(code, state)
+     │ state 検証（CSRF対策）
+     │ PKCE code_verifier を取り出し
+     │ https://oauth2.googleapis.com/token へ POST
+     │ → access_token, refresh_token, scope を取得
+     │ → https://www.googleapis.com/oauth2/v3/userinfo でメールアドレス確認
+     │ localStorage にトークン保存
+     ▼
+設定画面へ遷移 → 「✓ 接続済み」表示
+     │
+     ▼ Gmail取得時（AIコックピット等）
+fetchRawMessages()
+     │ googleToken.isValid() → キャッシュ確認（5分TTL）
+     │ キャッシュ有効 → キャッシュを返す（API呼び出しなし）
+     │ キャッシュ無効 → gmailFetcher.fetchMessages(accessToken)
+     │   ① GET /gmail/v1/users/me/messages?q=is:unread newer_than:3d
+     │   ② GET /gmail/v1/users/me/messages/{id}?format=full（並列最大10件）
+     │   → GmailMessage[] に変換
+     │ → gmailCache.set() でローカル保存
+     ▼
+gmailAnalyzer.ts で種別・優先度・期限を判定
+     ▼
+AIコックピット・今日の要対応・ホームに表示
+```
+
+---
+
+### Google サービス層（新規追加）
+
+```
+client/src/services/google/
+├── googleScopes.ts    — スコープ定数（Phase 5: gmail.readonly のみ）
+├── googleErrors.ts    — GoogleAuthError クラスとエラーコード定義
+├── googleStorage.ts   — localStorage/sessionStorage ラッパー（トークン・PKCE・キャッシュ・ログ）
+├── googleToken.ts     — トークン有効性確認・保存・リフレッシュ
+├── googleAuth.ts      — OAuth フロー実装（PKCE生成・認証URL生成・コールバック処理）
+└── googleSession.ts   — セッション状態管理（接続済み/接続中/エラー/未接続）
+```
+
+### Gmail サービス層（強化）
+
+```
+client/src/services/gmail/
+├── gmailFetcher.ts       — 新規: Gmail API 読み取り専用フェッチャー
+├── gmailCache.ts         — 新規: ローカルキャッシュ（5分TTL）
+├── briefingGenerator.ts  — 新規: メールデータからAIブリーフィングを生成する構造
+└── gmailClient.ts        — 更新: 認証済みなら本番API、未認証なら mockGmail を使用
+```
+
+### .env 設定
+
+`client/.env.example` を参照してください。
+
+```env
+VITE_GMAIL_CLIENT_ID=（Google Cloud Console で取得）
+VITE_GMAIL_CLIENT_SECRET=（取得後に設定）
+VITE_GOOGLE_REDIRECT_URI=http://localhost:5173/
+VITE_GOOGLE_READONLY_SCOPE=https://www.googleapis.com/auth/gmail.readonly
+```
+
+### ログ記録
+
+以下のイベントを localStorage に最大50件記録します：
+
+| イベント | タイミング |
+|---------|-----------|
+| `oauth_start` | OAuth認証フロー開始時 |
+| `oauth_success` | トークン取得・保存成功時（メールアドレス含む） |
+| `oauth_error` | 認証失敗・state不一致・トークン取得失敗時 |
+| `token_refresh` | アクセストークンのリフレッシュ時 |
+| `fetch_start` | Gmail API 取得開始時（query・件数） |
+| `fetch_success` | Gmail API 取得成功時（件数・所要時間） |
+| `fetch_error` | Gmail API 取得失敗時（エラー内容） |
+| `disconnect` | Googleアカウント切断時 |
+
+設定画面の「認証ログを見る」で確認できます。
+
+### キャッシュ設計
+
+- キャッシュ有効期限: **5分**
+- 保存先: **localStorage**（gmailCache.ts）
+- `gmailCache.isStale()` が true の場合のみ Google API を呼ぶ
+- 手動リフレッシュ: `refreshMessages()` でキャッシュクリア後に再取得
+
+### 書き込みAPIを実装していない証拠
+
+`client/src/services/` 配下に以下の関数・エンドポイントは**存在しない**：
+
+| 禁止処理 | 関数名 | 状態 |
+|---------|--------|------|
+| メール送信 | `sendMessage` | 未実装 |
+| メール返信 | `replyMessage` | 未実装 |
+| 下書き作成 | `createDraft` | 未実装 |
+| メール削除 | `deleteMessage` | 未実装 |
+| アーカイブ | `archiveMessage` | 未実装 |
+| 既読化 | `markAsRead` | 未実装 |
+| スター付与 | `addStar` | 未実装 |
+| ラベル変更 | `modifyLabels` | 未実装 |
+
+`gmailFetcher.ts` は `GET` リクエストのみ。`POST`/`PATCH`/`DELETE` は一切存在しない。
+
+### 安全設計
+
+- OAuth スコープ: `gmail.readonly` のみ（`gmail.modify` / `gmail.send` / `gmail.compose` は取得しない）
+- PKCE: code_verifier を sessionStorage に保存、トークン交換後に削除
+- state パラメータ: CSRF 対策として検証
+- トークン: localStorage に保存（HttpOnly Cookie は SPA では使用不可）
+- リフレッシュトークン: `google.accounts.oauth2` を通じて取得
+- 本番運用推奨: バックエンド Proxy 経由でのトークン交換（Phase 6 以降で対応予定）
+
+### Phase 6 予定
+
+**Phase 6**: Googleカレンダー読み取り専用連携  
+スコープ: `calendar.readonly`（現時点では取得しない）
 
 ---
 
@@ -318,14 +462,15 @@ Phase 3.5においても外部サービスへの接続は一切行っていま�
 
 | フェーズ | 機能 | 対応時期 |
 |---------|------|---------|
-| **Phase 4-1** | **Gmail読み取り（受信メールの取得）** | **次フェーズ** |
-| Phase 4-2 | Googleカレンダー読み取り | 次回 |
-| Phase 4-3 | Google Drive検索 | 次回 |
-| Phase 4-4 | Googleスプレッドシート読み取り | 次回 |
-| Phase 4-5 | LINE WORKS通知受信 | 未定 |
-| Phase 4-6 | Claude APIリアルタイム接続 | 未定 |
-| Phase 5-1 | Gmail下書き作成（送信なし） | 将来 |
-| Phase 5-2 | Google Drive保存 | 将来 |
+| ~~Phase 4~~ | ~~Gmail読み取り（サービス層構築）~~ | ✅ 完了 |
+| ~~Phase 4.1~~ | ~~Gmail由来データ全画面表示強化~~ | ✅ 完了 |
+| **Phase 5** | **Google OAuth + Gmail ReadOnly 実接続基盤** | ✅ 完了 |
+| Phase 6 | Googleカレンダー読み取り | 次回 |
+| Phase 7 | Google Drive検索 | 未定 |
+| Phase 8 | Googleスプレッドシート読み取り | 未定 |
+| Phase 9 | LINE WORKS通知受信 | 未定 |
+| Phase 10 | Claude APIリアルタイム接続 | 未定 |
+| 将来 | Gmail下書き作成（送信なし・人間承認必須） | 将来 |
 
 **書き込み処理はすべて人間の最終確認を前提とし、自動送信・自動保存は行いません。**
 

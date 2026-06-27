@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Screen } from './types'
 import { companies } from './data/mockData'
 import Navigation from './components/Navigation'
@@ -10,6 +10,8 @@ import CreateRequest from './components/screens/CreateRequest'
 import Dashboard from './components/screens/Dashboard'
 import Settings from './components/screens/Settings'
 import CockpitScreen from './components/screens/CockpitScreen'
+import { googleAuth } from './services/google/googleAuth'
+import { googleSession } from './services/google/googleSession'
 
 const SCREEN_TITLES: Record<Screen, string> = {
   home: 'AI社長室',
@@ -44,6 +46,40 @@ export default function App() {
   function navigate(s: Screen) {
     setScreen(s)
   }
+
+  // Google OAuth コールバック処理（ページロード時に URL パラメータを検査）
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get('code')
+    const state = params.get('state')
+    const error = params.get('error')
+
+    if (error) {
+      // ユーザーがキャンセルした等のエラー
+      googleSession.setError(`認証エラー: ${error}`)
+      window.history.replaceState({}, '', window.location.pathname)
+      setScreen('settings')
+      return
+    }
+
+    if (code && state) {
+      // OAuth コールバック: コードとトークンを交換
+      setScreen('settings')
+      googleSession.setConnecting()
+      googleAuth
+        .handleCallback(code, state)
+        .then(() => {
+          googleSession.setConnected()
+        })
+        .catch((e: Error) => {
+          googleSession.setError(e.message)
+        })
+        .finally(() => {
+          window.history.replaceState({}, '', window.location.pathname)
+        })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="app-shell">
