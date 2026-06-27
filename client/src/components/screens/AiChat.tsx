@@ -3,6 +3,9 @@ import type { AiMode, ChatMessage } from '../../types'
 import type { Screen } from '../../types'
 import { aiModes, initialChatMessages, mockAiResponses } from '../../data/mockData'
 import DemoBanner from '../DemoBanner'
+import { mockCalendarEvents } from '../../services/calendar/mockCalendar'
+import { mapToCalendarDerivedEvent } from '../../services/calendar/calendarMapper'
+import { createCalendarSummary } from '../../services/calendar/calendarAnalyzer'
 
 interface Props {
   onVoice: () => void
@@ -17,7 +20,72 @@ const GMAIL_SHORTCUTS = [
   '返信文だけ作って',
 ]
 
+const CALENDAR_SHORTCUTS = [
+  '今日の予定をまとめて',
+  '銀行関係の予定だけ見せて',
+  '今日の移動が必要な予定は？',
+  '期限がある予定はどれ？',
+  '予定とGmailを合わせて優先順位を出して',
+]
+
+// Calendar ショートカット回答（Schedule Provider 参照）
+function getCalendarShortcutResponse(input: string): string | null {
+  const calEvents = mockCalendarEvents.filter((e) => e.status !== 'cancelled')
+  const derived = calEvents.map((e) => mapToCalendarDerivedEvent(e, 'demo'))
+  const summary = createCalendarSummary(calEvents)
+
+  if (input.includes('今日の予定をまとめて') || input.includes('予定をまとめて')) {
+    const lines = derived.map((e) => {
+      const timeStr = e.isAllDay ? '終日' : new Date(e.startAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+      return `・${timeStr} 【${e.importance}】${e.title}（${e.category}）`
+    }).join('\n')
+    return `本日の予定 ${summary.totalCount}件です。\n\n${lines}\n\n重要予定${summary.importanceACount}件、移動が必要な予定${summary.travelRequiredCount}件あります。\n\nデータ元：デモCalendar · 読み取り専用 · 予定変更なし`
+  }
+
+  if (input.includes('銀行関係') || input.includes('銀行の予定')) {
+    const bank = derived.filter((e) => e.category === '銀行')
+    if (bank.length === 0) return '本日は銀行関係の予定はありません。'
+    const lines = bank.map((e) => {
+      const timeStr = e.isAllDay ? '終日' : new Date(e.startAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+      return `・${timeStr} ${e.title}\n  ${e.suggestedAction ?? ''}`
+    }).join('\n')
+    return `銀行関係の予定 ${bank.length}件です。\n\n${lines}\n\n事前に財務資料をご確認ください。`
+  }
+
+  if (input.includes('移動') && input.includes('予定')) {
+    const travel = derived.filter((e) => e.location && !e.location.includes('会議室'))
+    if (travel.length === 0) return '本日は移動が必要な予定はありません。'
+    const lines = travel.map((e) => {
+      const timeStr = e.isAllDay ? '終日' : new Date(e.startAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+      return `・${timeStr} ${e.title}\n  場所：${e.location}`
+    }).join('\n')
+    return `移動が必要な予定 ${travel.length}件です。\n\n${lines}\n\n余裕をもって出発してください。`
+  }
+
+  if (input.includes('期限') && input.includes('予定')) {
+    const deadlines = derived.filter((e) => e.deadlineRisk)
+    if (deadlines.length === 0) return '本日は期限のある予定はありません。'
+    const lines = deadlines.map((e) => `・${e.title}（${e.category}）\n  ${e.suggestedAction ?? '本日中に対応してください'}`).join('\n')
+    return `期限のある予定 ${deadlines.length}件です。\n\n${lines}`
+  }
+
+  if (input.includes('予定とGmail') || input.includes('優先順位')) {
+    const importantEvents = derived.filter((e) => e.importance === 'A' || e.deadlineRisk)
+    const lines = importantEvents.slice(0, 3).map((e) => {
+      const timeStr = e.isAllDay ? '終日' : new Date(e.startAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+      return `1位：${timeStr} ${e.title} — ${e.suggestedAction ?? e.category}`
+    }).join('\n')
+    return `Gmail × Calendar 横断優先順位です。\n\n${lines}\n\n※Gmailの銀行・行政メールと同日の予定は優先度を上げています。\nSchedule Provider + Inbox Provider 横断分析（Phase 6）`
+  }
+
+  return null
+}
+
 function getMockResponse(mode: AiMode, input: string): string {
+  // カレンダーショートカット回答を優先
+  const calendarResponse = getCalendarShortcutResponse(input)
+  if (calendarResponse) return calendarResponse
+
   const modeResponses = mockAiResponses[mode]
   if (!modeResponses) return mockAiResponses['secretary']['default']
 
@@ -173,6 +241,49 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
                 fontSize: 11,
                 fontWeight: 600,
                 color: '#1D4ED8',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── カレンダーショートカット（Phase 6）── */}
+      <div
+        style={{
+          flexShrink: 0,
+          background: '#F0FDF4',
+          borderBottom: '1px solid #BBF7D0',
+          padding: '6px 14px',
+        }}
+      >
+        <div style={{ fontSize: 10, fontWeight: 800, color: '#166534', marginBottom: 4 }}>
+          📅 カレンダーショートカット
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            gap: 6,
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+          }}
+        >
+          {CALENDAR_SHORTCUTS.map((s) => (
+            <button
+              key={s}
+              onClick={() => sendMessage(s)}
+              style={{
+                flexShrink: 0,
+                background: '#fff',
+                border: '1.5px solid #BBF7D0',
+                borderRadius: 999,
+                padding: '5px 12px',
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#166534',
                 whiteSpace: 'nowrap',
               }}
             >

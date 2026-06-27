@@ -4,6 +4,46 @@
 
 ---
 
+## Phase 6 — v0.6.0（2026-06-27）
+
+### 変更テーマ
+Google Calendar ReadOnly を Schedule Provider として接続。Inbox Provider との横断分析開始。
+
+### 追加した機能
+
+**Calendar サービス層（7ファイル）**
+- `client/src/services/calendar/types.ts`: GoogleCalendarEvent / CalendarDerivedEvent / CalendarSummary 型定義
+- `client/src/services/calendar/mockCalendar.ts`: デモ予定データ（銀行・現場・行政・運営確認等 5件）
+- `client/src/services/calendar/calendarClient.ts`: Calendar ReadOnly 入口（認証なし→mock、認証済み→API）
+- `client/src/services/calendar/calendarFetcher.ts`: GET 専用フェッチャー（書き込みAPI未実装）
+- `client/src/services/calendar/calendarMapper.ts`: GoogleCalendarEvent → CalendarDerivedEvent → UnifiedScheduleItem 変換
+- `client/src/services/calendar/calendarAnalyzer.ts`: 重要度・カテゴリ・期限リスク・推奨アクション・CalendarSummary 判定
+- `client/src/services/calendar/calendarCache.ts`: ローカルキャッシュ（5分 TTL）
+
+**docs（新規）**
+- `docs/release-check/CALENDAR_READONLY_DESIGN.md`: Calendar ReadOnly 設計書
+
+### 変更した機能
+
+- `googleScopes.ts`: CALENDAR_READONLY をアクティブスコープへ昇格（FUTURE_SCOPES → GOOGLE_SCOPES）。PHASE6_SCOPES 追加。FORBIDDEN_SCOPES 定義。`hasWriteScope()` 関数追加。
+- `providerTypes.ts`: `UnifiedScheduleItem` を拡張（description / attendees / calendarName / category / relatedCompany / relatedPerson / deadlineRisk / suggestedAction / readOnly: true / writeEnabled: false）
+- `scheduleProvider.ts`: stub → Google Calendar 接続実装（認証なし→デモ）
+- `priorityEngine.ts`: Inbox × Schedule 横断スコアリング追加（同日同カテゴリ +20、関連予定最重要 +10、scheduleItem スコアリング追加）
+- `briefingEngine.ts`: Schedule Provider を含むセクション追加、Inbox × Schedule 横断アクション生成
+- `CockpitScreen.tsx`: 今日の予定セクション追加（重要/移動/期限/銀行カウント + 予定リスト）
+- `Home.tsx`: 今日の予定カード追加（Schedule Provider 由来）
+- `AiChat.tsx`: カレンダーショートカット追加（5種）、カレンダー回答ロジック追加
+- `Settings.tsx`: AI社長室データ基盤カードを Phase 6 表記へ更新、v0.6.0 バージョン更新
+- `docs/release-check/` 11ファイル: Phase 6 内容に更新
+
+### 削除した機能
+- なし
+
+### 外部サービス追加
+- Google Calendar ReadOnly（`calendar.readonly` スコープのみ。書き込みなし。）
+
+---
+
 ## Phase 5.5 — v0.5.5（2026-06-27）
 
 ### 変更テーマ

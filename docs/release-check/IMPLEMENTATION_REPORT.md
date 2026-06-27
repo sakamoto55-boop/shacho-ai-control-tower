@@ -1,6 +1,61 @@
 # IMPLEMENTATION_REPORT.md — 実装内容・未実装項目・注意点
 
-> 最終更新: Phase 5.5 — v0.5.5（2026-06-27）
+> 最終更新: Phase 6 — v0.6.0（2026-06-27）
+
+---
+
+## Phase 6 実装内容
+
+### ① Calendar サービス層 ✅ 完了（client/src/services/calendar/ — 7ファイル）
+
+| ファイル | 状態 |
+|---------|------|
+| `types.ts` | 完了（GoogleCalendarEvent / CalendarDerivedEvent / CalendarSummary） |
+| `mockCalendar.ts` | 完了（銀行打合せ・現場確認・行政書類・運営確認等 5件） |
+| `calendarClient.ts` | 完了（mock/cache/API 切り替え、書き込みなし） |
+| `calendarFetcher.ts` | 完了（GET 専用、書き込みAPI未実装） |
+| `calendarMapper.ts` | 完了（GoogleCalendarEvent → CalendarDerivedEvent → UnifiedScheduleItem） |
+| `calendarAnalyzer.ts` | 完了（10種カテゴリ・重要度A/B/C・期限リスク・CalendarSummary） |
+| `calendarCache.ts` | 完了（5分 TTL、localStorage、isStale/getLastFetchedAt） |
+
+### ② Scope 管理更新 ✅ 完了
+
+- `GOOGLE_SCOPES.CALENDAR_READONLY` を追加
+- `PHASE6_SCOPES` を追加（gmail.readonly + calendar.readonly）
+- `FORBIDDEN_SCOPES` を定義（書き込みスコープリスト）
+- `hasWriteScope()` 関数を追加
+
+### ③ UnifiedScheduleItem 拡張 ✅ 完了
+
+11フィールドを追加: description / attendees / calendarName / category / relatedCompany / relatedPerson / deadlineRisk / suggestedAction / readOnly: true / writeEnabled: false
+
+### ④ Schedule Provider 接続 ✅ 完了
+
+- `scheduleProvider.ts`: stub → Google Calendar ReadOnly 実装
+- `connectionStatus`: `googleToken.hasToken()` で動的決定（接続済み / 未接続）
+- デモモード: 認証なしは mockCalendarEvents を返す
+
+### ⑤ AI Engine 横断連携 ✅ 完了
+
+- `priorityEngine.ts`: Inbox × Schedule 横断スコアリング（同日同カテゴリ +20、関連予定最重要 +10）
+- `briefingEngine.ts`: Schedule セクション追加（generateSections に schedule 引数追加）、横断アクション生成
+
+### ⑥ 画面反映 ✅ 完了
+
+| 画面 | 変更内容 |
+|------|---------|
+| `CockpitScreen.tsx` | 今日の予定セクション追加（重要/移動/期限/銀行カウント + 予定リスト5件） |
+| `Home.tsx` | 今日の予定カード追加（件数/重要/移動/期限 + 次の予定表示） |
+| `AiChat.tsx` | カレンダーショートカット追加（5種）+ 回答ロジック（Schedule Provider 参照） |
+| `Settings.tsx` | Phase 6 表記・v0.6.0 バージョン更新 |
+
+### ⑦ ドキュメント ✅ 完了
+
+- `docs/release-check/CALENDAR_READONLY_DESIGN.md`: 新規作成（Calendar 設計書）
+- `docs/release-check/` 全 10 ファイル: Phase 6 内容に更新
+- `README.md`: Phase 6 セクション追加
+
+### ⑧ バージョン更新 ✅ 完了 → v0.6.0
 
 ---
 

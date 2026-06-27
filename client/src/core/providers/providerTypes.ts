@@ -63,15 +63,25 @@ export interface UnifiedInboxItem {
 // ─── 統合スケジュールアイテム（Calendar） ────────────────────
 export interface UnifiedScheduleItem {
   id: string
-  source: string
+  source: string              // 'デモCalendar' | 'Google Calendar'
   providerType: 'schedule'
   title: string
-  startAt: string // ISO 8601
+  description: string | null
+  startAt: string             // ISO 8601
   endAt: string | null
   location: string | null
   isAllDay: boolean
+  attendees: string[]
+  calendarName: string
   priority: 'A' | 'B' | 'C'
   alertLevel: 'danger' | 'warning' | 'info' | null
+  category: string            // '銀行' | '面談' | '会議' | '現場' | '行政' | '福祉' | '締切' | '支払' | '請求' | '監査' | 'その他'
+  relatedCompany: string | null
+  relatedPerson: string | null
+  deadlineRisk: boolean
+  suggestedAction: string | null
+  readOnly: true
+  writeEnabled: false
 }
 
 // ─── 統合ファイルアイテム（Drive） ───────────────────────────

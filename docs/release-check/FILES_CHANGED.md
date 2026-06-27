@@ -1,6 +1,52 @@
 # FILES_CHANGED.md — 変更・追加・削除ファイル一覧
 
-> 最終更新: Phase 5.5 — v0.5.5（2026-06-27）
+> 最終更新: Phase 6 — v0.6.0（2026-06-27）
+
+---
+
+## Phase 6 変更ファイル
+
+### 新規作成 (8ファイル)
+
+| ファイルパス | 役割 |
+|-------------|------|
+| `client/src/services/calendar/types.ts` | Calendar API 型 / CalendarDerivedEvent / CalendarSummary |
+| `client/src/services/calendar/mockCalendar.ts` | デモ予定データ（銀行・現場・行政等 5件） |
+| `client/src/services/calendar/calendarClient.ts` | Calendar ReadOnly 入口（mock/cache/api 切り替え） |
+| `client/src/services/calendar/calendarFetcher.ts` | GET 専用フェッチャー（書き込みAPI未実装） |
+| `client/src/services/calendar/calendarMapper.ts` | GoogleCalendarEvent → UnifiedScheduleItem 変換 |
+| `client/src/services/calendar/calendarAnalyzer.ts` | 重要度・カテゴリ・期限リスク・推奨アクション判定 |
+| `client/src/services/calendar/calendarCache.ts` | ローカルキャッシュ（5分 TTL） |
+| `docs/release-check/CALENDAR_READONLY_DESIGN.md` | Calendar ReadOnly 設計書（新規） |
+
+### 更新 (13ファイル)
+
+| ファイルパス | 変更内容 |
+|-------------|---------|
+| `client/src/services/google/googleScopes.ts` | CALENDAR_READONLY 昇格・PHASE6_SCOPES 追加・FORBIDDEN_SCOPES 定義 |
+| `client/src/core/providers/providerTypes.ts` | UnifiedScheduleItem 拡張（11フィールド追加） |
+| `client/src/core/providers/scheduleProvider.ts` | stub → Google Calendar 接続実装 |
+| `client/src/core/ai-engine/priorityEngine.ts` | Inbox × Schedule 横断スコアリング追加 |
+| `client/src/core/ai-engine/briefingEngine.ts` | Schedule セクション追加・横断アクション生成 |
+| `client/src/components/screens/CockpitScreen.tsx` | 今日の予定セクション追加（Schedule Provider 由来） |
+| `client/src/components/screens/Home.tsx` | 今日の予定カード追加（Schedule Provider 由来） |
+| `client/src/components/screens/AiChat.tsx` | カレンダーショートカット追加・回答ロジック追加 |
+| `client/src/components/screens/Settings.tsx` | Phase 6 表記更新・v0.6.0 バージョン更新 |
+| `README.md` | Phase 6 セクション追加 |
+| `docs/release-check/CHANGELOG_PHASE.md` | Phase 6 変更履歴追加 |
+| `docs/release-check/FILES_CHANGED.md` | Phase 6 ファイル一覧追加（本ファイル） |
+| `docs/release-check/IMPLEMENTATION_REPORT.md` | Phase 6 実装内容追加 |
+| `docs/release-check/SAFETY_REPORT.md` | Phase 6 Calendar 安全確認追加 |
+| `docs/release-check/TEST_CHECKLIST.md` | Phase 6 テスト項目追加 |
+| `docs/release-check/DATA_FLOW.md` | Calendar データフロー追加 |
+| `docs/release-check/ARCHITECTURE_OVERVIEW.md` | Schedule Provider 接続状態更新 |
+| `docs/release-check/PROVIDER_DESIGN.md` | scheduleProvider 実装詳細追加 |
+| `docs/release-check/AI_ENGINE_DESIGN.md` | Schedule 横断ロジック更新 |
+| `docs/release-check/NO_SCREENSHOT_REQUIRED.md` | CALENDAR_READONLY_DESIGN.md 追加 |
+
+### 削除 (0ファイル)
+
+なし
 
 ---
 

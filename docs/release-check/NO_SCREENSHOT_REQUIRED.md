@@ -1,7 +1,7 @@
 # NO_SCREENSHOT_REQUIRED.md — スクリーンショット不要の検収フロー
 
 > このファイルは、スクリーンショットなしで変更点と安全性を確認できることを明記します。  
-> 最終更新: Phase 5.5 — v0.5.5（2026-06-27）
+> 最終更新: Phase 6 — v0.6.0（2026-06-27）
 
 ---
 
@@ -29,6 +29,7 @@
 | `ARCHITECTURE_OVERVIEW.md` | AI社長室4層アーキテクチャ概要・設計原則（Phase 5.5追加） |
 | `PROVIDER_DESIGN.md` | Provider一覧・インターフェース・Unified型・追加手順（Phase 5.5追加） |
 | `AI_ENGINE_DESIGN.md` | AI Engine各エンジン入出力・承認ゲート設計（Phase 5.5追加） |
+| `CALENDAR_READONLY_DESIGN.md` | Google Calendar ReadOnly 設計・フロー・書き込み禁止確認（Phase 6追加） |
 
 ---
 

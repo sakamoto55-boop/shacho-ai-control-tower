@@ -4,6 +4,8 @@ import { actionItems, todayBriefing, situationCards, dashboardMetrics } from '..
 import DemoBanner from '../DemoBanner'
 import { mockGmailMessages } from '../../services/gmail/mockGmail'
 import { createGmailSummary } from '../../services/gmail/gmailAnalyzer'
+import { mockCalendarEvents } from '../../services/calendar/mockCalendar'
+import { createCalendarSummary } from '../../services/calendar/calendarAnalyzer'
 
 interface Props {
   onNavigate: (screen: Screen) => void
@@ -17,6 +19,11 @@ const alertMetrics = dashboardMetrics.filter((m) => m.alert).length
 export default function Home({ onNavigate, onVoice }: Props) {
   const [briefingExpanded, setBriefingExpanded] = useState(true)
   const gmailSummary = useMemo(() => createGmailSummary(mockGmailMessages), [])
+  const calendarSummary = useMemo(() => createCalendarSummary(mockCalendarEvents), [])
+  const nextEvent = mockCalendarEvents.find((e) => e.status !== 'cancelled' && e.start.dateTime)
+  const nextEventTime = nextEvent?.start.dateTime
+    ? new Date(nextEvent.start.dateTime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+    : null
 
   const quickCards = [
     {
@@ -56,6 +63,70 @@ export default function Home({ onNavigate, onVoice }: Props) {
   return (
     <div className="screen-content">
       <DemoBanner />
+
+      {/* ── Schedule Provider — 今日の予定 ── */}
+      <div
+        style={{
+          background: '#F0FDF4',
+          border: '1.5px solid #BBF7D0',
+          borderRadius: 14,
+          padding: '12px 14px',
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 16 }}>📅</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#166534' }}>
+              今日の予定：{calendarSummary.totalCount}件
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <span style={{ background: '#DCFCE7', color: '#166534', borderRadius: 999, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+              デモCalendar
+            </span>
+            <span style={{ background: '#D1FAE5', color: '#065F46', borderRadius: 999, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+              読み取り専用
+            </span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+          {[
+            { label: '重要', value: calendarSummary.importanceACount + '件', color: '#EF4444', bg: '#FEE2E2' },
+            { label: '移動', value: calendarSummary.travelRequiredCount + '件', color: '#D97706', bg: '#FEF3C7' },
+            { label: '期限', value: calendarSummary.deadlineRiskCount + '件', color: '#DC2626', bg: '#FEE2E2' },
+          ].map((stat) => (
+            <div key={stat.label} style={{ display: 'flex', alignItems: 'center', gap: 4, background: stat.bg, borderRadius: 8, padding: '4px 8px' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: stat.color }}>{stat.label}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: stat.color }}>{stat.value}</span>
+            </div>
+          ))}
+        </div>
+        {nextEventTime && nextEvent && (
+          <div style={{ fontSize: 12, color: '#166534', fontWeight: 600 }}>
+            次の予定：{nextEventTime} {nextEvent.summary}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6 }}>
+          <span style={{ fontSize: 10, color: '#166534', fontWeight: 600 }}>
+            予定変更なし · Google Calendar ReadOnly
+          </span>
+          <button
+            onClick={() => onNavigate('cockpit')}
+            style={{
+              marginLeft: 'auto',
+              background: '#166534',
+              color: '#fff',
+              borderRadius: 8,
+              padding: '5px 12px',
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            全予定を見る →
+          </button>
+        </div>
+      </div>
 
       {/* ── Gmail要対応サマリー ── */}
       <div

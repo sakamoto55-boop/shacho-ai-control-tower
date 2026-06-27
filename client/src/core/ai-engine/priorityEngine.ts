@@ -1,7 +1,7 @@
 import type { UnifiedInboxItem, UnifiedScheduleItem, UnifiedRisk } from '../providers/providerTypes'
 import type { PriorityScore } from './aiEngineTypes'
 
-function scoreInboxItemInternal(item: UnifiedInboxItem): PriorityScore {
+function scoreInboxItemInternal(item: UnifiedInboxItem, schedule: UnifiedScheduleItem[] = []): PriorityScore {
   let baseScore = 50
   const modifiers: { reason: string; delta: number }[] = []
 
@@ -31,6 +31,20 @@ function scoreInboxItemInternal(item: UnifiedInboxItem): PriorityScore {
     modifiers.push({ reason: '返信下書きあり', delta: 5 })
   }
 
+  // ── 横断スコアリング（Inbox × Schedule）────────────────────────
+  // Gmailタイプとカレンダー予定が一致する場合は優先度を上げる
+  if (schedule.length > 0) {
+    const relatedEvent = findRelatedScheduleEvent(item, schedule)
+    if (relatedEvent) {
+      modifiers.push({ reason: `本日予定と関連（${relatedEvent.category}）`, delta: 20 })
+
+      // 予定の重要度がAの場合はさらに加算
+      if (relatedEvent.priority === 'A') {
+        modifiers.push({ reason: '関連予定が最重要', delta: 10 })
+      }
+    }
+  }
+
   const totalDelta = modifiers.reduce((sum, m) => sum + m.delta, 0)
   const finalScore = Math.min(100, Math.max(0, baseScore + totalDelta))
 
@@ -44,29 +58,79 @@ function scoreInboxItemInternal(item: UnifiedInboxItem): PriorityScore {
   }
 }
 
+// Inbox アイテムと関連するスケジュールイベントを探す
+function findRelatedScheduleEvent(item: UnifiedInboxItem, schedule: UnifiedScheduleItem[]): UnifiedScheduleItem | null {
+  const inboxKeywords = [
+    item.taskType,
+    ...item.subject.split(/[　\s]+/).filter((w) => w.length >= 2),
+  ].filter(Boolean)
+
+  for (const event of schedule) {
+    // カテゴリが一致する（例：GmailTaskType '銀行' と Schedule category '銀行'）
+    if (item.taskType === event.category) return event
+
+    // タイトルにキーワードが含まれる
+    const eventText = `${event.title} ${event.category}`.toLowerCase()
+    if (inboxKeywords.some((k) => k && eventText.includes(k.toLowerCase()))) {
+      return event
+    }
+  }
+  return null
+}
+
 export const priorityEngine = {
-  scoreInboxItem(item: UnifiedInboxItem): PriorityScore {
-    return scoreInboxItemInternal(item)
+  scoreInboxItem(item: UnifiedInboxItem, schedule: UnifiedScheduleItem[] = []): PriorityScore {
+    return scoreInboxItemInternal(item, schedule)
   },
 
-  rankItems(items: UnifiedInboxItem[]): UnifiedInboxItem[] {
+  rankItems(items: UnifiedInboxItem[], schedule: UnifiedScheduleItem[] = []): UnifiedInboxItem[] {
     const scored = items.map((item) => ({
       item,
-      score: scoreInboxItemInternal(item),
+      score: scoreInboxItemInternal(item, schedule),
     }))
     scored.sort((a, b) => b.score.finalScore - a.score.finalScore)
     return scored.map((s) => s.item)
   },
 
+  // Schedule Provider のスコアリング
+  scoreScheduleItem(event: UnifiedScheduleItem, inbox: UnifiedInboxItem[] = []): number {
+    let score = 50
+    if (event.priority === 'A') score += 30
+    else if (event.priority === 'B') score += 10
+    else score -= 10
+
+    if (event.deadlineRisk) score += 20
+    if (['銀行', '行政', '監査'].includes(event.category)) score += 15
+    if (['現場', '請求', '支払'].includes(event.category)) score += 5
+
+    // Inboxとの関連
+    const related = inbox.some(
+      (item) => item.taskType === event.category
+    )
+    if (related) score += 15
+
+    return Math.min(100, Math.max(0, score))
+  },
+
+  // Inbox + Schedule 横断 TOP アイテム生成
   getCrossServiceTopItems(
     inbox: UnifiedInboxItem[],
-    _schedule: UnifiedScheduleItem[],
+    schedule: UnifiedScheduleItem[],
     risks: UnifiedRisk[]
   ): string[] {
     const topActions: string[] = []
 
-    // 最上位のインボックスアイテム
-    const rankedInbox = this.rankItems(inbox)
+    // スケジュールの重要予定（最大2件）
+    const importantEvents = schedule
+      .filter((e) => e.priority === 'A' || e.deadlineRisk)
+      .slice(0, 2)
+    for (const event of importantEvents) {
+      const timeStr = event.isAllDay ? '本日' : formatEventTime(event.startAt)
+      topActions.push(`【予定】${timeStr} ${event.title}（${event.category}）`)
+    }
+
+    // Inbox + Schedule 横断スコアで上位インボックスアイテム
+    const rankedInbox = this.rankItems(inbox, schedule)
     for (const item of rankedInbox.slice(0, 3)) {
       topActions.push(`【${item.priority}】${item.subject}（${item.from}）`)
     }
@@ -78,4 +142,13 @@ export const priorityEngine = {
 
     return topActions
   },
+}
+
+function formatEventTime(isoString: string): string {
+  try {
+    const d = new Date(isoString)
+    return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return ''
+  }
 }

@@ -1,6 +1,79 @@
 # DATA_FLOW.md — データの流れ
 
-> 最終更新: Phase 5.5 — v0.5.5（2026-06-27）
+> 最終更新: Phase 6 — v0.6.0（2026-06-27）
+
+---
+
+## Phase 6 追加: Calendar データフロー
+
+```
+─────────────── Calendar 取得フロー ───────────────
+
+calendarClient.fetchEvents()
+  │
+  ├── [未認証] → mockCalendarEvents（mockCalendar.ts）
+  │
+  └── [認証済み]
+          │
+          ├── calendarCache.get() → キャッシュあり（5分以内）
+          │         │
+          │         ▼ GoogleCalendarEvent[]（キャッシュ）
+          │
+          └── calendarCache.isStale() = true
+                    │
+                    ▼
+              googleToken.getOrThrow()
+                    │
+                    ▼
+              calendarFetcher.fetchCalendarEvents(accessToken)
+                    │ GET /calendar/v3/calendars/primary/events
+                    │   ?timeMin=今日00:00 &timeMax=7日後 &singleEvents=true
+                    ▼
+              GoogleCalendarEvent[]
+                    │
+                    ▼
+              calendarCache.set(events)
+
+─────────────── Calendar → UnifiedScheduleItem フロー ───────────────
+
+GoogleCalendarEvent[]
+  │
+  ├── calendarAnalyzer.analyzeCategory()   → '銀行'|'面談'|'会議'|'現場'|...
+  ├── calendarAnalyzer.analyzeImportance() → 'A'|'B'|'C'
+  ├── calendarAnalyzer.hasDeadlineRisk()   → boolean
+  ├── calendarAnalyzer.suggestAction()     → string|null
+  └── calendarMapper.mapToCalendarDerivedEvent()
+        ↓ CalendarDerivedEvent
+        ↓ calendarMapper.mapCalendarDerivedEventToUnifiedScheduleItem()
+        ↓
+UnifiedScheduleItem[]
+  │ (readOnly: true, writeEnabled: false)
+  ├── scheduleProvider.getItems()
+  │       ↓
+  │   CockpitScreen.tsx (今日の予定セクション)
+  │   Home.tsx          (今日の予定カード)
+  │   AiChat.tsx        (カレンダーショートカット回答)
+  │
+  └── AI Engine へ
+          │
+          ├── priorityEngine.rankItems(inbox, schedule)   ← 横断スコアリング
+          ├── briefingEngine.generateSections(inbox, risks, schedule)
+          └── priorityEngine.getCrossServiceTopItems(inbox, schedule, risks)
+
+─────────────── Inbox × Schedule 横断フロー ───────────────
+
+UnifiedInboxItem[] (Gmail)
+  + UnifiedScheduleItem[] (Calendar)
+      │
+      ▼ priorityEngine.scoreInboxItem(item, schedule)
+      │   → Gmailタスクタイプ === Calendar カテゴリ → +20
+      │   → 関連予定が最重要(A) → +10
+      │
+      ▼ briefingEngine.generateCrossItems(inbox, schedule)
+      │   → 「10:00 銀行打合せは、追加資料依頼と関連 → 先に資料確認」
+      │
+      ▼ AIコックピット / ホーム / AI相談 に反映
+```
 
 ---
 

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import type { PriorityAction, ActionSuggestion, TimelinePeriod } from '../../types'
 import {
   companyHealthScore,
@@ -10,14 +10,17 @@ import {
 import { mockGmailMessages } from '../../services/gmail/mockGmail'
 import { mapToGmailDerivedTask } from '../../services/gmail/gmailMapper'
 import { createGmailSummary } from '../../services/gmail/gmailAnalyzer'
+import { mockCalendarEvents } from '../../services/calendar/mockCalendar'
+import { mapGoogleCalendarEventToUnifiedScheduleItem } from '../../services/calendar/calendarMapper'
+import { createCalendarSummary } from '../../services/calendar/calendarAnalyzer'
+import { calendarClient } from '../../services/calendar/calendarClient'
+import type { UnifiedScheduleItem } from '../../core/providers/providerTypes'
 import DemoBanner from '../DemoBanner'
 
-// AI Engine: 将来的に以下のプロバイダーを横断して判断する
-// import { providerRegistry } from '../../core/providers/providerRegistry'
+// AI Engine: Schedule Provider (Phase 6) + Inbox Provider (Phase 5.5) 横断参照
 // import { priorityEngine } from '../../core/ai-engine/priorityEngine'
 // import { briefingEngine } from '../../core/ai-engine/briefingEngine'
-// import { riskEngine } from '../../core/ai-engine/riskEngine'
-// 現時点: Gmail (Inbox Provider) のみを参照 — Phase 5.5 で基盤設計完了
+// 現時点: ローカルデータで参照 — Claude API接続後にリアルタイム生成へ切り替え予定
 
 const IMPORTANCE_CONFIG = {
   critical: { label: '最優先', color: '#EF4444', bg: '#FEF2F2' },
@@ -54,12 +57,35 @@ const CATEGORY_COLORS: Record<string, string> = {
 const gmailDerivedTasks = mockGmailMessages.map(mapToGmailDerivedTask)
 const gmailSummary = createGmailSummary(mockGmailMessages)
 
+// Schedule Provider 経由 (Phase 6: デモCalendarまたは Google Calendar ReadOnly)
+const demoScheduleItems = mockCalendarEvents
+  .filter((e) => e.status !== 'cancelled')
+  .map((e) => mapGoogleCalendarEventToUnifiedScheduleItem(e, 'demo'))
+const demoCalendarSummary = createCalendarSummary(mockCalendarEvents)
+
 export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
   const [expandedActionId, setExpandedActionId] = useState<string | null>('pa1')
   const [activeSuggestion, setActiveSuggestion] = useState<ActionSuggestion | null>(null)
   const [activeTimeline, setActiveTimeline] = useState<TimelinePeriod>('today')
   const [searchQuery, setSearchQuery] = useState('')
   const [healthExpanded, setHealthExpanded] = useState(true)
+  const [scheduleItems, setScheduleItems] = useState<UnifiedScheduleItem[]>(demoScheduleItems)
+  const [scheduleSource, setScheduleSource] = useState<'demo' | 'api'>('demo')
+
+  useEffect(() => {
+    calendarClient.fetchEvents().then((result) => {
+      if (result.source !== 'mock') {
+        setScheduleItems(result.events
+          .filter((e) => e.status !== 'cancelled')
+          .map((e) => mapGoogleCalendarEventToUnifiedScheduleItem(e, 'google-calendar')))
+        setScheduleSource('api')
+      }
+    }).catch(() => { /* デモデータを維持 */ })
+  }, [])
+
+  const calendarSummary = scheduleSource === 'api'
+    ? { totalCount: scheduleItems.length, importanceACount: scheduleItems.filter((e) => e.priority === 'A').length, deadlineRiskCount: scheduleItems.filter((e) => e.deadlineRisk).length, travelRequiredCount: scheduleItems.filter((e) => e.location && !e.location.includes('会議室')).length }
+    : demoCalendarSummary
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return []
@@ -269,6 +295,113 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
             onSuggestion={setActiveSuggestion}
           />
         ))}
+      </div>
+
+      {/* ── Schedule Provider — 今日の予定 ── */}
+      <div
+        style={{
+          background: '#F0FDF4',
+          border: '1.5px solid #BBF7D0',
+          borderRadius: 'var(--radius)',
+          padding: '14px',
+          marginBottom: 14,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 18 }}>📅</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#166534' }}>
+              今日の予定：{calendarSummary.totalCount}件
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {scheduleSource === 'demo' && demoMode !== false && (
+              <span style={{ background: '#DCFCE7', color: '#166534', borderRadius: 999, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+                デモCalendar
+              </span>
+            )}
+            <span style={{ background: '#D1FAE5', color: '#065F46', borderRadius: 999, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+              読み取り専用
+            </span>
+            <span style={{ background: '#FEE2E2', color: '#991B1B', borderRadius: 999, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+              予定変更なし
+            </span>
+          </div>
+        </div>
+
+        {/* カウント行 */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+          {[
+            { label: '重要A', v: calendarSummary.importanceACount, c: '#EF4444', bg: '#FEE2E2' },
+            { label: '移動注意', v: calendarSummary.travelRequiredCount, c: '#D97706', bg: '#FEF3C7' },
+            { label: '期限あり', v: calendarSummary.deadlineRiskCount, c: '#DC2626', bg: '#FEE2E2' },
+            { label: '銀行', v: 'bankCount' in calendarSummary ? calendarSummary.bankCount : scheduleItems.filter((e) => e.category === '銀行').length, c: '#1B3D6F', bg: '#DBEAFE' },
+          ].map((s) => (
+            <div key={s.label} style={{ background: s.bg, borderRadius: 8, padding: '3px 8px', display: 'flex', gap: 3, alignItems: 'center' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: s.c }}>{s.label}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: s.c }}>{typeof s.v === 'number' ? s.v : 0}件</span>
+            </div>
+          ))}
+        </div>
+
+        {/* 予定リスト */}
+        <div style={{ background: '#fff', borderRadius: 10, overflow: 'hidden', border: '1px solid #BBF7D0' }}>
+          {scheduleItems.slice(0, 5).map((event, i) => {
+            const timeStr = event.isAllDay
+              ? '終日'
+              : new Date(event.startAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+            const alertColor = event.alertLevel === 'danger' ? '#EF4444' : event.alertLevel === 'warning' ? '#F59E0B' : '#166534'
+            return (
+              <div
+                key={event.id}
+                style={{
+                  padding: '10px 12px',
+                  borderBottom: i < scheduleItems.length - 1 && i < 4 ? '1px solid #DCFCE7' : 'none',
+                  background: event.alertLevel === 'danger' ? '#FFF8F8' : '#fff',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: '#6B7280', minWidth: 40 }}>
+                    {timeStr}
+                  </span>
+                  <span style={{ background: alertColor + '20', color: alertColor, borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 800 }}>
+                    {event.priority}
+                  </span>
+                  <span style={{ background: '#F1F5F9', color: '#475569', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>
+                    {event.category}
+                  </span>
+                  {event.deadlineRisk && (
+                    <span style={{ background: '#FEE2E2', color: '#991B1B', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>
+                      期限
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 1 }}>
+                  {event.title}
+                </div>
+                {event.location && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    📍 {event.location}
+                  </div>
+                )}
+                {event.suggestedAction && (
+                  <div style={{ fontSize: 11, color: '#166534', marginTop: 2, fontWeight: 600 }}>
+                    💡 {event.suggestedAction}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {scheduleItems.length === 0 && (
+            <div style={{ padding: '16px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
+              本日の予定はありません
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginTop: 8, fontSize: 10, color: '#166534', fontWeight: 600 }}>
+          元データ：{scheduleSource === 'api' ? 'Google Calendar ReadOnly' : 'デモCalendar'} · 予定作成・変更なし · 社長確認のみ
+        </div>
       </div>
 
       {/* ── Gmailからの要対応 ── */}

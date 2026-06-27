@@ -467,7 +467,7 @@ export default function Settings({
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--navy)' }}>AI社長室データ基盤</div>
                 <div style={{ fontSize: 10, color: '#6366F1', fontWeight: 600 }}>
-                  Provider設計 Phase 5.5 — 外部接続なし
+                  Phase 6 — Calendar ReadOnly 接続 · 書き込みなし
                 </div>
               </div>
               <span
@@ -1157,7 +1157,7 @@ export default function Settings({
           lineHeight: 1.7,
         }}
       >
-        AI社長室 v0.5.5 Phase 5.5 — {selectedCompany?.name}
+        AI社長室 v0.6.0 Phase 6 — {selectedCompany?.name}
         <br />
         フロントエンドMVP（仮データのみ · 外部書き込みなし）
       </div>

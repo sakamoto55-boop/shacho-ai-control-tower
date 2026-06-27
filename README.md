@@ -8,8 +8,8 @@
 
 `client/` ディレクトリに、**iPhone最優先のスマホ対応Webアプリ**が含まれています。
 
-> **現在のバージョン：v0.5.5 Phase 5.5**
-> すべての数値・メッセージは仮データです。Gmail読み取り専用連携の構造を追加しましたが、実際の認証情報は未設定のため mockGmail を使用しています。Gmailへの書き込み（送信・返信・削除・ラベル変更等）は未実装です。Phase 5.5 では Provider / AI Engine アーキテクチャ基盤を追加しました（外部接続なし）。
+> **現在のバージョン：v0.6.0 Phase 6**
+> Phase 6 では Google Calendar ReadOnly を Schedule Provider として接続しました。`calendar.readonly` スコープのみを使用。予定作成・更新・削除・招待返信は未実装です。Gmailへの書き込みも引き続き未実装です。Schedule Provider のデータが AIコックピット・ホーム・AI相談に反映されています。
 
 ### 検収ドキュメント
 
@@ -320,10 +320,89 @@ Phase 5.1 では、Phase 5 で構築した OAuth 基盤に対して**安全性�
 
 ---
 
-### Phase 6 予定
+---
 
-**Phase 6**: Googleカレンダー読み取り専用連携  
-スコープ: `calendar.readonly`（現時点では取得しない）
+## Phase 6 で追加した内容（Google Calendar ReadOnly / Schedule Provider 接続）
+
+### 概要
+
+Phase 6 では **Google Calendar ReadOnly を Schedule Provider へ接続** しました。  
+取得スコープは `calendar.readonly` のみ。**予定作成・更新・削除・招待返信は未実装です。**
+
+### カレンダーサービス層（新規追加）
+
+```
+client/src/services/calendar/
+├── types.ts           — GoogleCalendarEvent / CalendarDerivedEvent / CalendarSummary 型定義
+├── mockCalendar.ts    — デモ予定データ（銀行打合せ・現場確認・行政手続き等 5件）
+├── calendarClient.ts  — Calendar ReadOnly 入口（認証なし → mock、認証済み → API）
+├── calendarFetcher.ts — GET 専用フェッチャー（createEvent/updateEvent/deleteEvent 未実装）
+├── calendarMapper.ts  — GoogleCalendarEvent → UnifiedScheduleItem 変換
+├── calendarAnalyzer.ts — 重要度・カテゴリ・期限リスク・推奨アクション判定
+└── calendarCache.ts   — ローカルキャッシュ（5分 TTL）
+```
+
+### Schedule Provider への接続
+
+```
+Google Calendar API ReadOnly
+  ↓ calendarFetcher.fetchCalendarEvents(accessToken)
+  ↓ 認証なし → mockCalendarEvents
+GoogleCalendarEvent[]
+  ↓ calendarMapper.mapToCalendarDerivedEvent()
+  ↓ calendarAnalyzer.analyzeCategory/analyzeImportance/hasDeadlineRisk
+CalendarDerivedEvent[]
+  ↓ calendarMapper.mapCalendarDerivedEventToUnifiedScheduleItem()
+UnifiedScheduleItem[]
+  ↓ scheduleProvider.getItems()
+  ↓ providerRegistry.getScheduleItems()
+AIコックピット / ホーム / AI相談 / Briefing Engine
+```
+
+### AI Engine 横断連携（Phase 6 強化）
+
+```
+Inbox Provider（Gmail）× Schedule Provider（Calendar）
+  ↓ priorityEngine.rankItems(inbox, schedule)
+  → Gmail '銀行' タスク + Calendar '銀行打合せ' 予定が同日 → 優先度 +20
+  → Calendar '行政' 予定 + Gmail 関連メール → ブリーフィングへ
+
+  ↓ briefingEngine.generateSections(inbox, risks, schedule)
+  → スケジュールセクション追加（最大5件）
+  → Inbox × Schedule 横断アクション（「10:00 銀行打合せは資料確認メールと関連」）
+```
+
+### 書き込みAPIを実装していない証拠（Calendar）
+
+`client/src/services/calendar/calendarFetcher.ts` には以下の関数は**存在しない**:
+
+| 禁止処理 | 関数名 | 状態 |
+|---------|--------|------|
+| 予定作成 | `createEvent` | 未実装 |
+| 予定更新 | `updateEvent` | 未実装 |
+| 予定削除 | `deleteEvent` | 未実装 |
+| 招待返信 | `respondEvent` | 未実装 |
+| 出席者変更 | `attendeeModify` | 未実装 |
+
+`calendarFetcher.ts` は `GET` リクエストのみ。`POST`/`PATCH`/`PUT`/`DELETE` は一切存在しない。
+
+### 使用スコープ
+
+```
+Phase 6 スコープ（PHASE6_SCOPES）:
+  https://www.googleapis.com/auth/gmail.readonly       ← Phase 5 から継続
+  https://www.googleapis.com/auth/calendar.readonly    ← Phase 6 で追加
+
+禁止スコープ（FORBIDDEN_SCOPES — 絶対に追加しない）:
+  gmail.modify / gmail.send / gmail.compose
+  calendar / calendar.events（書き込み可能）
+  drive / spreadsheets
+```
+
+### 次フェーズ
+
+**Phase 7**: Google Drive ReadOnly / File Provider 接続  
+スコープ: `drive.readonly`（現時点では未取得）
 
 ---
 

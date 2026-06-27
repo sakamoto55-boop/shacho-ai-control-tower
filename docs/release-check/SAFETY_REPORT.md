@@ -1,7 +1,63 @@
 # SAFETY_REPORT.md — 外部API接続状況・安全設計確認書
 
-> 最終更新: Phase 5.5 — v0.5.5（2026-06-27）  
+> 最終更新: Phase 6 — v0.6.0（2026-06-27）  
 > このファイルは外部API接続・書き込み処理の有無を確認するための文書です。
+
+---
+
+## Phase 6 追加安全確認
+
+| チェック項目 | 状態 |
+|------------|------|
+| 新規外部サービス追加 | ✅ Google Calendar ReadOnly のみ（`calendar.readonly` スコープ） |
+| Calendar 書き込み API 追加 | ❌ なし（createEvent/updateEvent/deleteEvent/respondEvent/attendeeModify 未実装） |
+| Calendar スコープ | ✅ `calendar.readonly` のみ（`calendar` / `calendar.events` は取得しない） |
+| Gmail スコープ変更 | ❌ なし（`gmail.readonly` のみ継続） |
+| `calendarFetcher.ts` の HTTP メソッド | ✅ GET のみ（POST/PATCH/PUT/DELETE なし） |
+| 書き込みスコープ混入チェック | ✅ `hasWriteScope()` 関数で検証可能 |
+| FORBIDDEN_SCOPES 定義 | ✅ googleScopes.ts に禁止スコープを明示 |
+| 個人LINE接続 | ❌ 実装なし（CLAUDE.md 制約どおり） |
+| Drive / Sheets 接続 | ❌ 未接続（Phase 7予定） |
+| freee / TKC / kintone 接続 | ❌ 未接続（stub のみ） |
+| Claude API 接続 | ❌ 未接続（将来ポイントのみ記載） |
+
+---
+
+## Calendar 書き込み禁止の確認
+
+### 禁止されている処理と実装状態
+
+| 処理 | 関数名 | 実装状態 | 証拠ファイル |
+|------|--------|---------|------------|
+| 予定作成 | `createEvent` | **未実装** | `calendarFetcher.ts`: GET のみ |
+| 予定更新 | `updateEvent` | **未実装** | `calendarFetcher.ts`: GET のみ |
+| 予定削除 | `deleteEvent` | **未実装** | `calendarFetcher.ts`: GET のみ |
+| 招待返信 | `respondEvent` | **未実装** | `calendarFetcher.ts`: GET のみ |
+| 出席者変更 | `attendeeModify` | **未実装** | `calendarFetcher.ts`: GET のみ |
+| 通知送信 | `sendNotification` | **未実装** | `calendarFetcher.ts`: GET のみ |
+
+### HTTP メソッドの使用状況（Calendar）
+
+| ファイル | GET | POST | PATCH | PUT | DELETE |
+|---------|-----|------|-------|-----|--------|
+| `calendarFetcher.ts` | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `calendarClient.ts` | ✅（fetchEvents委譲） | ❌ | ❌ | ❌ | ❌ |
+
+---
+
+## 現在の外部API接続状況（Phase 6 更新）
+
+| サービス | 接続状態 | スコープ | 書き込み |
+|---------|---------|---------|---------|
+| Google OAuth | ✅ 構造実装済み（ClientID未設定なら未接続） | — | なし |
+| Gmail API | 🔧 ClientID設定後に有効 | `gmail.readonly` のみ | **なし** |
+| Google Calendar | 🔧 ClientID + calendar.readonly 設定後に有効 | `calendar.readonly` のみ | **なし** |
+| Google Drive | ❌ 未接続 | 未取得 | なし |
+| Google Sheets | ❌ 未接続 | 未取得 | なし |
+| LINE WORKS | ❌ 未接続 | 未取得 | なし |
+| Claude API | ❌ 未接続 | — | なし |
+| freee | ❌ 未接続 | — | なし |
+| kintone | ❌ 未接続 | — | なし |
 
 ---
 
