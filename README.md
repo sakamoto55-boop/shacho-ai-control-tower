@@ -4,13 +4,13 @@
 >
 > | | |
 > |--|--|
-> | 📱 **公開URL（スマホで開く）** | `https://sakamoto55-boop.github.io/shacho-ai-control-tower/` |
+> | 📱 **公開URL（スマホで開く）** | **https://sakamoto55-boop.github.io/shacho-ai-control-tower/** ✅ 公開中 |
 > | 📖 **使い方ガイド** | [docs/HOW_TO_USE.md](docs/HOW_TO_USE.md) |
 > | ✅ **現在できること** | [docs/CURRENT_STATUS.md](docs/CURRENT_STATUS.md) |
 > | 🔧 **本番接続手順** | [docs/NEXT_SETUP_STEPS.md](docs/NEXT_SETUP_STEPS.md) |
 > | 📦 **納品物一覧** | [docs/DELIVERY_SUMMARY.md](docs/DELIVERY_SUMMARY.md) |
 
-> ⚠️ **URLが開かない場合**: GitHubリポジトリの Settings → Pages → Branch: gh-pages → Save で有効化してください（30秒で設定完了）。
+> スマホ（Safari / Chrome）で上記URLを開くだけで使えます。アプリのインストールは不要です。
 
 ---
 

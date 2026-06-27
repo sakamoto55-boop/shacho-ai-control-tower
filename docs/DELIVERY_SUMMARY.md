@@ -8,10 +8,11 @@
 
 | 項目 | 内容 |
 |------|------|
-| **公開URL** | `https://sakamoto55-boop.github.io/shacho-ai-control-tower/` |
-| 有効化状態 | GitHub Pages 有効化後にアクセス可能 |
-| 有効化手順 | リポジトリ Settings → Pages → Branch: gh-pages → / → Save |
+| **公開URL** | https://sakamoto55-boop.github.io/shacho-ai-control-tower/ |
+| 公開状態 | ✅ **公開中・アクセス可能**（2026-06-27 有効化確認済み）|
+| リポジトリ公開設定 | public（GitHub Pages 無料利用のため非公開→公開へ変更）|
 | デプロイ元 | `gh-pages` ブランチ（静的ファイル: index.html + assets/） |
+| デプロイ方式 | GitHub Pages（Deploy from a branch）|
 
 ---
 
@@ -23,7 +24,8 @@
 | 開発ブランチ | `claude/ai-ceo-room-mobile-e7k8ye` |
 | Phase 10 コミット | `8c90505` — feat(phase10): AI Engine統合 / 社長承認フロー |
 | Phase 10.1 コミット | `9b267dd` — docs(phase10.1): v1.0.0 完成検収・凍結ドキュメント整備 |
-| Phase 10.2 コミット | （このコミット — 納品物作成・デプロイ） |
+| Phase 10.2 コミット | `73b5f82` — docs(phase10.2): 納品物作成・GitHub Pages デプロイ |
+| Phase 10.2 確定コミット | 公開URL確定後の最終更新（このコミット）|
 | gh-pages コミット | `a810101` — deploy: AI社長室 v1.0.0 MVP — GitHub Pages |
 
 ---
