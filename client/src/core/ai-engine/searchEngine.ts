@@ -1,12 +1,13 @@
-// 横断検索エンジン — inbox + schedule + file + metrics を横断して検索する
+// 横断検索エンジン — inbox + schedule + file + metrics + notifications を横断して検索する
 
-import type { UnifiedInboxItem, UnifiedFileItem, UnifiedBusinessMetric } from '../providers/providerTypes'
+import type { UnifiedInboxItem, UnifiedFileItem, UnifiedBusinessMetric, UnifiedNotification } from '../providers/providerTypes'
 import { searchDriveFiles } from '../../services/drive/driveSearch'
 
 export interface SearchResults {
   inbox: UnifiedInboxItem[]
   files: UnifiedFileItem[]
   metrics: UnifiedBusinessMetric[]
+  notifications: UnifiedNotification[]
   totalCount: number
 }
 
@@ -44,22 +45,40 @@ export const searchEngine = {
     )
   },
 
-  // Inbox + Drive + BusinessData 横断検索
+  // LINE WORKS通知検索（Phase 9 追加）
+  searchNotifications(query: string, notifications: UnifiedNotification[]): UnifiedNotification[] {
+    if (!query.trim()) return []
+    const q = query.toLowerCase()
+    return notifications.filter(
+      (n) =>
+        n.title.toLowerCase().includes(q) ||
+        n.body.toLowerCase().includes(q) ||
+        (n.senderName?.toLowerCase().includes(q) ?? false) ||
+        (n.senderDepartment?.toLowerCase().includes(q) ?? false) ||
+        (n.category?.toLowerCase().includes(q) ?? false) ||
+        (n.suggestedAction?.toLowerCase().includes(q) ?? false)
+    )
+  },
+
+  // Inbox + Drive + BusinessData + Notification 横断検索
   searchAll(
     query: string,
     inbox: UnifiedInboxItem[],
     files: UnifiedFileItem[],
-    metrics: UnifiedBusinessMetric[] = []
+    metrics: UnifiedBusinessMetric[] = [],
+    notifications: UnifiedNotification[] = []
   ): SearchResults {
-    if (!query.trim()) return { inbox: [], files: [], metrics: [], totalCount: 0 }
+    if (!query.trim()) return { inbox: [], files: [], metrics: [], notifications: [], totalCount: 0 }
     const inboxResults = this.search(query, inbox)
     const fileResults = this.searchFiles(query, files)
     const metricResults = this.searchMetrics(query, metrics)
+    const notifResults = this.searchNotifications(query, notifications)
     return {
       inbox: inboxResults,
       files: fileResults,
       metrics: metricResults,
-      totalCount: inboxResults.length + fileResults.length + metricResults.length,
+      notifications: notifResults,
+      totalCount: inboxResults.length + fileResults.length + metricResults.length + notifResults.length,
     }
   },
 }

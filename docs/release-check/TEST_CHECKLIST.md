@@ -1,7 +1,55 @@
 # TEST_CHECKLIST.md — 手動検収チェックリスト
 
-> 最終更新: Phase 8 — v0.8.0（2026-06-27）  
+> 最終更新: Phase 9 — v0.9.0（2026-06-27）  
 > 各項目を実際にブラウザで確認してチェックしてください。
+
+---
+
+## Phase 9 検収チェック
+
+### TypeScript ビルド確認
+- [ ] `cd client && npm run build` がゼロエラーで完了する
+- [ ] `noUnusedLocals` / `noUnusedParameters` エラーが出ない
+
+### AIコックピット — LINE WORKS通知セクション（新規）
+- [ ] 「💬 LINE WORKS通知」セクション（ティール #F0FDFA）が表示される
+- [ ] 緊急N件・重要AN件・事故N件・SOSN件のチップが表示される
+- [ ] 事故報告・SOS 2件のカードが赤背景で表示される
+- [ ] フッターに「デモLINE WORKS · 読み取り専用 · 送信・返信・既読化なし」が表示される
+
+### ホーム画面 — LINE WORKSカード（新規）
+- [ ] 「💬 LINE WORKS通知」カード（ティール #F0FDFA）が表示される
+- [ ] 緊急件数・重要A件数のチップが表示される
+- [ ] 「LINE WORKSの通知を確認する →」ボタンで actions タブへ遷移する
+
+### 今日の要対応 — LINE WORKSセクション（新規）
+- [ ] 「💬 LINE WORKS（デモ）」セクションが表示される
+- [ ] 通知カードに「返信」「既読」ボタンが存在しない
+- [ ] critical通知（事故報告・SOS）が赤ボーダーで表示される
+- [ ] high通知（欠勤・車両・遅延）がオレンジボーダーで表示される
+- [ ] カードをタップするとモーダルが開く
+- [ ] モーダルに「送信・返信・既読化は禁止です」バナーが表示される
+- [ ] 受信箱カード4件が表示される（見積・請求・シフト・銀行）
+
+### AI相談 — LINE WORKSショートカットバー（新規）
+- [ ] 「💬 LINE WORKSショートカット」バーがティール背景で表示される
+- [ ] 6件のショートカットボタンが表示される
+- [ ] 「LINE WORKSの通知を要約して」をタップすると通知サマリーが返る
+- [ ] 「今日のSOS・緊急連絡は？」をタップするとSOS・緊急情報が返る
+- [ ] 各回答に「デモLINE WORKS · 読み取り専用 · 送信・返信・既読化なし」が含まれる
+
+### Settings — Phase 9 更新
+- [ ] 「Phase 9 — LINE WORKS Notification 接続 · 書き込みなし」のサブタイトルが表示される
+- [ ] LINE WORKS通知が「実装済」になっている
+- [ ] Provider健全性にLINE WORKS通知「デモ接続」（ティール）が表示される
+- [ ] バージョン「v0.9.0 Phase 9」が設定画面最下部に表示される
+
+### LINE WORKSサービス層 確認（TypeScript型チェック）
+- [ ] `mockLineWorksNotifications.length` が 5 を返す
+- [ ] `mockLineWorksInboxMessages.length` が 4 を返す
+- [ ] `createNotificationSummary()` が criticalCount / accidentCount / sosCount を返す
+- [ ] `detectNotificationRisks()` が severity / riskType を含む配列を返す
+- [ ] `lineworksFetcher.sendMessage()` が WRITE_FORBIDDEN エラーを throw する
 
 ---
 

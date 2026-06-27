@@ -1,6 +1,6 @@
 # ARCHITECTURE_OVERVIEW.md — AI社長室 アーキテクチャ概要
 
-> 最終更新: Phase 5.5 — v0.5.5（2026-06-27）
+> 最終更新: Phase 9 — v0.9.0（2026-06-27）
 
 ---
 
@@ -35,14 +35,14 @@ Layer 2: Provider層 — 外部サービスを「判断軸」に変換
   Provider        Provider        Provider        Provider
   ・Gmail         ・Calendar      ・Drive         ・Sheets
   ・LINE WORKS    （Phase 6）     （将来）         ・freee
-  （接続済）                                      ・TKC
+  （デモ接続）                                    ・TKC
                                                   （将来）
 
   Workflow        Notification
   Provider        Provider
-  ・承認フロー    ・アラート
-  ・下書き        ・ブリーフィング
-  （将来）        （将来）
+  ・承認フロー    ・LINE WORKS通知
+  ・下書き        ・アラート
+  （将来）        （Phase 9 デモ接続）
 
 ──────────────────────────────────────────────────────────────────
 Layer 3: AI Engine層 — 横断判断・優先度付け・リスク検知
@@ -96,16 +96,16 @@ client/src/core/
 
 ---
 
-## Provider別接続状況（Phase 5.5 時点）
+## Provider別接続状況（Phase 9 時点）
 
 | Provider | 接続状態 | データソース | 次フェーズ |
 |---------|---------|------------|---------|
-| Inbox Provider | 準備済（デモ中） | Gmail | LINE WORKS（未定） |
+| Inbox Provider | デモ接続 | Gmail + LINE WORKS（デモ） | — |
 | Schedule Provider | 未接続 | — | Google Calendar（Phase 6） |
 | File Provider | 未接続 | — | Google Drive（将来） |
-| BusinessData Provider | 未接続 | — | Google Sheets / freee / TKC（将来） |
+| BusinessData Provider | デモ接続 | Google Sheets（デモ） | freee / TKC（将来） |
 | Workflow Provider | 未接続 | — | 社長承認フロー（将来） |
-| Notification Provider | 未接続 | — | 朝ブリーフィング自動配信（将来） |
+| Notification Provider | デモ接続 | LINE WORKS通知（デモ）| OAuth2本番接続（Phase 10） |
 
 ---
 

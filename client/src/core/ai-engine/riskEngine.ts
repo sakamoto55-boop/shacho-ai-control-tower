@@ -1,7 +1,7 @@
 // リスク横断検知エンジン
-// 将来: inbox + schedule + businessData + workflow を横断してリスクを検知
+// Phase 9: LINE WORKS通知を追加
 
-import type { UnifiedInboxItem, UnifiedBusinessMetric, UnifiedRisk } from '../providers/providerTypes'
+import type { UnifiedInboxItem, UnifiedBusinessMetric, UnifiedRisk, UnifiedNotification } from '../providers/providerTypes'
 
 const RISK_KEYWORDS: Record<string, UnifiedRisk['riskType']> = {
   '事故': '事故',
@@ -112,6 +112,61 @@ export const riskEngine = {
     return risks
   },
 
+  detectFromNotifications(notifications: UnifiedNotification[]): UnifiedRisk[] {
+    const risks: UnifiedRisk[] = []
+    const now = new Date().toISOString()
+
+    for (const notif of notifications) {
+      if (notif.category === 'accident') {
+        risks.push({
+          id: `risk-lw-${notif.id}-accident`,
+          sources: ['line-works'],
+          riskType: '事故',
+          severity: 'critical',
+          title: `事故リスク（LINE WORKS）: ${notif.senderName ?? '不明'}からの報告`,
+          description: notif.body.slice(0, 100),
+          detectedAt: now,
+          deadline: null,
+        })
+      } else if (notif.category === 'sos') {
+        risks.push({
+          id: `risk-lw-${notif.id}-sos`,
+          sources: ['line-works'],
+          riskType: '事故',
+          severity: 'critical',
+          title: `SOS緊急連絡（LINE WORKS）: ${notif.senderName ?? '不明'}`,
+          description: notif.body.slice(0, 100),
+          detectedAt: now,
+          deadline: null,
+        })
+      } else if (notif.category === 'vehicle' && notif.riskFlag) {
+        risks.push({
+          id: `risk-lw-${notif.id}-vehicle`,
+          sources: ['line-works'],
+          riskType: 'その他',
+          severity: 'high',
+          title: `車両トラブルリスク（LINE WORKS）: ${notif.senderName ?? '不明'}`,
+          description: notif.body.slice(0, 100),
+          detectedAt: now,
+          deadline: null,
+        })
+      } else if (notif.category === 'absence') {
+        risks.push({
+          id: `risk-lw-${notif.id}-absence`,
+          sources: ['line-works'],
+          riskType: '人員不足',
+          severity: 'high',
+          title: `欠勤による人員不足（LINE WORKS）: ${notif.senderName ?? '不明'}`,
+          description: notif.body.slice(0, 100),
+          detectedAt: now,
+          deadline: null,
+        })
+      }
+    }
+
+    return risks
+  },
+
   aggregateRisks(...riskArrays: UnifiedRisk[][]): UnifiedRisk[] {
     const all = riskArrays.flat()
     const seen = new Set<string>()
@@ -127,3 +182,4 @@ export const riskEngine = {
 
   // 将来: detectFromSchedule(), detectFromWorkflow()
 }
+

@@ -1,6 +1,74 @@
 # DATA_FLOW.md — データの流れ
 
-> 最終更新: Phase 6 — v0.6.0（2026-06-27）
+> 最終更新: Phase 9 — v0.9.0（2026-06-27）
+
+---
+
+## Phase 9 追加: LINE WORKS データフロー
+
+```
+─────────────── LINE WORKS 通知取得フロー ───────────────
+
+lineworksClient.fetchNotifications()
+  │
+  ├── [デモ/未設定] → mockLineWorksNotifications（mockLineworks.ts 5件）
+  │
+  └── [VITE_LINEWORKS_BOT_ID 設定済み]
+          │
+          ├── lineworksCache.get() → キャッシュあり（5分以内）
+          │         │
+          │         ▼ LineWorksNotificationMessage[]（キャッシュ）
+          │
+          └── lineworksCache.isStale() = true
+                    │
+                    ▼
+              lineworksFetcher.getMessages(channelId)
+                    │ GET https://www.worksapis.com/v1.0/bots/{botId}/channels/{channelId}/messages
+                    │ ← 読み取りのみ / 書き込みAPI呼び出しなし
+                    ▼
+              LineWorksNotificationMessage[]
+                    │
+                    ▼
+              lineworksCache.set(data)
+
+─────────────── LINE WORKS → UnifiedNotification フロー ───────────────
+
+LineWorksNotificationMessage[]（mockLineworks.ts）
+  │
+  ├── lineworksMapper.buildNotificationTitle()  → 【緊急】/【要確認】プレフィックス付きタイトル
+  ├── lineworksMapper.mapLineWorksToUnifiedNotification()
+  └── notificationProvider.getItems()
+        ↓
+UnifiedNotification[]
+  │ (readOnly: true, writeEnabled: false, urgency, category, riskFlag)
+  │
+  ├── CockpitScreen  — ティールセクション（緊急通知カード）
+  ├── Home           — ティールLINE WORKSカード
+  ├── TodayActions   — LINE WORKSセクション（通知5件）
+  ├── AiChat         — LINE WORKSショートカットバー（6件）
+  └── riskEngine.detectFromNotifications() → UnifiedRisk[]
+
+─────────────── LINE WORKS → UnifiedInboxItem フロー ───────────────
+
+LineWorksInboxMessage[]（mockLineworks.ts 4件）
+  │
+  └── lineworksMapper.mapLineWorksToUnifiedInboxItem()
+        ↓
+UnifiedInboxItem[]
+  │ (readOnly: true, writeEnabled: false, source: 'LINE WORKS')
+  │
+  └── inboxProvider.getItems()
+        → [...gmailItems, ...lwItems]  — Gmail + LINE WORKS 統合
+
+─────────────── 書き込み禁止ガード ───────────────
+
+lineworksFetcher.sendMessage()    → throw Error('WRITE_FORBIDDEN: sendMessage is not allowed')
+lineworksFetcher.replyMessage()   → throw Error('WRITE_FORBIDDEN')
+lineworksFetcher.markAsRead()     → throw Error('WRITE_FORBIDDEN')
+lineworksFetcher.deleteMessage()  → throw Error('WRITE_FORBIDDEN')
+lineworksFetcher.postToChannel()  → throw Error('WRITE_FORBIDDEN')
+... (計10メソッド全て WRITE_FORBIDDEN)
+```
 
 ---
 

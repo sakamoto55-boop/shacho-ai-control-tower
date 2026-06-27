@@ -1,6 +1,6 @@
 # PROVIDER_DESIGN.md — Provider設計仕様
 
-> 最終更新: Phase 5.5 — v0.5.5（2026-06-27）
+> 最終更新: Phase 9 — v0.9.0（2026-06-27）
 
 ---
 
@@ -118,13 +118,22 @@ interface ProviderDescriptor {
 
 ---
 
-### Notification Provider（未接続・将来）
+### Notification Provider（Phase 9 デモ接続）
 
 | 項目 | 値 |
 |------|-----|
-| providerId | `notification-alert` |
-| connectionStatus | planned |
+| providerId | `lineworks-notification` |
+| providerName | LINE WORKS 通知 |
+| sourceService | LINE WORKS |
+| connectionStatus | demo（Phase 9）|
+| readOnly | true |
+| writeEnabled | false |
 | データ型 | `UnifiedNotification` |
+| Phase | 9（デモ接続） / Phase 10（OAuth2本番） |
+
+**現状**: mockLineWorksNotifications 5件（`VITE_LINEWORKS_BOT_ID` 未設定時）
+
+**書き込み禁止**: `lineworksFetcher.ts` の全10書き込みメソッドが `WRITE_FORBIDDEN` エラーを throw
 
 ---
 

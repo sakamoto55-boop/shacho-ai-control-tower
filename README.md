@@ -8,8 +8,8 @@
 
 `client/` ディレクトリに、**iPhone最優先のスマホ対応Webアプリ**が含まれています。
 
-> **現在のバージョン：v0.6.0 Phase 6**
-> Phase 6 では Google Calendar ReadOnly を Schedule Provider として接続しました。`calendar.readonly` スコープのみを使用。予定作成・更新・削除・招待返信は未実装です。Gmailへの書き込みも引き続き未実装です。Schedule Provider のデータが AIコックピット・ホーム・AI相談に反映されています。
+> **現在のバージョン：v0.9.0 Phase 9**
+> Phase 9 では LINE WORKS を Notification Provider / Inbox Provider へデモ接続しました。読み取り設計・通知受信設計・モックデータ反映のみ。送信・返信・既読化・削除・Bot送信・Webhook返信 等の書き込み操作は一切実装していません。本番時はバックエンド管理が必須です（`LINEWORKS_CLIENT_SECRET` はフロントエンドに置かない）。
 
 ### 検収ドキュメント
 
@@ -403,6 +403,86 @@ Phase 6 スコープ（PHASE6_SCOPES）:
 ### 次フェーズ
 
 **Phase 9**: LINE WORKS / Notification Provider 接続
+
+---
+
+## Phase 9 で追加した内容（LINE WORKS Notification / Inbox Provider デモ接続）
+
+### 概要
+
+LINE WORKS を **読み取り専用** でデモ接続し、AI社長室の Notification Provider / Inbox Provider に通知・社内連絡を流し込む。  
+Inbox × Schedule × File × BusinessData × Notification の **五元横断分析** を開始。
+
+- 緊急通知（事故・SOS・欠勤・車両・遅延）5件をデモ表示
+- 社内連絡（見積依頼・請求確認・シフト・銀行対応）4件をデモ表示
+- **メッセージ送信・返信・既読化・削除・Bot送信・Webhook返信 等の書き込みは一切実装していません**
+
+### 絶対禁止操作（LINE WORKS）
+
+| 操作 | 実装状態 |
+|------|---------|
+| メッセージ送信 | `WRITE_FORBIDDEN` エラー（throw） |
+| 返信送信 | `WRITE_FORBIDDEN` エラー（throw） |
+| 既読化（markAsRead） | `WRITE_FORBIDDEN` エラー（throw） |
+| トーク削除 | `WRITE_FORBIDDEN` エラー（throw） |
+| ファイル送信 | `WRITE_FORBIDDEN` エラー（throw） |
+| ユーザー追加 | `WRITE_FORBIDDEN` エラー（throw） |
+| Bot送信 | `WRITE_FORBIDDEN` エラー（throw） |
+| チャンネル投稿 | `WRITE_FORBIDDEN` エラー（throw） |
+| Webhook返信 | 未実装（Phase 10以降） |
+| メッセージ更新 | `WRITE_FORBIDDEN` エラー（throw） |
+
+### 追加したファイル（8ファイル）
+
+| ファイル | 役割 |
+|---------|------|
+| `client/src/services/lineworks/types.ts` | LINE WORKS固有型定義 |
+| `client/src/services/lineworks/mockLineworks.ts` | モックデータ9件（通知5件 + 受信箱4件） |
+| `client/src/services/lineworks/lineworksClient.ts` | fetchNotifications / fetchInboxMessages（読み取りのみ） |
+| `client/src/services/lineworks/lineworksFetcher.ts` | GET専用HTTPラッパー + WRITE_FORBIDDENガード |
+| `client/src/services/lineworks/lineworksMapper.ts` | LineWorksMessage → UnifiedNotification / UnifiedInboxItem 変換 |
+| `client/src/services/lineworks/lineworksAnalyzer.ts` | detectNotificationRisks / createNotificationSummary |
+| `client/src/services/lineworks/lineworksCache.ts` | 5分TTLキャッシュ（localStorage） |
+| `client/src/services/lineworks/lineworksWebhookTypes.ts` | 将来Webhook受信用型定義のみ（送信なし） |
+
+### LINE WORKS Notification Provider → データフロー
+
+```
+mockLineWorksNotifications（5件: 事故・SOS・欠勤・車両・遅延）
+  ↓ lineworksMapper.mapLineWorksToUnifiedNotification()
+UnifiedNotification[]
+  ↓ notificationProvider.getItems()
+  ↓ riskEngine.detectFromNotifications()   → UnifiedRisk[] (accident/sos→critical)
+  ↓ briefingEngine.generateSections()      → 'notification' セクション追加
+  ↓ priorityEngine.rankItems()             → LINE WORKS criticalクロス加点 +30
+AIコックピット（ティールセクション）/ ホーム（ティールカード）/ 今日の要対応 / AI相談
+```
+
+### 環境変数（本番接続時 — Phase 10以降）
+
+```env
+# LINE WORKS（Phase 9: デモ / Phase 10以降: 本番）
+VITE_LINEWORKS_CLIENT_ID=your_client_id_here
+VITE_LINEWORKS_DOMAIN_ID=your_domain_id_here
+VITE_LINEWORKS_BOT_ID=your_bot_id_here
+VITE_LINEWORKS_CHANNEL_ID=your_channel_id_here
+
+# ⚠️ 以下はフロントエンドに置かない（バックエンドのみで管理）
+# LINEWORKS_CLIENT_SECRET=絶対にフロントに置かない
+```
+
+### カラーテーマ（ティール — LINE WORKS統一）
+
+```
+bg:     #F0FDFA (teal-50)
+border: #CCFBF1 (teal-100)
+text:   #0F766E (teal-700)
+button: #14B8A6 (teal-500)
+```
+
+### 次フェーズ
+
+**Phase 10**: LINE WORKS OAuth2 本番接続、Webhook受信バックエンドエンドポイント実装、バックエンドProxy経由での読み取りAPI
 
 ---
 
@@ -805,12 +885,12 @@ Phase 3.5においても外部サービスへの接続は一切行っていま�
 |---------|------|---------|
 | ~~Phase 4~~ | ~~Gmail読み取り（サービス層構築）~~ | ✅ 完了 |
 | ~~Phase 4.1~~ | ~~Gmail由来データ全画面表示強化~~ | ✅ 完了 |
-| **Phase 5** | **Google OAuth + Gmail ReadOnly 実接続基盤** | ✅ 完了 |
-| Phase 6 | Googleカレンダー読み取り | 次回 |
-| Phase 7 | Google Drive検索 | 未定 |
-| Phase 8 | Googleスプレッドシート読み取り | 未定 |
-| Phase 9 | LINE WORKS通知受信 | 未定 |
-| Phase 10 | Claude APIリアルタイム接続 | 未定 |
+| ~~Phase 5~~ | ~~Google OAuth + Gmail ReadOnly 実接続基盤~~ | ✅ 完了 |
+| ~~Phase 6~~ | ~~Google Calendar ReadOnly / Schedule Provider~~ | ✅ 完了 |
+| ~~Phase 7~~ | ~~Google Drive ReadOnly / File Provider~~ | ✅ 完了 |
+| ~~Phase 8~~ | ~~Google Sheets ReadOnly / BusinessData Provider~~ | ✅ 完了 |
+| ~~Phase 9~~ | ~~LINE WORKS Notification / Inbox Provider デモ接続~~ | ✅ 完了 |
+| **Phase 10** | **LINE WORKS OAuth2 本番接続・Webhook受信バックエンド** | 次回 |
 | 将来 | Gmail下書き作成（送信なし・人間承認必須） | 将来 |
 
 **書き込み処理はすべて人間の最終確認を前提とし、自動送信・自動保存は行いません。**

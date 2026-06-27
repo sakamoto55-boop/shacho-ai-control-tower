@@ -1,7 +1,38 @@
 # SAFETY_REPORT.md — 外部API接続状況・安全設計確認書
 
-> 最終更新: Phase 8 — v0.8.0（2026-06-27）  
+> 最終更新: Phase 9 — v0.9.0（2026-06-27）  
 > このファイルは外部API接続・書き込み処理の有無を確認するための文書です。
+
+---
+
+## Phase 9 追加安全確認
+
+| チェック項目 | 状態 |
+|------------|------|
+| 新規外部サービス追加 | ✅ LINE WORKS 読み取り専用のみ（デモモード） |
+| LINE WORKS 書き込みAPI追加 | ❌ なし（sendMessage/replyMessage/markAsRead/deleteMessage等 WRITE_FORBIDDEN実装） |
+| フロントへの秘密鍵配置 | ❌ なし（VITE_LINEWORKS_CLIENT_SECRET はenv.exampleに記載禁止） |
+| `lineworksFetcher.ts` の HTTP メソッド | ✅ GET のみ（書き込み系は throw new Error('WRITE_FORBIDDEN')） |
+| `UnifiedNotification` の書き込みフラグ | ✅ `readOnly: true` / `writeEnabled: false` |
+| Webhook返信 | ❌ 実装なし（受信型定義のみ） |
+| 個人LINE接続 | ❌ 実装なし（CLAUDE.md 制約どおり） |
+
+## LINE WORKS 書き込み禁止の確認
+
+### 禁止されている処理と実装状態
+
+| 処理 | 関数名 | 実装状態 | 証拠 |
+|------|--------|---------|------|
+| メッセージ送信 | `sendMessage` | WRITE_FORBIDDEN | `lineworksFetcher.ts` |
+| 返信送信 | `replyMessage` | WRITE_FORBIDDEN | `lineworksFetcher.ts` |
+| 既読化 | `markAsRead` | WRITE_FORBIDDEN | `lineworksFetcher.ts` |
+| メッセージ削除 | `deleteMessage` | WRITE_FORBIDDEN | `lineworksFetcher.ts` |
+| チャンネル投稿 | `postToChannel` | WRITE_FORBIDDEN | `lineworksFetcher.ts` |
+| Bot送信 | `sendBotMessage` | WRITE_FORBIDDEN | `lineworksFetcher.ts` |
+| ユーザー追加 | `addMember` | WRITE_FORBIDDEN | `lineworksFetcher.ts` |
+| ファイル送信 | `sendFile` | WRITE_FORBIDDEN | `lineworksFetcher.ts` |
+| メッセージ更新 | `updateMessage` | WRITE_FORBIDDEN | `lineworksFetcher.ts` |
+| チャンネル作成 | `createChannel` | WRITE_FORBIDDEN | `lineworksFetcher.ts` |
 
 ---
 

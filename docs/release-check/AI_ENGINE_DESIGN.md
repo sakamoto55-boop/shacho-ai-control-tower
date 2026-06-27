@@ -1,6 +1,6 @@
 # AI_ENGINE_DESIGN.md — AI Engine設計仕様
 
-> 最終更新: Phase 5.5 — v0.5.5（2026-06-27）
+> 最終更新: Phase 9 — v0.9.0（2026-06-27）
 
 ---
 
@@ -45,7 +45,7 @@ AI Engineは複数のProviderからデータを受け取り、横断的に分析
 ### PriorityEngine
 
 ```
-入力: UnifiedInboxItem[], UnifiedScheduleItem[], UnifiedRisk[]
+入力: UnifiedInboxItem[], UnifiedScheduleItem[], UnifiedRisk[], UnifiedBusinessMetric[], UnifiedNotification[]
 出力: PriorityScore[], UnifiedInboxItem[]（ランク順）, string[]（TOPアクション）
 
 スコア計算（0-100）:
@@ -55,20 +55,25 @@ AI Engineは複数のProviderからデータを受け取り、横断的に分析
   重要タイプ（銀行/事故）: +10
   要注意タイプ（請求/契約）: +5
   返信下書きあり: +5
+  LINE WORKS通知クロス加点（Phase 9追加）:
+    urgency=critical && riskFlag=true の通知と関連 → +30
 ```
 
 ### BriefingEngine
 
 ```
-入力: UnifiedInboxItem[], UnifiedRisk[]
+入力: UnifiedInboxItem[], UnifiedRisk[], UnifiedScheduleItem[], UnifiedBusinessMetric[], UnifiedFileItem[], UnifiedNotification[]
 出力: BriefingSection[]
 
-セクション:
-  1. 受信トレイ 要対応（優先度A）
-  2. 検知リスク（critical/high）
-  3. 本日の推奨アクション（deadline付き）
+セクション（Phase 9 時点）:
+  1. LINE WORKS緊急通知（notification セクション — urgency: critical/high）
+  2. 受信トレイ 要対応（inbox — 優先度A）
+  3. 経営数字サマリー（business-data — リスクあり指標）
+  4. 検知リスク（risk — critical/high）
+  5. 本日の推奨アクション（action — deadline付き）
 
-将来: schedule, businessMetrics も受け取り
+BriefingSection.sectionType:
+  'notification' | 'inbox' | 'schedule' | 'business-data' | 'risk' | 'files' | 'action'
 ```
 
 ### RiskEngine
@@ -77,15 +82,21 @@ AI Engineは複数のProviderからデータを受け取り、横断的に分析
 入力:
   detectFromInbox(): UnifiedInboxItem[]
   detectFromBusinessData(): UnifiedBusinessMetric[]
+  detectFromNotifications(): UnifiedNotification[]  ← Phase 9追加
 出力: UnifiedRisk[]
 
-キーワード検知:
+キーワード検知（Inbox）:
   事故/労災 → 事故リスク
   未払い/未回収 → 未回収リスク
   未請求 → 未請求リスク
   資金/口座残高 → 資金繰りリスク
   契約終了/期限 → 契約期限リスク
   人員不足/退職 → 人員不足リスク
+
+LINE WORKS通知ベース（Phase 9追加）:
+  category=accident or sos → severity: 'critical', riskType: '事故'
+  category=vehicle && riskFlag → severity: 'high', riskType: 'その他'
+  category=absence → severity: 'high', riskType: '人員不足'
 
 将来: detectFromSchedule(), detectFromWorkflow()
 ```
@@ -109,10 +120,19 @@ AI Engineは複数のProviderからデータを受け取り、横断的に分析
 
 ```
 現時点:
-  search(query, inbox[]): UnifiedInboxItem[]
-  subject / from / bodyPreview / taskType でキーワード検索
+  searchInbox(query, inbox[]): UnifiedInboxItem[]
+  searchSchedule(query, schedule[]): UnifiedScheduleItem[]
+  searchFiles(query, files[]): UnifiedFileItem[]
+  searchMetrics(query, metrics[]): UnifiedBusinessMetric[]
+  searchNotifications(query, notifications[]): UnifiedNotification[]  ← Phase 9追加
+  searchAll(query, {inbox, schedule, files, metrics, notifications}): SearchResults
 
-将来: searchSchedule(), searchFiles(), searchBusinessData()
+SearchResults（Phase 9 時点）:
+  inbox: UnifiedInboxItem[]
+  schedule: UnifiedScheduleItem[]
+  files: UnifiedFileItem[]
+  metrics: UnifiedBusinessMetric[]
+  notifications: UnifiedNotification[]  ← Phase 9追加
 ```
 
 ### ApprovalEngine

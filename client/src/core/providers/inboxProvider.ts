@@ -1,11 +1,13 @@
-// Connects existing Gmail services → UnifiedInboxItem[]
-// Future: will also handle LINE WORKS
+// Connects Gmail + LINE WORKS → UnifiedInboxItem[]
+// Phase 9: LINE WORKS inbox items added
 
 import type { ProviderDescriptor, UnifiedInboxItem } from './providerTypes'
 import type { GmailDerivedTask } from '../../types'
 import { mockGmailMessages } from '../../services/gmail/mockGmail'
 import { mapToGmailDerivedTask } from '../../services/gmail/gmailMapper'
 import { googleToken } from '../../services/google/googleToken'
+import { lineworksClient } from '../../services/lineworks/lineworksClient'
+import { mapLineWorksToUnifiedInboxItem } from '../../services/lineworks/lineworksMapper'
 
 export function mapGmailDerivedTaskToUnifiedInboxItem(task: GmailDerivedTask): UnifiedInboxItem {
   return {
@@ -50,7 +52,10 @@ export const inboxProvider = {
 
   async getItems(): Promise<UnifiedInboxItem[]> {
     const tasks = mockGmailMessages.map(mapToGmailDerivedTask)
-    return tasks.map(mapGmailDerivedTaskToUnifiedInboxItem)
+    const gmailItems = tasks.map(mapGmailDerivedTaskToUnifiedInboxItem)
+    const lwResult = await lineworksClient.fetchInboxMessages()
+    const lwItems = lwResult.data.map(mapLineWorksToUnifiedInboxItem)
+    return [...gmailItems, ...lwItems]
   },
 
   async refresh(): Promise<void> {

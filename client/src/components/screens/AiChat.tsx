@@ -12,6 +12,9 @@ import { createDriveSummary } from '../../services/drive/driveAnalyzer'
 import { searchDriveFiles } from '../../services/drive/driveSearch'
 import { mockBusinessDataset } from '../../services/sheets/mockSheets'
 import { createBusinessSummary, detectBusinessRisks } from '../../services/sheets/sheetsAnalyzer'
+import { mockLineWorksNotifications, mockLineWorksInboxMessages } from '../../services/lineworks/mockLineworks'
+import { mapLineWorksToUnifiedNotification } from '../../services/lineworks/lineworksMapper'
+import { createNotificationSummary } from '../../services/lineworks/lineworksAnalyzer'
 
 interface Props {
   onVoice: () => void
@@ -189,8 +192,73 @@ function getSheetsShortcutResponse(input: string): string | null {
   return null
 }
 
+const LINEWORKS_SHORTCUTS = [
+  'LINE WORKSの通知を要約して',
+  '今日のSOS・緊急連絡は？',
+  '事故・トラブル報告を教えて',
+  '欠勤・遅延情報をまとめて',
+  'LINE WORKSの優先度A案件は？',
+  '現場からの報告を整理して',
+]
+
+// LINE WORKS ショートカット回答（Notification Provider 参照）
+function getLineWorksShortcutResponse(input: string): string | null {
+  const notifications = mockLineWorksNotifications.map(mapLineWorksToUnifiedNotification)
+  const summary = createNotificationSummary(notifications)
+  const inboxItems = mockLineWorksInboxMessages
+
+  if (input.includes('LINE WORKSの通知を要約') || input.includes('通知を要約')) {
+    const lines = notifications.slice(0, 5).map((n) => {
+      const mark = n.urgency === 'critical' ? '🚨' : '⚠️'
+      return `・${mark}【${n.category}】${n.senderName ?? '不明'}：${n.body.slice(0, 40)}…`
+    }).join('\n')
+    return `LINE WORKS通知 ${notifications.length}件です。\n\n${lines}\n\n緊急${summary.criticalCount}件、重要${summary.highCount}件。\nデータ元：デモLINE WORKS · 読み取り専用 · 送信・既読化なし`
+  }
+
+  if (input.includes('SOS') || input.includes('緊急連絡')) {
+    const sos = notifications.filter((n) => n.category === 'sos' || n.urgency === 'critical')
+    if (sos.length === 0) return '本日はSOS・緊急連絡はありません。'
+    const lines = sos.map((n) => `・🚨 ${n.senderName ?? '不明'}（${n.senderDepartment ?? '部署不明'}）\n  ${n.body.slice(0, 60)}…\n  → ${n.suggestedAction ?? '早急に確認してください'}`).join('\n\n')
+    return `本日のSOS・緊急連絡 ${sos.length}件です。\n\n${lines}\n\n⚠️ 送信・既読化は禁止です。LINE WORKSで直接対応してください。`
+  }
+
+  if (input.includes('事故') || input.includes('トラブル')) {
+    const accidents = notifications.filter((n) => n.category === 'accident' || n.category === 'vehicle')
+    if (accidents.length === 0) return '本日は事故・トラブル報告はありません。'
+    const lines = accidents.map((n) => `・【${n.category}】${n.senderName ?? '不明'}：${n.body.slice(0, 60)}…\n  → ${n.suggestedAction ?? '確認が必要です'}`).join('\n\n')
+    return `事故・トラブル報告 ${accidents.length}件です。\n\n${lines}\n\nデータ元：デモLINE WORKS · 読み取り専用`
+  }
+
+  if (input.includes('欠勤') || input.includes('遅延')) {
+    const absences = notifications.filter((n) => n.category === 'absence' || n.category === 'delay')
+    if (absences.length === 0) return '本日は欠勤・遅延の報告はありません。'
+    const lines = absences.map((n) => `・【${n.category}】${n.senderName ?? '不明'}：${n.body.slice(0, 60)}…\n  → ${n.suggestedAction ?? '対応が必要です'}`).join('\n\n')
+    return `欠勤・遅延情報 ${absences.length}件です。\n\n${lines}`
+  }
+
+  if (input.includes('LINE WORKSの優先度A') || input.includes('優先度A案件')) {
+    const priorityA = inboxItems.filter((m) => m.priority === 'A')
+    if (priorityA.length === 0) return '優先度Aの案件はありません。'
+    const lines = priorityA.map((m) => `・${m.subject}\n  送信者：${m.senderName} · 期限：${m.deadline ?? '未設定'}`).join('\n')
+    return `LINE WORKS 優先度A案件 ${priorityA.length}件です。\n\n${lines}\n\n⚠️ 返信・既読化は禁止です。社長が直接対応してください。`
+  }
+
+  if (input.includes('現場') && input.includes('報告')) {
+    const field = notifications.filter((n) => n.category === 'delay' || n.category === 'vehicle' || n.category === 'accident')
+    if (field.length === 0) return '本日の現場からの報告はありません。'
+    const lines = field.map((n) => `・【${n.category}】${n.senderName ?? '不明'}：${n.body.slice(0, 60)}…`).join('\n')
+    return `現場からの報告 ${field.length}件です。\n\n${lines}\n\nデータ元：デモLINE WORKS · 読み取り専用 · 送信なし`
+  }
+
+  return null
+}
+
 function getMockResponse(mode: AiMode, input: string): string {
-  // Sheets ショートカット回答を最優先
+  // LINE WORKS ショートカット回答を最優先
+  const lwResponse = getLineWorksShortcutResponse(input)
+  if (lwResponse) return lwResponse
+
+  // Sheets ショートカット回答を優先
   const sheetsResponse = getSheetsShortcutResponse(input)
   if (sheetsResponse) return sheetsResponse
 
@@ -443,6 +511,41 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
                 fontSize: 11,
                 fontWeight: 600,
                 color: '#92400E',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── LINE WORKSショートカット（Phase 9）── */}
+      <div
+        style={{
+          flexShrink: 0,
+          background: '#F0FDFA',
+          borderBottom: '1px solid #CCFBF1',
+          padding: '6px 14px',
+        }}
+      >
+        <div style={{ fontSize: 10, fontWeight: 800, color: '#0F766E', marginBottom: 4 }}>
+          💬 LINE WORKS通知ショートカット
+        </div>
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+          {LINEWORKS_SHORTCUTS.map((s) => (
+            <button
+              key={s}
+              onClick={() => sendMessage(s)}
+              style={{
+                flexShrink: 0,
+                background: '#fff',
+                border: '1.5px solid #CCFBF1',
+                borderRadius: 999,
+                padding: '5px 12px',
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#0F766E',
                 whiteSpace: 'nowrap',
               }}
             >

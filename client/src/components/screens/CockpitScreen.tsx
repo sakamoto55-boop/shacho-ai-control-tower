@@ -20,6 +20,9 @@ import { createDriveSummary } from '../../services/drive/driveAnalyzer'
 import { driveClient } from '../../services/drive/driveClient'
 import { mockBusinessDataset } from '../../services/sheets/mockSheets'
 import { createBusinessSummary, detectBusinessRisks } from '../../services/sheets/sheetsAnalyzer'
+import { mockLineWorksNotifications } from '../../services/lineworks/mockLineworks'
+import { mapLineWorksToUnifiedNotification } from '../../services/lineworks/lineworksMapper'
+import { createNotificationSummary } from '../../services/lineworks/lineworksAnalyzer'
 import type { UnifiedScheduleItem, UnifiedFileItem } from '../../core/providers/providerTypes'
 import DemoBanner from '../DemoBanner'
 
@@ -87,6 +90,14 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
   const businessDataset = mockBusinessDataset
   const businessSummary = createBusinessSummary(businessDataset)
   const businessRisks = detectBusinessRisks(businessDataset.metrics)
+
+  // Notification Provider（Phase 9）— LINE WORKS
+  const lwNotifications = useMemo(
+    () => mockLineWorksNotifications.map(mapLineWorksToUnifiedNotification),
+    []
+  )
+  const lwSummary = useMemo(() => createNotificationSummary(lwNotifications), [lwNotifications])
+  const lwCritical = lwNotifications.filter((n) => n.urgency === 'critical')
 
   useEffect(() => {
     calendarClient.fetchEvents().then((result) => {
@@ -489,6 +500,74 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
 
         <div style={{ fontSize: 10, color: '#7C3AED', marginTop: 8, fontWeight: 600 }}>
           データ元：デモSheets · 読み取り専用 · セル更新・行追加・削除なし
+        </div>
+      </div>
+
+      {/* ── LINE WORKS 通知（Phase 9）── */}
+      <div style={{ background: '#F0FDFA', border: '1.5px solid #CCFBF1', borderRadius: 14, padding: '14px 16px', marginBottom: 14 }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: '#0F766E', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>💬 LINE WORKS通知</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <span style={{ fontSize: 10, background: '#CCFBF1', color: '#0F766E', borderRadius: 999, padding: '2px 8px' }}>デモ</span>
+            <span style={{ fontSize: 10, background: '#D1FAE5', color: '#065F46', borderRadius: 999, padding: '2px 8px' }}>読み取り専用</span>
+          </div>
+        </div>
+
+        {/* カウントチップ */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+          {[
+            { label: `🚨 緊急 ${lwSummary.criticalCount}件`, show: lwSummary.criticalCount > 0, color: '#991B1B', bg: '#FEE2E2' },
+            { label: `⚠️ 重要 ${lwSummary.highCount}件`, show: lwSummary.highCount > 0, color: '#92400E', bg: '#FEF3C7' },
+            { label: `🚑 事故 ${lwSummary.accidentCount}件`, show: lwSummary.accidentCount > 0, color: '#991B1B', bg: '#FEE2E2' },
+            { label: `SOS ${lwSummary.sosCount}件`, show: lwSummary.sosCount > 0, color: '#991B1B', bg: '#FEE2E2' },
+          ].filter((c) => c.show).map((c) => (
+            <span key={c.label} style={{ fontSize: 11, fontWeight: 700, background: c.bg, color: c.color, borderRadius: 999, padding: '3px 10px' }}>{c.label}</span>
+          ))}
+        </div>
+
+        {/* 緊急通知カード */}
+        <div style={{ background: '#fff', borderRadius: 10, overflow: 'hidden', border: '1px solid #CCFBF1' }}>
+          {lwCritical.slice(0, 3).map((notif, i) => (
+            <div
+              key={notif.id}
+              style={{
+                padding: '10px 12px',
+                borderBottom: i < lwCritical.length - 1 && i < 2 ? '1px solid #CCFBF1' : 'none',
+                background: notif.riskFlag ? '#FEF2F2' : '#fff',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                <span style={{ background: notif.urgency === 'critical' ? '#FEE2E2' : '#FEF3C7', color: notif.urgency === 'critical' ? '#991B1B' : '#92400E', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 800 }}>
+                  {notif.urgency === 'critical' ? '🚨 緊急' : '⚠️ 重要'}
+                </span>
+                <span style={{ background: '#F1F5F9', color: '#475569', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>
+                  {notif.category}
+                </span>
+                {notif.riskFlag && (
+                  <span style={{ background: '#FEE2E2', color: '#991B1B', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>
+                    リスク
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>
+                {notif.title}
+              </div>
+              {notif.suggestedAction && (
+                <div style={{ fontSize: 11, color: '#0F766E', fontWeight: 600 }}>
+                  💡 {notif.suggestedAction}
+                </div>
+              )}
+            </div>
+          ))}
+          {lwCritical.length === 0 && (
+            <div style={{ padding: '14px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
+              緊急通知なし
+            </div>
+          )}
+        </div>
+
+        <div style={{ fontSize: 10, color: '#0F766E', marginTop: 8, fontWeight: 600 }}>
+          元データ：デモLINE WORKS · 本番未接続 · 送信・既読化・削除なし
         </div>
       </div>
 

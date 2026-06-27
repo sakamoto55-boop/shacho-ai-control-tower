@@ -4,6 +4,51 @@
 
 ---
 
+## Phase 9 — v0.9.0（2026-06-27）
+
+### 変更テーマ
+LINE WORKS を AI社長室の Notification Provider / Inbox Provider に接続する準備を行う。読み取り設計・通知受信設計・モックデータ反映のみ。送信・返信・既読化・削除は一切実装しない。
+
+### 追加した機能
+
+**LINE WORKS サービス層（8ファイル）**
+- `client/src/services/lineworks/types.ts`: LINE WORKS固有型（LineWorksMessage / LineWorksMember / LineWorksChannel / LineWorksNotificationMessage / LineWorksInboxMessage）
+- `client/src/services/lineworks/mockLineworks.ts`: デモデータ9件（通知5件：事故/SOS/欠勤/車両/遅延、受信箱4件：見積/請求/お結び/銀行）
+- `client/src/services/lineworks/lineworksClient.ts`: fetchNotifications / fetchInboxMessages（読み取りのみ）
+- `client/src/services/lineworks/lineworksFetcher.ts`: GET専用薄ラッパー + WRITE_FORBIDDEN ガード（sendMessage/replyMessage/markAsRead等8メソッド禁止）
+- `client/src/services/lineworks/lineworksMapper.ts`: LineWorksMessage → UnifiedNotification / UnifiedInboxItem 変換
+- `client/src/services/lineworks/lineworksAnalyzer.ts`: detectNotificationRisks / createNotificationSummary
+- `client/src/services/lineworks/lineworksCache.ts`: 5分TTLキャッシュ（localStorage）
+- `client/src/services/lineworks/lineworksWebhookTypes.ts`: 将来Webhook受信用型定義のみ
+
+**docs（新規）**
+- `docs/release-check/LINEWORKS_NOTIFICATION_DESIGN.md`: LINE WORKS Notification Provider 設計書
+
+### 変更した機能
+
+- `providerTypes.ts`: `ProviderConnectionStatus` に `'demo'` 追加。`UnifiedNotification` を 8フィールド → 18フィールドに拡張（senderName/category/urgency/riskFlag/readOnly: true/writeEnabled: false 等）
+- `notificationProvider.ts`: stub → LINE WORKS接続実装（デモモード）
+- `inboxProvider.ts`: LINE WORKS inbox 4件を追加（Gmail + LINE WORKS 統合）
+- `aiEngineTypes.ts`: BriefingSection.sectionType に `'notification'` 追加、AnalysisContext に `notifications?` 追加
+- `priorityEngine.ts`: notifications パラメータ追加（LINE WORKS重大通知クロス加点 +30）
+- `briefingEngine.ts`: notifications パラメータ追加、notification セクション生成（schedule→notification→inbox→business-data→risk→files→action）
+- `riskEngine.ts`: detectFromNotifications() 追加（accident/sos→critical、vehicle/absence→high）
+- `searchEngine.ts`: SearchResults に notifications フィールド追加、searchNotifications() 追加
+- `CockpitScreen.tsx`: LINE WORKS通知セクション追加（ティールテーマ #F0FDFA）
+- `Home.tsx`: LINE WORKSカード追加（ティール）
+- `TodayActions.tsx`: LINE WORKSセクション追加（通知カード＋受信箱カード、返信・既読化ボタンなし）
+- `AiChat.tsx`: LINE WORKSショートカット6種追加・LINE WORKS回答ロジック追加
+- `Settings.tsx`: Phase 9 表記・v0.9.0 バージョン更新・LINE WORKS通知 実装済・demo接続表示
+- `client/.env.example`: LINEWORKS 4変数追加（CLIENT_ID/DOMAIN_ID/BOT_ID/CHANNEL_ID）
+
+### 削除した機能
+- なし
+
+### 外部サービス追加
+- LINE WORKS（読み取り専用・デモモード。本番接続は Phase 10 で対応。送信・既読化・削除は永久に実装しない。）
+
+---
+
 ## Phase 8 — v0.8.0（2026-06-27）
 
 ### 変更テーマ

@@ -1,4 +1,4 @@
-import type { UnifiedInboxItem, UnifiedScheduleItem, UnifiedFileItem, UnifiedRisk, UnifiedBusinessMetric } from '../providers/providerTypes'
+import type { UnifiedInboxItem, UnifiedScheduleItem, UnifiedFileItem, UnifiedRisk, UnifiedBusinessMetric, UnifiedNotification } from '../providers/providerTypes'
 import type { BriefingSection } from './aiEngineTypes'
 
 export const briefingEngine = {
@@ -7,7 +7,8 @@ export const briefingEngine = {
     risks: UnifiedRisk[],
     schedule: UnifiedScheduleItem[] = [],
     files: UnifiedFileItem[] = [],
-    metrics: UnifiedBusinessMetric[] = []
+    metrics: UnifiedBusinessMetric[] = [],
+    notifications: UnifiedNotification[] = []
   ): BriefingSection[] {
     const sections: BriefingSection[] = []
 
@@ -25,6 +26,25 @@ export const briefingEngine = {
         items: eventItems,
         alertLevel: importantEvents.length > 0 ? 'warning' : 'info',
       })
+    }
+
+    // LINE WORKS通知セクション（Phase 9 追加）
+    if (notifications.length > 0) {
+      const urgentNotifs = notifications.filter(
+        (n) => n.urgency === 'critical' || n.urgency === 'high'
+      )
+      const notifItems = urgentNotifs.slice(0, 5).map((n) => {
+        const mark = n.urgency === 'critical' ? '🚨 ' : '⚠️ '
+        return `${mark}${n.title}`
+      })
+      if (notifItems.length > 0) {
+        sections.push({
+          sectionType: 'notification',
+          title: `LINE WORKS緊急通知 ${urgentNotifs.length}件`,
+          items: notifItems,
+          alertLevel: urgentNotifs.some((n) => n.urgency === 'critical') ? 'danger' : 'warning',
+        })
+      }
     }
 
     // 受信トレイセクション

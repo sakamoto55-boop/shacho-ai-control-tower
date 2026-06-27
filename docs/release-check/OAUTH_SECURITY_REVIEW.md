@@ -1,6 +1,6 @@
 # OAUTH_SECURITY_REVIEW.md — OAuth安全設計レビュー
 
-> 最終更新: Phase 5.1 — v0.5.1（2026-06-27）
+> 最終更新: Phase 9 — v0.9.0（2026-06-27）
 
 ---
 
@@ -160,3 +160,52 @@ SPA の場合、以下のリスクが残ります：
 | 本番Gmail 未接続 | ✅ 確認済み（mockGmail を使用） |
 | XSS 対策（完全） | ⚠️ 未実施（本番化前に要対応） |
 | バックエンドプロキシ | ⚠️ 未実装（本番化前に要検討） |
+
+---
+
+## 9. Phase 9 追加: LINE WORKS セキュリティノート
+
+### LINE WORKS OAuth2 / API キー管理
+
+| 項目 | 状態 | 備考 |
+|------|------|------|
+| `VITE_LINEWORKS_CLIENT_ID` | ✅ フロント可 | アプリ識別子のみ |
+| `VITE_LINEWORKS_DOMAIN_ID` | ✅ フロント可 | ドメイン識別子のみ |
+| `VITE_LINEWORKS_BOT_ID` | ✅ フロント可 | Bot識別子のみ |
+| `VITE_LINEWORKS_CHANNEL_ID` | ✅ フロント可 | チャンネル識別子のみ |
+| `LINEWORKS_CLIENT_SECRET` | ❌ フロント禁止 | **バックエンドのみで管理** |
+| `LINEWORKS_PRIVATE_KEY` | ❌ フロント禁止 | **バックエンドのみで管理** |
+
+### LINE WORKS 書き込み禁止ガード
+
+`lineworksFetcher.ts` に書き込み系メソッドは全て明示的に禁止:
+
+| メソッド | ガード |
+|---------|--------|
+| `sendMessage()` | `throw new Error('WRITE_FORBIDDEN: sendMessage is not allowed in this implementation')` |
+| `replyMessage()` | `throw new Error('WRITE_FORBIDDEN')` |
+| `markAsRead()` | `throw new Error('WRITE_FORBIDDEN')` |
+| `deleteMessage()` | `throw new Error('WRITE_FORBIDDEN')` |
+| `postToChannel()` | `throw new Error('WRITE_FORBIDDEN')` |
+| `sendBotMessage()` | `throw new Error('WRITE_FORBIDDEN')` |
+| `addMember()` | `throw new Error('WRITE_FORBIDDEN')` |
+| `sendFile()` | `throw new Error('WRITE_FORBIDDEN')` |
+| `updateMessage()` | `throw new Error('WRITE_FORBIDDEN')` |
+| `createChannel()` | `throw new Error('WRITE_FORBIDDEN')` |
+
+### Webhook 注意事項
+
+- Webhook受信エンドポイントはバックエンドのみで管理（Phase 10以降）
+- フロントエンドにWebhook受信・処理コードは含まない
+- `lineworksWebhookTypes.ts` は型定義のみ（実行コードなし）
+
+### Phase 9 安全宣言
+
+| チェック項目 | 状態 |
+|------------|------|
+| LINE WORKS 書き込みAPI 未実装 | ✅ 確認済み（全10メソッドがWRITE_FORBIDDEN） |
+| CLIENT_SECRET フロント未配置 | ✅ 確認済み（.env.example にも記載なし） |
+| LINE WORKS 本番未接続 | ✅ 確認済み（mockLineworks.ts を使用） |
+| Webhook 受信エンドポイント | ✅ 未実装（Phase 10以降） |
+| 既読化API | ✅ 未実装（WRITE_FORBIDDEN） |
+| メッセージ送信 | ✅ 未実装（WRITE_FORBIDDEN） |

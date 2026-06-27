@@ -3,6 +3,9 @@ import type { ActionItem, Priority, GmailDerivedTask } from '../../types'
 import { actionItems } from '../../data/mockData'
 import { mockGmailMessages } from '../../services/gmail/mockGmail'
 import { mapToGmailDerivedTask } from '../../services/gmail/gmailMapper'
+import { mockLineWorksNotifications, mockLineWorksInboxMessages } from '../../services/lineworks/mockLineworks'
+import { mapLineWorksToUnifiedNotification, mapLineWorksToUnifiedInboxItem } from '../../services/lineworks/lineworksMapper'
+import type { UnifiedNotification, UnifiedInboxItem } from '../../core/providers/providerTypes'
 import DemoBanner from '../DemoBanner'
 
 interface Props {
@@ -36,6 +39,8 @@ const STATUS_CONFIG: Record<string, { bg: string; color: string }> = {
 }
 
 const gmailTasks: GmailDerivedTask[] = mockGmailMessages.map(mapToGmailDerivedTask)
+const lwNotifications: UnifiedNotification[] = mockLineWorksNotifications.map(mapLineWorksToUnifiedNotification)
+const lwInboxItems: UnifiedInboxItem[] = mockLineWorksInboxMessages.map(mapLineWorksToUnifiedInboxItem)
 
 export default function TodayActions({ demoMode }: Props) {
   const [expanded, setExpanded] = useState<Priority>('A')
@@ -43,6 +48,9 @@ export default function TodayActions({ demoMode }: Props) {
   const [selectedItem, setSelectedItem] = useState<ActionItem | null>(null)
   const [selectedGmailTask, setSelectedGmailTask] = useState<GmailDerivedTask | null>(null)
   const [gmailExpanded, setGmailExpanded] = useState(true)
+  const [lwExpanded, setLwExpanded] = useState(true)
+  const [selectedLwNotif, setSelectedLwNotif] = useState<UnifiedNotification | null>(null)
+  const [selectedLwInbox, setSelectedLwInbox] = useState<UnifiedInboxItem | null>(null)
 
   function toggleDone(id: string) {
     setDoneIds((prev) => {
@@ -217,6 +225,73 @@ export default function TodayActions({ demoMode }: Props) {
             </div>
           )}
         </div>
+
+        {/* ── LINE WORKS からの要対応 ── */}
+        <div style={{ marginBottom: 12 }}>
+          <button
+            onClick={() => setLwExpanded(!lwExpanded)}
+            style={{
+              width: '100%',
+              background: '#F0FDFA',
+              borderRadius: lwExpanded ? '16px 16px 0 0' : 16,
+              padding: '14px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              boxShadow: 'var(--shadow)',
+              borderBottom: lwExpanded ? '1px solid #CCFBF1' : 'none',
+              border: '1.5px solid #CCFBF1',
+            }}
+          >
+            <span style={{ fontSize: 18 }}>💬</span>
+            <span style={{ flex: 1, fontWeight: 800, fontSize: 14, textAlign: 'left', color: '#0F766E' }}>
+              LINE WORKSからの要対応
+            </span>
+            {demoMode !== false && (
+              <span style={{ background: '#CCFBF1', color: '#0F766E', borderRadius: 999, padding: '2px 8px', fontSize: 10, fontWeight: 700 }}>
+                デモ
+              </span>
+            )}
+            <span style={{ background: '#CCFBF1', color: '#0F766E', borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 800 }}>
+              {lwNotifications.length + lwInboxItems.length}件
+            </span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 14 }}>
+              {lwExpanded ? '▲' : '▼'}
+            </span>
+          </button>
+
+          {lwExpanded && (
+            <div
+              style={{
+                background: '#fff',
+                borderRadius: '0 0 16px 16px',
+                boxShadow: 'var(--shadow)',
+                overflow: 'hidden',
+                border: '1.5px solid #CCFBF1',
+                borderTop: 'none',
+              }}
+            >
+              {/* 緊急通知 */}
+              {lwNotifications.map((notif, idx) => (
+                <LineWorksNotifCard
+                  key={notif.id}
+                  notif={notif}
+                  last={idx === lwNotifications.length - 1 && lwInboxItems.length === 0}
+                  onDetail={() => setSelectedLwNotif(notif)}
+                />
+              ))}
+              {/* 受信箱 */}
+              {lwInboxItems.map((item, idx) => (
+                <LineWorksInboxCard
+                  key={item.id}
+                  item={item}
+                  last={idx === lwInboxItems.length - 1}
+                  onDetail={() => setSelectedLwInbox(item)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 既存タスク詳細モーダル */}
@@ -227,6 +302,16 @@ export default function TodayActions({ demoMode }: Props) {
       {/* Gmail詳細モーダル */}
       {selectedGmailTask && (
         <GmailTaskModal task={selectedGmailTask} onClose={() => setSelectedGmailTask(null)} />
+      )}
+
+      {/* LINE WORKS 通知詳細モーダル */}
+      {selectedLwNotif && (
+        <LineWorksNotifModal notif={selectedLwNotif} onClose={() => setSelectedLwNotif(null)} />
+      )}
+
+      {/* LINE WORKS 受信箱詳細モーダル */}
+      {selectedLwInbox && (
+        <LineWorksInboxModal item={selectedLwInbox} onClose={() => setSelectedLwInbox(null)} />
       )}
     </>
   )
@@ -1077,6 +1162,241 @@ function TaskDetailModal({ item, onClose }: { item: ActionItem; onClose: () => v
               </Section>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── LINE WORKS 通知カード ────────────────────────────────────
+
+function LineWorksNotifCard({
+  notif,
+  last,
+  onDetail,
+}: {
+  notif: UnifiedNotification
+  last: boolean
+  onDetail: () => void
+}) {
+  const borderColor = notif.urgency === 'critical' ? '#EF4444' : '#F59E0B'
+
+  return (
+    <div
+      style={{
+        padding: '14px 16px',
+        borderBottom: last ? 'none' : '1px solid var(--border)',
+        borderLeft: `3px solid ${borderColor}`,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5, flexWrap: 'wrap' }}>
+        <span style={{ background: '#CCFBF1', color: '#0F766E', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 800 }}>
+          💬 LINE WORKS
+        </span>
+        <span style={{ background: '#F0FDFA', color: '#0F766E', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+          デモLINE WORKS
+        </span>
+        <span style={{ background: '#D1FAE5', color: '#065F46', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+          読み取り専用
+        </span>
+        <span style={{ background: '#FEF2F2', color: '#991B1B', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+          返信未送信
+        </span>
+        <span style={{ background: '#F0FDFA', color: '#0F766E', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+          既読化なし
+        </span>
+        {notif.priority === 'A' && (
+          <span style={{ background: '#FEF3C7', color: '#92400E', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+            社長確認待ち
+          </span>
+        )}
+        <span style={{ background: borderColor + '20', color: borderColor, borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 800 }}>
+          {notif.urgency === 'critical' ? '🚨 緊急' : '⚠️ 重要'}
+        </span>
+      </div>
+
+      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.4, marginBottom: 5 }}>
+        {notif.title}
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px 12px', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+        {notif.senderName && <span>👤 {notif.senderName}</span>}
+        {notif.senderDepartment && <span>🏢 {notif.senderDepartment}</span>}
+        {notif.sentAt && (
+          <span>
+            🕐 {new Date(notif.sentAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
+      </div>
+
+      {notif.suggestedAction && (
+        <div style={{ background: '#F0FDFA', borderRadius: 8, padding: '7px 10px', fontSize: 12, fontWeight: 600, color: '#0F766E', marginBottom: 8 }}>
+          → {notif.suggestedAction}
+        </div>
+      )}
+
+      <button
+        onClick={onDetail}
+        style={{ background: '#F0FDFA', color: '#0F766E', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4, border: '1px solid #CCFBF1' }}
+      >
+        📋 詳細を見る
+      </button>
+    </div>
+  )
+}
+
+function LineWorksInboxCard({
+  item,
+  last,
+  onDetail,
+}: {
+  item: UnifiedInboxItem
+  last: boolean
+  onDetail: () => void
+}) {
+  const priorityColor = item.priority === 'A' ? '#EF4444' : '#F59E0B'
+
+  return (
+    <div style={{ padding: '14px 16px', borderBottom: last ? 'none' : '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5, flexWrap: 'wrap' }}>
+        <span style={{ background: '#CCFBF1', color: '#0F766E', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 800 }}>
+          💬 LINE WORKS
+        </span>
+        <span style={{ background: '#D1FAE5', color: '#065F46', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+          読み取り専用
+        </span>
+        <span style={{ background: priorityColor + '20', color: priorityColor, borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 800 }}>
+          優先度{item.priority}
+        </span>
+        <span style={{ background: '#FEF3C7', color: '#92400E', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+          社長承認待ち
+        </span>
+      </div>
+
+      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.4, marginBottom: 5 }}>
+        {item.subject}
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px 12px', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+        <span>👤 {item.fromName}</span>
+        {item.deadline && <span>⏰ {item.deadline}</span>}
+      </div>
+
+      <div style={{ background: '#F0FDFA', borderRadius: 8, padding: '7px 10px', fontSize: 12, fontWeight: 600, color: '#0F766E', marginBottom: 8 }}>
+        → {item.bodyPreview.slice(0, 80)}
+      </div>
+
+      <button
+        onClick={onDetail}
+        style={{ background: '#F0FDFA', color: '#0F766E', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4, border: '1px solid #CCFBF1' }}
+      >
+        📋 詳細を見る
+      </button>
+    </div>
+  )
+}
+
+function LineWorksNotifModal({ notif, onClose }: { notif: UnifiedNotification; onClose: () => void }) {
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)' }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: '100%', maxWidth: 480, margin: '0 auto', background: '#fff', borderRadius: '24px 24px 0 0', maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+      >
+        <div style={{ padding: '12px 18px 0', flexShrink: 0 }}>
+          <div style={{ width: 40, height: 4, background: '#E2E8F0', borderRadius: 4, margin: '0 auto 14px' }} />
+          <div style={{ background: '#F0FDFA', border: '1px solid #CCFBF1', borderRadius: 10, padding: '8px 12px', fontSize: 12, color: '#0F766E', fontWeight: 700, marginBottom: 12 }}>
+            ⚠️ 送信・返信・既読化は禁止です — 社長確認後、LINE WORKSで直接対応してください
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', gap: 5, marginBottom: 6, flexWrap: 'wrap' }}>
+                <span style={{ background: '#CCFBF1', color: '#0F766E', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 800 }}>💬 LINE WORKS</span>
+                <span style={{ background: '#D1FAE5', color: '#065F46', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>読み取り専用</span>
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.4, color: 'var(--text-primary)' }}>{notif.title}</div>
+              {notif.senderName && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>👤 {notif.senderName}（{notif.senderDepartment ?? 'LINE WORKS'}）</div>}
+            </div>
+            <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--bg)', color: 'var(--text-secondary)', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
+          </div>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px calc(env(safe-area-inset-bottom, 0px) + 24px)', scrollbarWidth: 'none' }}>
+          <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>
+            {[
+              { label: '元データ', value: 'デモLINE WORKS（本番未接続）' },
+              { label: 'カテゴリ', value: notif.category ?? '通知' },
+              { label: '緊急度', value: notif.urgency ?? '—' },
+              { label: '書き込み', value: '禁止（送信・既読化・削除なし）' },
+            ].map((row) => (
+              <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{row.label}</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{row.value}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', marginBottom: 6 }}>📋 通知内容</div>
+            <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '10px 12px', fontSize: 14, lineHeight: 1.7, color: 'var(--text-primary)' }}>{notif.body}</div>
+          </div>
+          {notif.suggestedAction && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', marginBottom: 6 }}>✅ 推奨アクション</div>
+              <div style={{ background: '#F0FDFA', borderRadius: 10, padding: '10px 12px', fontSize: 14, color: '#0F766E', fontWeight: 600 }}>{notif.suggestedAction}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LineWorksInboxModal({ item, onClose }: { item: UnifiedInboxItem; onClose: () => void }) {
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)' }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: '100%', maxWidth: 480, margin: '0 auto', background: '#fff', borderRadius: '24px 24px 0 0', maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+      >
+        <div style={{ padding: '12px 18px 0', flexShrink: 0 }}>
+          <div style={{ width: 40, height: 4, background: '#E2E8F0', borderRadius: 4, margin: '0 auto 14px' }} />
+          <div style={{ background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 10, padding: '8px 12px', fontSize: 12, color: '#92400E', fontWeight: 700, marginBottom: 12 }}>
+            ⚠️ 送信・返信・既読化は禁止です — 社長確認後、LINE WORKSで直接対応してください
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', gap: 5, marginBottom: 6, flexWrap: 'wrap' }}>
+                <span style={{ background: '#CCFBF1', color: '#0F766E', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 800 }}>💬 LINE WORKS</span>
+                <span style={{ background: '#D1FAE5', color: '#065F46', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>読み取り専用</span>
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.4, color: 'var(--text-primary)' }}>{item.subject}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>👤 {item.fromName}{item.deadline && ` · ⏰ ${item.deadline}`}</div>
+            </div>
+            <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--bg)', color: 'var(--text-secondary)', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
+          </div>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px calc(env(safe-area-inset-bottom, 0px) + 24px)', scrollbarWidth: 'none' }}>
+          <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>
+            {[
+              { label: '元データ', value: 'デモLINE WORKS（本番未接続）' },
+              { label: '優先度', value: `優先度${item.priority}` },
+              { label: '書き込み', value: '禁止（送信・既読化・削除なし）' },
+            ].map((row) => (
+              <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{row.label}</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{row.value}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', marginBottom: 6 }}>📋 内容</div>
+            <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '10px 12px', fontSize: 14, lineHeight: 1.7, color: 'var(--text-primary)' }}>{item.bodyPreview}</div>
+          </div>
         </div>
       </div>
     </div>

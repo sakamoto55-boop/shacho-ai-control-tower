@@ -1,5 +1,59 @@
 # IMPLEMENTATION_REPORT.md — 実装内容・未実装項目・注意点
 
+> 最終更新: Phase 9 — v0.9.0（2026-06-27）
+
+---
+
+## Phase 9 実装内容
+
+### ① LINE WORKS サービス層 ✅ 完了（client/src/services/lineworks/ — 8ファイル）
+
+| ファイル | 状態 |
+|---------|------|
+| `types.ts` | 完了（LineWorksMessage / LineWorksMember / LineWorksChannel / LineWorksNotificationMessage / LineWorksInboxMessage） |
+| `mockLineworks.ts` | 完了（通知5件：事故/SOS/欠勤/車両/遅延、受信箱4件：見積/請求/お結び/銀行） |
+| `lineworksClient.ts` | 完了（mock/cache切り替え、書き込みなし） |
+| `lineworksFetcher.ts` | 完了（GET専用、書き込みAPI = WRITE_FORBIDDEN） |
+| `lineworksMapper.ts` | 完了（LineWorksMessage → UnifiedNotification / UnifiedInboxItem） |
+| `lineworksAnalyzer.ts` | 完了（detectNotificationRisks / createNotificationSummary） |
+| `lineworksCache.ts` | 完了（5分TTL、localStorage） |
+| `lineworksWebhookTypes.ts` | 完了（将来Webhook受信用型定義のみ） |
+
+### ② Provider接続 ✅ 完了
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `notificationProvider.ts` | stub → LINE WORKS接続（デモモード）|
+| `inboxProvider.ts` | LINE WORKS inbox 4件追加 |
+
+### ③ AI Engine ✅ 完了（5ファイル）
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `aiEngineTypes.ts` | sectionType に 'notification'、AnalysisContext に notifications? |
+| `priorityEngine.ts` | notifications パラメータ追加（重大通知クロス加点+30） |
+| `briefingEngine.ts` | notifications パラメータ追加・notification セクション生成 |
+| `riskEngine.ts` | detectFromNotifications() 追加 |
+| `searchEngine.ts` | searchNotifications() 追加・SearchResults 拡張 |
+
+### ④ 画面 ✅ 完了（5画面）
+
+| 画面 | 変更内容 |
+|-----|---------|
+| CockpitScreen | LINE WORKS通知セクション追加（ティール） |
+| Home | LINE WORKSカード追加 |
+| TodayActions | LINE WORKSセクション追加（通知+受信箱、返信ボタンなし） |
+| AiChat | LINE WORKSショートカット6種 |
+| Settings | v0.9.0、実装済表示 |
+
+### 未実装（設計済み）
+
+- LINE WORKS 本番OAuth2接続（Phase 10）
+- Webhook受信バックエンドエンドポイント（Phase 10）
+- バックエンドProxy経由でのトークン管理（Phase 10）
+
+---
+
 > 最終更新: Phase 6 — v0.6.0（2026-06-27）
 
 ---

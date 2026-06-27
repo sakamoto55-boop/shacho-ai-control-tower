@@ -1,11 +1,12 @@
-import type { UnifiedInboxItem, UnifiedScheduleItem, UnifiedFileItem, UnifiedRisk, UnifiedBusinessMetric } from '../providers/providerTypes'
+import type { UnifiedInboxItem, UnifiedScheduleItem, UnifiedFileItem, UnifiedRisk, UnifiedBusinessMetric, UnifiedNotification } from '../providers/providerTypes'
 import type { PriorityScore } from './aiEngineTypes'
 
 function scoreInboxItemInternal(
   item: UnifiedInboxItem,
   schedule: UnifiedScheduleItem[] = [],
   files: UnifiedFileItem[] = [],
-  metrics: UnifiedBusinessMetric[] = []
+  metrics: UnifiedBusinessMetric[] = [],
+  notifications: UnifiedNotification[] = []
 ): PriorityScore {
   let baseScore = 50
   const modifiers: { reason: string; delta: number }[] = []
@@ -80,6 +81,22 @@ function scoreInboxItemInternal(
     }
   }
 
+  // ── 横断スコアリング（Inbox × LINE WORKS通知）──────────────
+  if (notifications.length > 0) {
+    // LINE WORKS重大通知と同一カテゴリのメール
+    const criticalNotif = notifications.find(
+      (n) => n.urgency === 'critical' && n.riskFlag === true
+    )
+    if (criticalNotif) {
+      const textMatch =
+        (criticalNotif.category === 'accident' && (item.taskType === '事故' || item.subject.includes('事故'))) ||
+        (criticalNotif.category === 'sos' && item.priority === 'A')
+      if (textMatch) {
+        modifiers.push({ reason: `LINE WORKS重大通知と関連（${criticalNotif.category}）`, delta: 30 })
+      }
+    }
+  }
+
   const totalDelta = modifiers.reduce((sum, m) => sum + m.delta, 0)
   const finalScore = Math.min(100, Math.max(0, baseScore + totalDelta))
 
@@ -118,20 +135,22 @@ export const priorityEngine = {
     item: UnifiedInboxItem,
     schedule: UnifiedScheduleItem[] = [],
     files: UnifiedFileItem[] = [],
-    metrics: UnifiedBusinessMetric[] = []
+    metrics: UnifiedBusinessMetric[] = [],
+    notifications: UnifiedNotification[] = []
   ): PriorityScore {
-    return scoreInboxItemInternal(item, schedule, files, metrics)
+    return scoreInboxItemInternal(item, schedule, files, metrics, notifications)
   },
 
   rankItems(
     items: UnifiedInboxItem[],
     schedule: UnifiedScheduleItem[] = [],
     files: UnifiedFileItem[] = [],
-    metrics: UnifiedBusinessMetric[] = []
+    metrics: UnifiedBusinessMetric[] = [],
+    notifications: UnifiedNotification[] = []
   ): UnifiedInboxItem[] {
     const scored = items.map((item) => ({
       item,
-      score: scoreInboxItemInternal(item, schedule, files, metrics),
+      score: scoreInboxItemInternal(item, schedule, files, metrics, notifications),
     }))
     scored.sort((a, b) => b.score.finalScore - a.score.finalScore)
     return scored.map((s) => s.item)
@@ -157,13 +176,14 @@ export const priorityEngine = {
     return Math.min(100, Math.max(0, score))
   },
 
-  // Inbox + Schedule + File + BusinessData 横断 TOP アイテム生成
+  // Inbox + Schedule + File + BusinessData + Notification 横断 TOP アイテム生成
   getCrossServiceTopItems(
     inbox: UnifiedInboxItem[],
     schedule: UnifiedScheduleItem[],
     risks: UnifiedRisk[],
     files: UnifiedFileItem[] = [],
-    metrics: UnifiedBusinessMetric[] = []
+    metrics: UnifiedBusinessMetric[] = [],
+    notifications: UnifiedNotification[] = []
   ): string[] {
     const topActions: string[] = []
 
@@ -176,8 +196,16 @@ export const priorityEngine = {
       topActions.push(`【予定】${timeStr} ${event.title}（${event.category}）`)
     }
 
+    // LINE WORKS重大通知（最大2件）
+    const criticalNotifs = notifications
+      .filter((n) => n.urgency === 'critical' || n.riskFlag)
+      .slice(0, 2)
+    for (const notif of criticalNotifs) {
+      topActions.push(`【緊急通知】${notif.title}`)
+    }
+
     // Inbox + Schedule + File + BusinessData 横断スコアで上位インボックスアイテム
-    const rankedInbox = this.rankItems(inbox, schedule, files, metrics)
+    const rankedInbox = this.rankItems(inbox, schedule, files, metrics, notifications)
     for (const item of rankedInbox.slice(0, 3)) {
       topActions.push(`【${item.priority}】${item.subject}（${item.from}）`)
     }

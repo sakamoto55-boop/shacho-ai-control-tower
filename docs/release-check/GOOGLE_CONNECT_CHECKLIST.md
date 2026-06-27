@@ -1,6 +1,6 @@
 # GOOGLE_CONNECT_CHECKLIST.md — Google Cloud Console 設定チェックリスト
 
-> 最終更新: Phase 5.1 — v0.5.1（2026-06-27）  
+> 最終更新: Phase 9 — v0.9.0（2026-06-27）  
 > 本番接続前に以下の手順を完了してください。
 
 ---
@@ -156,3 +156,40 @@ VITE_GOOGLE_SCOPES=https://www.googleapis.com/auth/gmail.readonly https://www.go
 3. **OAuth 同意画面の本番申請**：外部ユーザー向けの場合は Google の確認・承認が必要
 4. **バックエンドプロキシの検討**：セキュリティ強化のため（OAUTH_SECURITY_REVIEW.md 参照）
 5. **CSP（Content Security Policy）の設定**：XSS 対策
+
+---
+
+## Phase 9: LINE WORKS 接続前チェックリスト
+
+> Phase 9 はデモモードのみ。本番 LINE WORKS 接続は Phase 10 以降。
+
+### LINE WORKS Developer Console 設定（Phase 10以降）
+
+- [ ] LINE WORKS Developer Console にログイン
+- [ ] アプリ作成 → Client ID / Client Secret 取得
+- [ ] API スコープ選択：**`bot.message.read` のみ**（書き込みスコープは追加しない）
+- [ ] 禁止スコープ（追加しない）：
+  - `bot.message.write`
+  - `channel.message.write`
+  - `user.write`
+  - `group.write`
+
+### 環境変数設定（Phase 10以降）
+
+```env
+# LINE WORKS（Phase 10以降 — 読み取り専用）
+VITE_LINEWORKS_CLIENT_ID=your_client_id_here
+VITE_LINEWORKS_DOMAIN_ID=your_domain_id_here
+VITE_LINEWORKS_BOT_ID=your_bot_id_here
+VITE_LINEWORKS_CHANNEL_ID=your_channel_id_here
+
+# 以下はフロントエンドに設定しない（バックエンドのみ）
+# LINEWORKS_CLIENT_SECRET=絶対にフロントに置かない
+```
+
+### Phase 9 安全確認
+
+- [x] LINE WORKS 本番API 未接続（デモモード）
+- [x] `LINEWORKS_CLIENT_SECRET` フロント未配置
+- [x] 書き込みAPI（送信・返信・既読化）全て WRITE_FORBIDDEN
+- [x] Webhook受信エンドポイント 未実装

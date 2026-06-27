@@ -1,6 +1,50 @@
 # FILES_CHANGED.md — 変更・追加・削除ファイル一覧
 
-> 最終更新: Phase 8 — v0.8.0（2026-06-27）
+> 最終更新: Phase 9 — v0.9.0（2026-06-27）
+
+---
+
+## Phase 9 変更ファイル
+
+### 新規作成 (9ファイル)
+
+| ファイルパス | 役割 |
+|-------------|------|
+| `client/src/services/lineworks/types.ts` | LINE WORKS固有型 / LineWorksMessage / LineWorksNotificationMessage / LineWorksInboxMessage |
+| `client/src/services/lineworks/mockLineworks.ts` | モックデータ9件（通知5件 + 受信箱4件） |
+| `client/src/services/lineworks/lineworksClient.ts` | fetchNotifications / fetchInboxMessages（読み取りのみ / mock切り替え） |
+| `client/src/services/lineworks/lineworksFetcher.ts` | GET専用HTTPラッパー + 書き込み10メソッド全て WRITE_FORBIDDEN |
+| `client/src/services/lineworks/lineworksMapper.ts` | LineWorksMessage → UnifiedNotification / UnifiedInboxItem 変換 |
+| `client/src/services/lineworks/lineworksAnalyzer.ts` | detectNotificationRisks / createNotificationSummary |
+| `client/src/services/lineworks/lineworksCache.ts` | 5分TTLキャッシュ（localStorage） |
+| `client/src/services/lineworks/lineworksWebhookTypes.ts` | 将来Webhook受信用型定義のみ（送信なし） |
+| `docs/release-check/LINEWORKS_NOTIFICATION_DESIGN.md` | Phase 9設計書（禁止操作・型・モックデータ・画面変更） |
+
+### 更新 (17ファイル)
+
+| ファイルパス | 変更内容 |
+|-------------|---------|
+| `client/src/core/providers/providerTypes.ts` | UnifiedNotification 8→18フィールド拡張・ProviderConnectionStatus に 'demo' 追加 |
+| `client/src/core/providers/notificationProvider.ts` | stub → LINE WORKS デモ接続実装 |
+| `client/src/core/providers/inboxProvider.ts` | LINE WORKS inbox 4件を Gmail に追加（統合） |
+| `client/src/core/ai-engine/aiEngineTypes.ts` | BriefingSection.sectionType に 'notification' 追加・AnalysisContext に notifications? 追加 |
+| `client/src/core/ai-engine/priorityEngine.ts` | notifications パラメータ追加・LINE WORKS criticalクロス加点 (+30) |
+| `client/src/core/ai-engine/briefingEngine.ts` | notifications パラメータ追加・notification セクション生成 |
+| `client/src/core/ai-engine/riskEngine.ts` | detectFromNotifications() 追加 |
+| `client/src/core/ai-engine/searchEngine.ts` | SearchResults に notifications フィールド追加・searchNotifications() 追加 |
+| `client/src/components/screens/CockpitScreen.tsx` | ティール通知セクション追加（緊急通知カード・riskFlag赤強調） |
+| `client/src/components/screens/Home.tsx` | ティールLINE WORKSカード追加（緊急件数・SOS件数・actions遷移） |
+| `client/src/components/screens/TodayActions.tsx` | LINE WORKSセクション追加（通知5件＋受信箱4件・4サブコンポーネント） |
+| `client/src/components/screens/AiChat.tsx` | LINE WORKSショートカットバー6件追加・getLineWorksShortcutResponse() |
+| `client/src/components/screens/Settings.tsx` | v0.9.0・Phase 9表記・LINE WORKS通知 実装済・demo状態表示 |
+| `client/.env.example` | VITE_LINEWORKS_* 4変数追加・CLIENT_SECRET禁止注記 |
+| `docs/release-check/CHANGELOG_PHASE.md` | Phase 9 セクション追加 |
+| `docs/release-check/SAFETY_REPORT.md` | Phase 9 安全確認・WRITE_FORBIDDEN 10メソッド一覧 |
+| `docs/release-check/IMPLEMENTATION_REPORT.md` | Phase 9 実装レポート追加 |
+
+### 削除 (0ファイル)
+
+なし
 
 ---
 

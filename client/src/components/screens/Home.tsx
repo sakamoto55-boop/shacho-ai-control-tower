@@ -10,6 +10,9 @@ import { mockDriveFiles } from '../../services/drive/mockDrive'
 import { createDriveSummary } from '../../services/drive/driveAnalyzer'
 import { mockBusinessDataset } from '../../services/sheets/mockSheets'
 import { createBusinessSummary, detectBusinessRisks } from '../../services/sheets/sheetsAnalyzer'
+import { mockLineWorksNotifications } from '../../services/lineworks/mockLineworks'
+import { mapLineWorksToUnifiedNotification } from '../../services/lineworks/lineworksMapper'
+import { createNotificationSummary } from '../../services/lineworks/lineworksAnalyzer'
 
 interface Props {
   onNavigate: (screen: Screen) => void
@@ -32,6 +35,12 @@ export default function Home({ onNavigate, onVoice }: Props) {
   const latestFile = mockDriveFiles.filter((f) => !f.trashed)[0]
   const businessSummary = useMemo(() => createBusinessSummary(mockBusinessDataset), [])
   const businessRisks = useMemo(() => detectBusinessRisks(mockBusinessDataset.metrics), [])
+  const lwNotifications = useMemo(
+    () => mockLineWorksNotifications.map(mapLineWorksToUnifiedNotification),
+    []
+  )
+  const lwSummary = useMemo(() => createNotificationSummary(lwNotifications), [lwNotifications])
+  const lwCritical = lwNotifications.filter((n) => n.urgency === 'critical' || n.riskFlag)
   const latestModified = latestFile?.modifiedTime
     ? new Date(latestFile.modifiedTime).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : null
@@ -246,6 +255,61 @@ export default function Home({ onNavigate, onVoice }: Props) {
           }}
         >
           経営数字を詳しく見る →
+        </button>
+      </div>
+
+      {/* ── LINE WORKS 通知カード（Phase 9）── */}
+      <div
+        style={{
+          background: '#F0FDFA',
+          border: '1.5px solid #CCFBF1',
+          borderRadius: 14,
+          padding: '12px 14px',
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 16 }}>💬</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#0F766E' }}>
+              LINE WORKS通知：{lwNotifications.length}件
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <span style={{ fontSize: 10, background: '#CCFBF1', color: '#0F766E', borderRadius: 999, padding: '2px 7px', fontWeight: 700 }}>
+              デモ
+            </span>
+            <span style={{ fontSize: 10, background: '#D1FAE5', color: '#065F46', borderRadius: 999, padding: '2px 7px', fontWeight: 700 }}>
+              読み取り専用
+            </span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+          {[
+            { label: `🚨 緊急 ${lwSummary.criticalCount}件`, show: lwSummary.criticalCount > 0, c: '#991B1B', bg: '#FEE2E2' },
+            { label: `⚠️ 重要A ${lwSummary.highCount}件`, show: lwSummary.highCount > 0, c: '#92400E', bg: '#FEF3C7' },
+            { label: `🚑 事故 ${lwSummary.accidentCount}件`, show: lwSummary.accidentCount > 0, c: '#991B1B', bg: '#FEE2E2' },
+            { label: `SOS ${lwSummary.sosCount}件`, show: lwSummary.sosCount > 0, c: '#991B1B', bg: '#FEE2E2' },
+          ].filter((s) => s.show).map((s) => (
+            <div key={s.label} style={{ background: s.bg, borderRadius: 8, padding: '3px 8px' }}>
+              <span style={{ fontSize: 10, fontWeight: 800, color: s.c }}>{s.label}</span>
+            </div>
+          ))}
+        </div>
+        {lwCritical.slice(0, 2).map((notif) => (
+          <div key={notif.id} style={{ fontSize: 12, color: '#0F766E', fontWeight: 600, marginBottom: 4, padding: '4px 8px', background: '#fff', borderRadius: 6, border: '1px solid #CCFBF1' }}>
+            🔴 {notif.title}
+          </div>
+        ))}
+        <button
+          onClick={() => onNavigate('actions')}
+          style={{
+            background: '#14B8A6', color: '#fff', border: 'none',
+            borderRadius: 8, padding: '7px 14px', fontSize: 12,
+            fontWeight: 700, cursor: 'pointer', width: '100%', marginTop: 6,
+          }}
+        >
+          LINE WORKSの通知を確認する →
         </button>
       </div>
 

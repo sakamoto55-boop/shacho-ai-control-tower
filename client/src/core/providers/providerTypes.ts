@@ -8,6 +8,7 @@ export type ProviderConnectionStatus =
   | 'connecting'
   | 'error'
   | 'planned'
+  | 'demo'
 
 export type ProviderHealthStatus =
   | 'healthy'
@@ -197,8 +198,9 @@ export interface UnifiedWorkflowItem {
   approvedAt: string | null
 }
 
-// ─── 統合通知（アラート・ブリーフィング） ────────────────────
+// ─── 統合通知（LINE WORKS 通知・アラート） ───────────────────
 export interface UnifiedNotification {
+  // 基本フィールド
   id: string
   source: string
   providerType: 'notification'
@@ -207,8 +209,21 @@ export interface UnifiedNotification {
   body: string
   receivedAt: string // ISO 8601
   priority: 'A' | 'B' | 'C'
-  isRead: boolean
-  actionRequired: boolean
+  // Phase 9 追加フィールド（LINE WORKS対応）
+  sourceMessageId?: string
+  senderName?: string
+  senderDepartment?: string
+  sentAt?: string // ISO 8601
+  category?: 'accident' | 'absence' | 'delay' | 'sos' | 'vehicle' | 'finance' | 'operation' | 'other'
+  urgency?: 'critical' | 'high' | 'medium' | 'low'
+  importance?: 'A' | 'B' | 'C'
+  requiresAction?: boolean
+  suggestedAction?: string
+  riskFlag?: boolean
+  isRead?: boolean
+  actionRequired?: boolean
+  readOnly: true
+  writeEnabled: false
 }
 
 // ─── 統合リスク（横断サービスリスク） ───────────────────────

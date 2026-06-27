@@ -3,6 +3,7 @@ import type {
   UnifiedScheduleItem,
   UnifiedBusinessMetric,
   UnifiedRisk,
+  UnifiedNotification,
 } from '../providers/providerTypes'
 
 // ─── データソース名 ───────────────────────────────────────────
@@ -22,6 +23,7 @@ export interface AnalysisContext {
   schedule: UnifiedScheduleItem[]
   businessMetrics: UnifiedBusinessMetric[]
   risks: UnifiedRisk[]
+  notifications?: UnifiedNotification[]
   analyzedAt: string // ISO 8601
 }
 
@@ -40,7 +42,7 @@ export interface PriorityScore {
 
 // ─── ブリーフィングセクション ─────────────────────────────────
 export interface BriefingSection {
-  sectionType: 'inbox' | 'schedule' | 'files' | 'business-data' | 'risk' | 'action'
+  sectionType: 'inbox' | 'schedule' | 'files' | 'business-data' | 'risk' | 'action' | 'notification'
   title: string
   items: string[]
   alertLevel: 'danger' | 'warning' | 'info' | null
