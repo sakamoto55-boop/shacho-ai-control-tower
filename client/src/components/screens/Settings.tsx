@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { companies, integrations, apiIntegrationPoints } from '../../data/mockData'
 import { getConnectionStatus, fetchInboxMessages } from '../../services/gmail/gmailClient'
+import { mockGmailMessages } from '../../services/gmail/mockGmail'
+import { createGmailSummary } from '../../services/gmail/gmailAnalyzer'
 import type { GmailFetchRange, GmailDerivedTask } from '../../types'
 
 interface Props {
@@ -42,6 +44,7 @@ export default function Settings({
 
   const selectedCompany = companies.find((c) => c.id === company)
   const connectionStatus = getConnectionStatus()
+  const gmailSummary = createGmailSummary(mockGmailMessages)
 
   async function handleGmailReadTest() {
     setGmailTesting(true)
@@ -118,6 +121,115 @@ export default function Settings({
             )}
           </div>
         ))}
+      </div>
+
+      {/* ── Gmail読み取りテスト（常時表示） ── */}
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 'var(--radius)',
+          padding: '14px 16px',
+          marginBottom: 14,
+          boxShadow: 'var(--shadow)',
+          border: '1.5px solid #BFDBFE',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <span style={{ fontSize: 20 }}>📧</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--navy)' }}>Gmail読み取りテスト</div>
+            <div style={{ fontSize: 10, color: '#3B82F6', fontWeight: 600 }}>
+              読み取り専用 · 書き込み禁止 · 外部未接続
+            </div>
+          </div>
+          <span style={{ background: '#DBEAFE', color: '#1D4ED8', borderRadius: 999, padding: '3px 8px', fontSize: 10, fontWeight: 800 }}>
+            デモGmail
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+          {[
+            { label: '接続状態', value: '未接続', alert: true },
+            { label: '権限', value: '読み取り専用', alert: false },
+            { label: '書き込み', value: '禁止', alert: false },
+            { label: 'データ元', value: 'mockGmail', alert: false },
+            { label: '最終取得', value: '2026/06/27 08:15（仮）', alert: false },
+          ].map((row) => (
+            <div
+              key={row.label}
+              style={{
+                display: 'flex',
+                gap: 4,
+                alignItems: 'center',
+                background: 'var(--bg)',
+                borderRadius: 8,
+                padding: '4px 8px',
+              }}
+            >
+              <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>{row.label}：</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: row.alert ? '#991B1B' : 'var(--text-primary)' }}>
+                {row.value}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#1D4ED8', background: '#EFF6FF', borderRadius: 8, padding: '6px 10px', marginBottom: 10, lineHeight: 1.5 }}>
+          取得対象：受信トレイ / 未読 / 重要そうなメール（過去24時間）
+          <br />現在の取得件数：{gmailSummary.totalCount}件 / 重要A：{gmailSummary.priorityACount}件 / 返信たたき台：{gmailSummary.replyDraftCount}件
+        </div>
+
+        <div style={{ fontSize: 10, color: '#92400E', background: '#FEF9C3', borderRadius: 8, padding: '6px 10px', marginBottom: 12 }}>
+          ⚠️ 本番Gmail未接続 · すべてデモデータ · 実際のメールは取得していません
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={handleGmailReadTest}
+            disabled={gmailTesting}
+            style={{
+              flex: 1,
+              padding: '10px',
+              borderRadius: 10,
+              background: gmailTesting ? 'var(--border)' : '#1B3D6F',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 700,
+            }}
+          >
+            {gmailTesting ? '取得中...' : '📥 読み取りテスト'}
+          </button>
+        </div>
+
+        {gmailTestResult && (
+          <div style={{ marginTop: 10, background: 'var(--bg)', borderRadius: 10, padding: '10px 12px' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#065F46', marginBottom: 6 }}>
+              ✅ デモGmailから{gmailTestResult.length}件を読み取りました。書き込み処理は行っていません。
+            </div>
+            {gmailTestResult.slice(0, 3).map((task) => (
+              <div
+                key={task.id}
+                style={{ padding: '5px 0', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center' }}
+              >
+                <span
+                  style={{
+                    background: task.priority === 'A' ? '#FEE2E2' : '#FFFBEB',
+                    color: task.priority === 'A' ? '#991B1B' : '#92400E',
+                    borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 800, flexShrink: 0,
+                  }}
+                >
+                  {task.priority}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {task.subject}
+                </span>
+              </div>
+            ))}
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6 }}>
+              ※ デモデータ · 本番Gmail未接続 · 送信・返信・下書き保存なし
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── データ連携ステータス ── */}
@@ -602,7 +714,7 @@ export default function Settings({
           lineHeight: 1.7,
         }}
       >
-        AI社長室 v0.4.0 Phase 4 — {selectedCompany?.name}
+        AI社長室 v0.4.1 Phase 4.1 — {selectedCompany?.name}
         <br />
         フロントエンドMVP（仮データのみ · 外部書き込みなし）
       </div>

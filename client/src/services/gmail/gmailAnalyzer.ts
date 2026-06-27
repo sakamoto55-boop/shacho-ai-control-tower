@@ -1,4 +1,4 @@
-import type { GmailMessage, GmailPriority, GmailTaskType } from './types'
+import type { GmailMessage, GmailPriority, GmailTaskType, GmailSummary } from './types'
 
 const BANK_KEYWORDS = ['銀行', '融資', '金融', '審査', '借入', '利率', '返済']
 const BILLING_KEYWORDS = ['請求', '支払', '未払', '振込', '入金', '代金', '未収']
@@ -35,4 +35,24 @@ export function extractDeadline(msg: GmailMessage): string | null {
   const match = text.match(/(\d+月\d+日)/)
   if (match) return match[1] + 'まで'
   return null
+}
+
+const TODAY_DUE_KEYWORDS = ['本日中', '今日中', '至急', '緊急', '即日']
+
+export function createGmailSummary(messages: GmailMessage[]): GmailSummary {
+  return {
+    totalCount: messages.length,
+    priorityACount: messages.filter((m) => analyzePriority(m) === 'A').length,
+    todayDueCount: messages.filter((m) => {
+      const t = m.subject + ' ' + m.body
+      return TODAY_DUE_KEYWORDS.some((kw) => t.includes(kw))
+    }).length,
+    bankCount: messages.filter((m) => analyzeTaskType(m) === '銀行').length,
+    billingCount: messages.filter((m) => analyzeTaskType(m) === '請求').length,
+    contractCount: messages.filter((m) => analyzeTaskType(m) === '契約').length,
+    accidentCount: messages.filter((m) => analyzeTaskType(m) === '事故').length,
+    replyDraftCount: messages.length,
+    topItems: messages.slice(0, 3),
+    safetyNotice: '読み取り専用 · 書き込み禁止 · 返信未送信 · 社長承認待ち',
+  }
 }

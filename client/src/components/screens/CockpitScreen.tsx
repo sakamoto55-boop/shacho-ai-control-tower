@@ -9,6 +9,7 @@ import {
 } from '../../data/mockData'
 import { mockGmailMessages } from '../../services/gmail/mockGmail'
 import { mapToGmailDerivedTask } from '../../services/gmail/gmailMapper'
+import { createGmailSummary } from '../../services/gmail/gmailAnalyzer'
 import DemoBanner from '../DemoBanner'
 
 const IMPORTANCE_CONFIG = {
@@ -43,6 +44,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 }
 
 const gmailDerivedTasks = mockGmailMessages.map(mapToGmailDerivedTask)
+const gmailSummary = createGmailSummary(mockGmailMessages)
 
 export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
   const [expandedActionId, setExpandedActionId] = useState<string | null>('pa1')
@@ -262,96 +264,95 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
       </div>
 
       {/* ── Gmailからの要対応 ── */}
-      <div className="section-label">
-        📧 Gmailからの要対応：{gmailDerivedTasks.length}件
-        {demoMode !== false && (
-          <span
-            style={{
-              marginLeft: 8,
-              background: '#DBEAFE',
-              color: '#1D4ED8',
-              borderRadius: 999,
-              padding: '2px 8px',
-              fontSize: 10,
-              fontWeight: 700,
-            }}
-          >
-            デモGmailデータ
-          </span>
-        )}
-      </div>
       <div
         style={{
-          background: '#fff',
-          borderRadius: 'var(--radius)',
-          boxShadow: 'var(--shadow)',
-          overflow: 'hidden',
-          marginBottom: 18,
+          background: '#EFF6FF',
           border: '1.5px solid #BFDBFE',
+          borderRadius: 'var(--radius)',
+          padding: '14px',
+          marginBottom: 14,
         }}
       >
-        {gmailDerivedTasks.map((task, i) => {
-          const isLast = i === gmailDerivedTasks.length - 1
-          const priorityColor = task.priority === 'A' ? '#EF4444' : task.priority === 'B' ? '#F59E0B' : '#6B7280'
-          return (
-            <div
-              key={task.id}
-              style={{
-                padding: '11px 16px',
-                borderBottom: isLast ? 'none' : '1px solid var(--border)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-              }}
-            >
-              <span
+        {/* ヘッダー */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 18 }}>📧</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#1D4ED8' }}>
+              Gmailからの要対応：{gmailSummary.totalCount}件
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {demoMode !== false && (
+              <span style={{ background: '#DBEAFE', color: '#1D4ED8', borderRadius: 999, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+                デモGmail
+              </span>
+            )}
+            <span style={{ background: '#D1FAE5', color: '#065F46', borderRadius: 999, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+              読み取り専用
+            </span>
+            <span style={{ background: '#FEE2E2', color: '#991B1B', borderRadius: 999, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+              送信なし
+            </span>
+          </div>
+        </div>
+
+        {/* カウント行 */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+          {[
+            { label: '重要A', v: gmailSummary.priorityACount, c: '#EF4444', bg: '#FEE2E2' },
+            { label: '本日中', v: gmailSummary.todayDueCount, c: '#DC2626', bg: '#FEE2E2' },
+            { label: '銀行', v: gmailSummary.bankCount, c: '#1B3D6F', bg: '#DBEAFE' },
+            { label: '請求', v: gmailSummary.billingCount, c: '#92400E', bg: '#FEF3C7' },
+            { label: '契約', v: gmailSummary.contractCount, c: '#7C3AED', bg: '#EDE9FE' },
+            { label: '事故', v: gmailSummary.accidentCount, c: '#6B7280', bg: '#F3F4F6' },
+          ].map((s) => (
+            <div key={s.label} style={{ background: s.bg, borderRadius: 8, padding: '3px 8px', display: 'flex', gap: 3, alignItems: 'center' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: s.c }}>{s.label}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: s.c }}>{s.v}件</span>
+            </div>
+          ))}
+        </div>
+
+        {/* TOP3メール */}
+        <div style={{ background: '#fff', borderRadius: 10, overflow: 'hidden', border: '1px solid #BFDBFE' }}>
+          {gmailSummary.topItems.map((msg, i) => {
+            const task = gmailDerivedTasks.find((t) => t.gmailMessageId === msg.id)!
+            const pColor = task.priority === 'A' ? '#EF4444' : '#F59E0B'
+            return (
+              <div
+                key={msg.id}
                 style={{
-                  flexShrink: 0,
-                  background: priorityColor + '20',
-                  color: priorityColor,
-                  borderRadius: 6,
-                  padding: '2px 8px',
-                  fontSize: 11,
-                  fontWeight: 800,
-                  minWidth: 28,
-                  textAlign: 'center',
+                  padding: '10px 12px',
+                  borderBottom: i < gmailSummary.topItems.length - 1 ? '1px solid #DBEAFE' : 'none',
                 }}
               >
-                {task.priority}
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: 'var(--text-primary)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <span style={{ background: pColor + '20', color: pColor, borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 800 }}>
+                    {task.priority}
+                  </span>
+                  <span style={{ background: '#F1F5F9', color: '#475569', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>
+                    {task.taskType}
+                  </span>
+                  {task.estimatedDeadline && (
+                    <span style={{ background: '#FEE2E2', color: '#991B1B', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>
+                      {task.estimatedDeadline}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>
                   {task.subject}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                  {task.from}
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  {task.from} · {task.recommendedAction}
                 </div>
               </div>
-              <span
-                style={{
-                  flexShrink: 0,
-                  background: '#F1F5F9',
-                  color: 'var(--text-secondary)',
-                  borderRadius: 6,
-                  padding: '2px 7px',
-                  fontSize: 10,
-                  fontWeight: 700,
-                }}
-              >
-                {task.taskType}
-              </span>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
+
+        <div style={{ marginTop: 8, fontSize: 10, color: '#1D4ED8', fontWeight: 600 }}>
+          元データ：デモGmail · 本番Gmail未接続 · 返信未送信 · 社長承認待ち
+        </div>
       </div>
 
       {/* ── 時系列ビュー ── */}

@@ -251,52 +251,22 @@ function GmailTaskCard({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5, flexWrap: 'wrap' }}>
-        <span
-          style={{
-            background: '#DBEAFE',
-            color: '#1D4ED8',
-            borderRadius: 6,
-            padding: '2px 7px',
-            fontSize: 10,
-            fontWeight: 800,
-          }}
-        >
+        <span style={{ background: '#DBEAFE', color: '#1D4ED8', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 800 }}>
           📧 Gmail
         </span>
-        <span
-          style={{
-            background: '#D1FAE5',
-            color: '#065F46',
-            borderRadius: 6,
-            padding: '2px 7px',
-            fontSize: 10,
-            fontWeight: 700,
-          }}
-        >
+        <span style={{ background: '#E0E7FF', color: '#4338CA', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+          デモGmail
+        </span>
+        <span style={{ background: '#D1FAE5', color: '#065F46', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
           読み取り専用
         </span>
-        <span
-          style={{
-            background: priorityColor + '20',
-            color: priorityColor,
-            borderRadius: 6,
-            padding: '2px 7px',
-            fontSize: 10,
-            fontWeight: 800,
-          }}
-        >
+        <span style={{ background: priorityColor + '20', color: priorityColor, borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 800 }}>
           優先度{task.priority}
         </span>
-        <span
-          style={{
-            background: '#FEF3C7',
-            color: '#92400E',
-            borderRadius: 6,
-            padding: '2px 7px',
-            fontSize: 10,
-            fontWeight: 700,
-          }}
-        >
+        <span style={{ background: '#FEF2F2', color: '#991B1B', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+          返信未送信
+        </span>
+        <span style={{ background: '#FEF3C7', color: '#92400E', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
           社長承認待ち
         </span>
       </div>
@@ -509,9 +479,25 @@ function GmailTaskModal({
             scrollbarWidth: 'none',
           }}
         >
+          {/* メタ情報 */}
+          <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>
+            {[
+              { label: '元データ', value: 'デモGmail（本番未接続）' },
+              { label: '受信日時', value: task.receivedAt.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) },
+              { label: '推定重要度', value: `優先度${task.priority} · ${task.taskType}` },
+              { label: '返信状態', value: task.replyStatus },
+              { label: '書き込み', value: '禁止' },
+            ].map((row) => (
+              <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{row.label}</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{row.value}</span>
+              </div>
+            ))}
+          </div>
+
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', marginBottom: 6 }}>
-              📋 要約
+              📋 メール要約
             </div>
             <div
               style={{
@@ -580,14 +566,19 @@ function GmailTaskModal({
             </button>
             <div
               style={{
-                marginTop: 8,
+                marginTop: 10,
+                background: '#FEF9C3',
+                border: '1px solid #FDE68A',
+                borderRadius: 10,
+                padding: '8px 12px',
                 fontSize: 11,
-                color: 'var(--text-muted)',
-                textAlign: 'center',
-                lineHeight: 1.5,
+                color: '#92400E',
+                fontWeight: 700,
+                lineHeight: 1.6,
               }}
             >
-              ※ 送信ボタンはありません。コピーして手動で送信してください。
+              ⚠️ これは下書き案です。Gmailには保存・送信されていません。
+              <br />送信・返信は社長が内容を確認後、手動でのみ行えます。
             </div>
           </div>
 

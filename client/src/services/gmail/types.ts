@@ -39,6 +39,19 @@ export interface GmailDerivedTask {
 
 export type GmailFetchRange = '24h' | '3d' | '7d'
 
+export interface GmailSummary {
+  totalCount: number
+  priorityACount: number
+  todayDueCount: number
+  bankCount: number
+  billingCount: number
+  contractCount: number
+  accidentCount: number
+  replyDraftCount: number
+  topItems: GmailMessage[]
+  safetyNotice: string
+}
+
 export interface GmailConnectionStatus {
   connected: false
   mode: 'demo' | 'production'

@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import type { Screen } from '../../types'
 import { actionItems, todayBriefing, situationCards, dashboardMetrics } from '../../data/mockData'
 import DemoBanner from '../DemoBanner'
+import { mockGmailMessages } from '../../services/gmail/mockGmail'
+import { createGmailSummary } from '../../services/gmail/gmailAnalyzer'
 
 interface Props {
   onNavigate: (screen: Screen) => void
@@ -14,6 +16,7 @@ const alertMetrics = dashboardMetrics.filter((m) => m.alert).length
 
 export default function Home({ onNavigate, onVoice }: Props) {
   const [briefingExpanded, setBriefingExpanded] = useState(true)
+  const gmailSummary = useMemo(() => createGmailSummary(mockGmailMessages), [])
 
   const quickCards = [
     {
@@ -53,6 +56,69 @@ export default function Home({ onNavigate, onVoice }: Props) {
   return (
     <div className="screen-content">
       <DemoBanner />
+
+      {/* ── Gmail要対応サマリー ── */}
+      <div
+        style={{
+          background: '#EFF6FF',
+          border: '1.5px solid #BFDBFE',
+          borderRadius: 14,
+          padding: '12px 14px',
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 16 }}>📧</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#1D4ED8' }}>
+              Gmail由来の要対応：{gmailSummary.totalCount}件
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <span style={{ background: '#DBEAFE', color: '#1D4ED8', borderRadius: 999, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+              デモGmail
+            </span>
+            <span style={{ background: '#D1FAE5', color: '#065F46', borderRadius: 999, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
+              読み取り専用
+            </span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+          {[
+            { label: '重要A', value: gmailSummary.priorityACount + '件', color: '#EF4444', bg: '#FEE2E2' },
+            { label: '本日中', value: gmailSummary.todayDueCount + '件', color: '#DC2626', bg: '#FEE2E2' },
+            { label: '銀行', value: gmailSummary.bankCount + '件', color: '#1B3D6F', bg: '#DBEAFE' },
+            { label: '請求', value: gmailSummary.billingCount + '件', color: '#92400E', bg: '#FEF3C7' },
+            { label: '契約', value: gmailSummary.contractCount + '件', color: '#7C3AED', bg: '#EDE9FE' },
+            { label: '返信たたき台', value: gmailSummary.replyDraftCount + '件', color: '#065F46', bg: '#D1FAE5' },
+          ].map((stat) => (
+            <div key={stat.label} style={{ display: 'flex', alignItems: 'center', gap: 4, background: stat.bg, borderRadius: 8, padding: '4px 8px' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: stat.color }}>{stat.label}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: stat.color }}>{stat.value}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <span style={{ fontSize: 10, color: '#1D4ED8', fontWeight: 600 }}>
+            本番Gmail未接続 · 返信未送信 · 社長承認待ち
+          </span>
+          <button
+            onClick={() => onNavigate('actions')}
+            style={{
+              marginLeft: 'auto',
+              background: '#1D4ED8',
+              color: '#fff',
+              borderRadius: 8,
+              padding: '5px 12px',
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            要対応を見る →
+          </button>
+        </div>
+      </div>
+
       {/* ── AIブリーフィングカード ── */}
       <div
         style={{
