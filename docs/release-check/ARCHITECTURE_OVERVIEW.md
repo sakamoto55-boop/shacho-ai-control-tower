@@ -1,6 +1,31 @@
 # ARCHITECTURE_OVERVIEW.md — AI社長室 アーキテクチャ概要
 
-> 最終更新: Phase 9 — v0.9.0（2026-06-27）
+> 最終更新: Phase 10 — v1.0.0（2026-06-27）
+
+---
+
+## Phase 10 AI Engine追加（v1.0.0 確定）
+
+### 追加エンジン（6本）
+
+| エンジン | ファイル | 役割 |
+|---------|---------|------|
+| CrossProviderContext | `crossProviderContext.ts` | 全Provider横断コンテキスト / テーマ別クラスタリング |
+| CompanyHealthEngine | `companyHealthEngine.ts` | 会社健康スコア（9カテゴリ / グレードA〜D）|
+| DecisionEngine | `decisionEngine.ts` | 社長の今日の優先判断リスト TOP7 |
+| ActionDraftEngine | `actionDraftEngine.ts` | 社長承認用下書き（`externalSendDisabled: true`）|
+| ExecutiveBriefing | `executiveBriefing.ts` | 朝ブリーフィングテキスト生成 |
+| AI Orchestrator | `aiOrchestrator.ts` | 全統合 `runOrchestrator()` → `OrchestratorResult` |
+
+### Provider接続状況テーブル（Phase 10 更新）
+
+| Provider | 接続状態 | データソース | 次フェーズ |
+|---------|---------|------------|---------|
+| Inbox Provider | デモ接続 | Gmail（13件）+ LINE WORKS受信箱（4件）| — |
+| Schedule Provider | デモ接続 | Google Calendar（デモ）| 本番OAuth（Phase 11）|
+| File Provider | デモ接続 | Google Drive（デモ）| 本番OAuth（Phase 11）|
+| BusinessData Provider | デモ接続 | Google Sheets（デモ）| freee / TKC（将来）|
+| Notification Provider | デモ接続 | LINE WORKS通知（5件）| 本番OAuth（Phase 11）|
 
 ---
 

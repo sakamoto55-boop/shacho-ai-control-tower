@@ -1,6 +1,52 @@
 # FILES_CHANGED.md — 変更・追加・削除ファイル一覧
 
-> 最終更新: Phase 9 — v0.9.0（2026-06-27）
+> 最終更新: Phase 10 — v1.0.0（2026-06-27）
+
+---
+
+## Phase 10 変更ファイル
+
+### 新規作成 (6ファイル — AI Engine)
+
+| ファイルパス | 役割 |
+|-------------|------|
+| `client/src/core/ai-engine/crossProviderContext.ts` | 全Provider横断コンテキスト生成 / `buildCrossProviderContexts()` |
+| `client/src/core/ai-engine/companyHealthEngine.ts` | 会社健康スコア / 9カテゴリ / グレードA〜D / `calculateCompanyHealth()` |
+| `client/src/core/ai-engine/decisionEngine.ts` | 社長の今日の優先判断リスト TOP7 / `buildDecisionList()` / `buildImmediateActions()` |
+| `client/src/core/ai-engine/actionDraftEngine.ts` | 社長承認用アクション下書き（最大6件）/ `buildApprovalQueue()` / `externalSendDisabled: true` |
+| `client/src/core/ai-engine/executiveBriefing.ts` | 朝ブリーフィングテキスト生成 / `generateExecutiveBriefing()` |
+| `client/src/core/ai-engine/aiOrchestrator.ts` | 全Provider統合 / AI Engine実行 / `runOrchestrator()` / `OrchestratorResult` |
+
+### 新規作成 (4ファイル — docs)
+
+| ファイルパス | 役割 |
+|-------------|------|
+| `docs/release-check/RELEASE_NOTES_v1.0.0.md` | v1.0.0 リリースノート（Phase 1〜10 要約・Provider・AI Engine・安全設計） |
+| `docs/release-check/V1_ACCEPTANCE_CHECKLIST.md` | v1.0.0 完成検収チェックリスト（12項目） |
+| `docs/release-check/V1_SAFETY_LOCK.md` | v1.0.0 安全凍結宣言（禁止操作一覧・ActionDraft安全確認） |
+| `docs/release-check/V1_ARCHITECTURE_FREEZE.md` | v1.0.0 アーキテクチャ凍結宣言（Provider・AI Engine・画面・データフロー） |
+
+### 更新 (6ファイル — 画面)
+
+| ファイルパス | 変更内容 |
+|-------------|---------|
+| `client/src/components/screens/CockpitScreen.tsx` | AI優先アクション TOP5（`DecisionItem`）・社長承認キュー amber セクション追加 |
+| `client/src/components/screens/TodayActions.tsx` | AI優先順タブ（emerald）追加・`DecisionItem`カード・JSX構造修正 |
+| `client/src/components/screens/AiChat.tsx` | 統合ショートカットバー（indigo）8件追加・`OrchestratorResult`回答ロジック |
+| `client/src/components/screens/Dashboard.tsx` | 会社健康度カード（9カテゴリグリッド・グレード色分け・上位リスク警告）追加 |
+| `client/src/components/screens/Settings.tsx` | `v1.0.0 Phase 10` 表記・Phase 10 フェーズ一覧追加 |
+
+### 更新 (4ファイル — TypeScript修正)
+
+| ファイルパス | 修正内容 |
+|-------------|---------|
+| `client/src/core/ai-engine/aiOrchestrator.ts` | `UnifiedRisk` フィールド修正（`sources[]` / `riskType` / `deadline` / severity mapping） |
+| `client/src/core/ai-engine/decisionEngine.ts` | 未使用変数 `now` 削除 |
+| `client/src/core/ai-engine/actionDraftEngine.ts` | `categoryLabelMap` を `Record<string, string>` 型に変更・`finance`/`operation` キー追加 |
+| `client/src/components/screens/CockpitScreen.tsx` | 未使用 `aiJudgement` import 削除・重複 `background` スタイルプロパティ修正 |
+
+### 削除
+- なし
 
 ---
 

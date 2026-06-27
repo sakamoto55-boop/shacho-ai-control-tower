@@ -1,7 +1,48 @@
 # SAFETY_REPORT.md — 外部API接続状況・安全設計確認書
 
-> 最終更新: Phase 9 — v0.9.0（2026-06-27）  
+> 最終更新: Phase 10 — v1.0.0（2026-06-27）  
 > このファイルは外部API接続・書き込み処理の有無を確認するための文書です。
+
+---
+
+## Phase 10 追加安全確認
+
+| チェック項目 | 状態 |
+|------------|------|
+| 新規外部サービス追加 | ❌ なし（全Provider デモモックのまま） |
+| 外部API 書き込み追加 | ❌ なし（全 WRITE_FORBIDDEN 維持） |
+| `ActionDraft.externalSendDisabled` | ✅ 全件 `true`（`actionDraftEngine.ts` 3箇所確認） |
+| `ActionDraft.saveDisabled` | ✅ 全件 `true`（外部保存なし） |
+| `ActionDraft.readOnly` | ✅ 全件 `true` |
+| `ActionDraft.writeEnabled` | ✅ 全件 `false` |
+| `aiOrchestrator.ts` 外部HTTP呼び出し | ❌ なし（全データ mock から取得） |
+| `OrchestratorResult` 書き込みフラグ | ✅ `todayPlan.readOnly: true` / `todayPlan.writeEnabled: false` |
+| 承認フロー外部実行 | ❌ なし（UIと型のみ・外部実行は Phase 11以降） |
+| APIキー直書き | ❌ なし（`.env.example` のみ） |
+
+## ActionDraft 安全設計確認
+
+`actionDraftEngine.ts` で生成される全 ActionDraft の安全フィールド：
+
+```typescript
+// 受信箱からの返信下書き（line 22〜36）
+externalSendDisabled: true,
+saveDisabled: true,
+readOnly: true,
+writeEnabled: false,
+
+// 緊急通知からの対応連絡下書き（line 42〜56）
+externalSendDisabled: true,
+saveDisabled: true,
+readOnly: true,
+writeEnabled: false,
+
+// 決断リストからの確認依頼下書き（line 63〜78）
+externalSendDisabled: true,
+saveDisabled: true,
+readOnly: true,
+writeEnabled: false,
+```
 
 ---
 

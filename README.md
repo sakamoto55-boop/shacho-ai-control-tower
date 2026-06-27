@@ -8,13 +8,27 @@
 
 `client/` ディレクトリに、**iPhone最優先のスマホ対応Webアプリ**が含まれています。
 
-> **現在のバージョン：v0.9.0 Phase 9**
-> Phase 9 では LINE WORKS を Notification Provider / Inbox Provider へデモ接続しました。読み取り設計・通知受信設計・モックデータ反映のみ。送信・返信・既読化・削除・Bot送信・Webhook返信 等の書き込み操作は一切実装していません。本番時はバックエンド管理が必須です（`LINEWORKS_CLIENT_SECRET` はフロントエンドに置かない）。
+> **現在のバージョン：v1.0.0 Phase 10**
+> Phase 10 で全5Provider（Gmail / Calendar / Drive / Sheets / LINE WORKS）を横断するAI Engineを統合し、MVP完成。社長の今日の優先判断・会社健康スコア・承認フロー（UIと型のみ）を実装。外部APIへの書き込みは一切なし。本番接続は Phase 11 以降。
+
+### v1.0.0 MVP 完成
+
+- **実用開始ライン到達** — 社長が毎朝起動して今日の判断を行う最小限の機能が揃いました
+- **本番接続前の安定版** — 全データはデモモック。外部APIキー不要で動作確認可能
+- **全5Provider接続完了**（デモ）— Inbox / Schedule / File / BusinessData / Notification
+- **AI Engine 6本統合完了** — crossProviderContext / companyHealthEngine / decisionEngine / actionDraftEngine / executiveBriefing / aiOrchestrator
+- **6画面完成** — Home / AIコックピット / 今日の要対応 / AI相談 / 経営ダッシュボード / 設定
+
+> Gitタグ候補: `v1.0.0-mvp`（実際のタグ作成は指示があるまで保留）
 
 ### 検収ドキュメント
 
 | ファイル | 内容 |
 |---------|------|
+| [RELEASE_NOTES_v1.0.0.md](docs/release-check/RELEASE_NOTES_v1.0.0.md) | v1.0.0 リリースノート（Phase 1〜10 要約・Provider・AI Engine・安全設計） |
+| [V1_ACCEPTANCE_CHECKLIST.md](docs/release-check/V1_ACCEPTANCE_CHECKLIST.md) | v1.0.0 完成検収チェックリスト（12項目）|
+| [V1_SAFETY_LOCK.md](docs/release-check/V1_SAFETY_LOCK.md) | v1.0.0 安全凍結宣言（禁止操作一覧・ActionDraft安全確認）|
+| [V1_ARCHITECTURE_FREEZE.md](docs/release-check/V1_ARCHITECTURE_FREEZE.md) | v1.0.0 アーキテクチャ凍結宣言（Provider・AI Engine・画面・データフロー）|
 | [CHANGELOG_PHASE.md](docs/release-check/CHANGELOG_PHASE.md) | フェーズ別変更履歴 |
 | [FILES_CHANGED.md](docs/release-check/FILES_CHANGED.md) | 変更・追加・削除ファイル一覧 |
 | [IMPLEMENTATION_REPORT.md](docs/release-check/IMPLEMENTATION_REPORT.md) | 実装内容・未実装項目・注意点 |
@@ -406,6 +420,40 @@ Phase 6 スコープ（PHASE6_SCOPES）:
 
 ---
 
+## Phase 10 で追加した内容（AI Engine統合 · 全Provider横断 · 社長承認フロー）
+
+### 概要
+
+全5Provider（Gmail / Calendar / Drive / Sheets / LINE WORKS）を横断するAI Engineを構築し、社長室のMVPを完成させた。  
+**外部APIへの書き込みは一切なし。全データはデモモック。承認フローはUIと型のみ（外部実行はPhase 11以降）。**
+
+### AI Engine 新規6ファイル
+
+| ファイル | 役割 |
+|---------|------|
+| `client/src/core/ai-engine/crossProviderContext.ts` | 全Provider横断コンテキスト生成（銀行/請求/事故/人員/現場テーマ）|
+| `client/src/core/ai-engine/companyHealthEngine.ts` | 会社健康スコア（9カテゴリ・グレードA〜D）|
+| `client/src/core/ai-engine/decisionEngine.ts` | 社長の今日の優先判断リスト TOP7 |
+| `client/src/core/ai-engine/actionDraftEngine.ts` | 社長承認用下書き（最大6件・`externalSendDisabled: true`）|
+| `client/src/core/ai-engine/executiveBriefing.ts` | 朝ブリーフィングテキスト生成 |
+| `client/src/core/ai-engine/aiOrchestrator.ts` | `runOrchestrator()` → `OrchestratorResult`（全統合）|
+
+### 画面更新（5画面）
+
+| 画面 | Phase 10 追加 |
+|------|------------|
+| AIコックピット | AI優先アクション TOP5 / 社長承認キュー amber セクション |
+| 今日の要対応 | AI優先順タブ（emerald）/ `DecisionItem` カード |
+| AI相談 | 統合ショートカット indigo バー（8件）|
+| 経営ダッシュボード | 会社健康度カード（9カテゴリグリッド）|
+| 設定 | v1.0.0 / Phase 10 表記 |
+
+### 次フェーズ
+
+**Phase 11**: バックエンドProxy構築・本番OAuth接続・社長承認後の外部実行設計
+
+---
+
 ## Phase 9 で追加した内容（LINE WORKS Notification / Inbox Provider デモ接続）
 
 ### 概要
@@ -482,7 +530,7 @@ button: #14B8A6 (teal-500)
 
 ### 次フェーズ
 
-**Phase 10**: LINE WORKS OAuth2 本番接続、Webhook受信バックエンドエンドポイント実装、バックエンドProxy経由での読み取りAPI
+**Phase 11**: バックエンドProxy構築・本番OAuth接続・社長承認後の外部実行設計
 
 ---
 
@@ -890,7 +938,8 @@ Phase 3.5においても外部サービスへの接続は一切行っていま�
 | ~~Phase 7~~ | ~~Google Drive ReadOnly / File Provider~~ | ✅ 完了 |
 | ~~Phase 8~~ | ~~Google Sheets ReadOnly / BusinessData Provider~~ | ✅ 完了 |
 | ~~Phase 9~~ | ~~LINE WORKS Notification / Inbox Provider デモ接続~~ | ✅ 完了 |
-| **Phase 10** | **LINE WORKS OAuth2 本番接続・Webhook受信バックエンド** | 次回 |
+| ~~Phase 10~~ | ~~AI Engine統合・全Provider横断・社長承認フロー（UIと型のみ）~~ | ✅ 完了 |
+| **Phase 11** | **バックエンドProxy構築・本番OAuth接続・社長承認後の外部実行設計** | 次回 |
 | 将来 | Gmail下書き作成（送信なし・人間承認必須） | 将来 |
 
 **書き込み処理はすべて人間の最終確認を前提とし、自動送信・自動保存は行いません。**

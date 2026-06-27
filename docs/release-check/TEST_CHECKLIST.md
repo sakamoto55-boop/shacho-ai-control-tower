@@ -1,7 +1,55 @@
 # TEST_CHECKLIST.md — 手動検収チェックリスト
 
-> 最終更新: Phase 9 — v0.9.0（2026-06-27）  
+> 最終更新: Phase 10 — v1.0.0（2026-06-27）  
 > 各項目を実際にブラウザで確認してチェックしてください。
+
+---
+
+## Phase 10 検収チェック（v1.0.0）
+
+### TypeScript ビルド確認
+- [ ] `cd client && npm run build` がゼロエラーで完了する
+- [ ] `noUnusedLocals` / `noUnusedParameters` エラーが出ない
+- [ ] `npx tsc --noEmit` がゼロエラーで完了する
+
+### AIコックピット — AI優先アクション（新規）
+- [ ] 「🎯 今日の優先判断」セクションが表示される
+- [ ] TOP5カードが rank 1〜5 で表示される
+- [ ] 各カードに urgency（critical/high）の色分けがある
+- [ ] 「⚡ 今すぐ対応」緊急アクションセクションが表示される
+- [ ] 「✅ 社長承認キュー」amber セクションが表示される
+- [ ] ActionDraft カードに「この操作は現在UIのみ」テキストがある
+
+### 今日の要対応 — AI優先順タブ（新規）
+- [ ] 「🤖 AI優先順」タブ（emerald 背景）が表示される
+- [ ] タブ切り替えで DecisionItem カードが表示される
+- [ ] 各カードに rank・urgency・reason・suggestedAction が表示される
+- [ ] 他のタブ（Gmailタブ・LINE WORKSタブ）が引き続き機能する
+
+### AI相談 — 統合ショートカット（新規）
+- [ ] indigo 背景バー（#EEF2FF）が画面上部に表示される
+- [ ] 8件のショートカットボタンが表示される
+- [ ] 「今日の優先順位TOP5は？」をタップするとAI回答が返る
+- [ ] 「会社の健康スコアを教えて」をタップすると健康スコアが返る
+- [ ] 各回答に orchestratorResult のデータが反映されている
+
+### 経営ダッシュボード — 会社健康度カード（新規）
+- [ ] 「🏢 会社健康度」カードが月次サマリーの前に表示される
+- [ ] グレード（A/B/C/D）が大きく表示される（A=green-700, B=blue-700, C=amber-700, D=red-700）
+- [ ] 9カテゴリグリッドが表示される（資金繰り / 粗利率 / 未請求 / 未回収 / 事故 / 人員 / 売上 / 社内SOS / 予定負荷）
+- [ ] 各カテゴリにグレード文字（A/B/C/D）が表示される
+- [ ] リスク警告バー（amber）が表示される（リスクがある場合）
+
+### 設定画面 — v1.0.0 表示
+- [ ] バージョンバッジが「v1.0.0 Phase 10」と表示される
+- [ ] フェーズ一覧に「Phase 10: AI Engine統合 · 全Provider横断 · 社長承認フロー 実装済」がある
+- [ ] 全Provider（5件）が demo 状態で表示される
+
+### 外部書き込みなし（コード確認）
+- [ ] `aiOrchestrator.ts` に HTTP fetch/axios 呼び出しが存在しない
+- [ ] `actionDraftEngine.ts` の全 ActionDraft に `externalSendDisabled: true` がある
+- [ ] `actionDraftEngine.ts` の全 ActionDraft に `saveDisabled: true` がある
+- [ ] `aiOrchestrator.ts` の `todayPlan` に `readOnly: true as const` がある
 
 ---
 

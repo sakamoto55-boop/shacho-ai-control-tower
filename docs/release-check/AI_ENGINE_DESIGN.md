@@ -1,6 +1,104 @@
 # AI_ENGINE_DESIGN.md — AI Engine設計仕様
 
-> 最終更新: Phase 9 — v0.9.0（2026-06-27）
+> 最終更新: Phase 10 — v1.0.0（2026-06-27）
+
+---
+
+## Phase 10 新規エンジン詳細（v1.0.0）
+
+### CrossProviderContext（`crossProviderContext.ts`）
+
+```
+入力: UnifiedInboxItem[], UnifiedScheduleItem[], UnifiedFileItem[],
+      UnifiedBusinessMetric[], UnifiedNotification[]
+出力: CrossProviderContext[]
+
+テーマ: 銀行融資リスク / 未回収・未請求 / 事故SOS /
+        人員不足 / 現場お結び問題 / 経営異常値
+```
+
+各コンテキストに `evidenceSources[]`（最大4件）・`riskLevel`・`urgency`・`requiresApproval` を付与。
+
+### CompanyHealthEngine（`companyHealthEngine.ts`）
+
+```
+入力: UnifiedBusinessMetric[], UnifiedNotification[], UnifiedScheduleItem[]
+出力: CompanyHealthScore
+
+9カテゴリ:
+  cashflow / grossProfit / unbilled / uncollected /
+  accident / personnel / sales / internalSOS / scheduleLoad
+
+グレード: A（90+）/ B（70-89）/ C（50-69）/ D（50未満）
+```
+
+### DecisionEngine（`decisionEngine.ts`）
+
+```
+入力: inbox, schedule, metrics, notifications, crossContexts
+出力: DecisionItem[] TOP7（urgency降順 → importance順）
+
+優先順位:
+  1. 緊急通知（urgency=critical）
+  2. 横断コンテキスト（importance=A かつ urgency≠low）
+  3. 受信箱優先度A
+  4. 経営数値危険指標（riskLevel=critical or high）
+  5. 今日の重要予定（priority=A かつ 今日）
+```
+
+各 `DecisionItem` は `readOnly: true` / `writeEnabled: false` 必須。
+
+### ActionDraftEngine（`actionDraftEngine.ts`）
+
+```
+入力: inbox, notifications, decisions
+出力: ActionDraft[] 最大6件
+
+生成対象:
+  1. 受信箱 priority=A かつ requiresApproval=true → 返信下書き
+  2. 通知 urgency=critical or (high かつ riskFlag=true) → 対応連絡下書き
+  3. decisions category=bank かつ importance=A → 確認依頼下書き
+
+全件必須フィールド:
+  externalSendDisabled: true
+  saveDisabled: true
+  readOnly: true
+  writeEnabled: false
+  requiresApproval: true
+  approvalStatus: 'pending'
+```
+
+### ExecutiveBriefing（`executiveBriefing.ts`）
+
+```
+入力: inbox, schedule, metrics, notifications, crossContexts, decisions, healthScore
+出力: ExecutiveBriefing（朝ブリーフィングテキスト）
+
+内容: greeting / headline / summary / healthGrade /
+      topDecisions / topRisks / todaySchedule / actionItems
+```
+
+### AI Orchestrator（`aiOrchestrator.ts`）
+
+```
+入力: なし（内部で全mockデータ取得）
+出力: OrchestratorResult
+
+処理順:
+  1. 全Provider mockデータ取得
+  2. buildCrossProviderContexts()
+  3. calculateCompanyHealth()
+  4. detectNotificationRisks() + detectBusinessRisks()
+  5. riskClusters生成
+  6. buildDecisionList()
+  7. buildApprovalQueue()
+  8. generateExecutiveBriefing()
+  9. buildImmediateActions()
+  10. todayPlan生成
+  11. OrchestratorResult 返却
+
+呼び出し元（各画面）: useMemo(() => runOrchestrator(), [])
+```
 
 ---
 

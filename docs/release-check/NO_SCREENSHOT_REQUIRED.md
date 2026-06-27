@@ -1,7 +1,37 @@
 # NO_SCREENSHOT_REQUIRED.md — スクリーンショット不要の検収フロー
 
 > このファイルは、スクリーンショットなしで変更点と安全性を確認できることを明記します。  
-> 最終更新: Phase 9 — v0.9.0（2026-06-27）
+> 最終更新: Phase 10 — v1.0.0（2026-06-27）
+
+---
+
+## Phase 10 確認方法（v1.0.0）
+
+### ビルド確認（コマンドで完結）
+```bash
+cd client && npm run build
+# → 0 エラーで完了することを確認
+```
+
+### AI Engine コード確認
+```bash
+# actionDraftEngine.ts の全件安全フィールド確認
+grep -n "externalSendDisabled" client/src/core/ai-engine/actionDraftEngine.ts
+grep -n "saveDisabled" client/src/core/ai-engine/actionDraftEngine.ts
+
+# aiOrchestrator.ts に外部HTTP呼び出しがないことを確認
+grep -n "fetch\|axios\|http" client/src/core/ai-engine/aiOrchestrator.ts
+# → 結果なし（全データmock）
+
+# OrchestratorResult の readOnly確認
+grep -n "readOnly: true" client/src/core/ai-engine/aiOrchestrator.ts
+```
+
+### TypeScript型確認
+```bash
+cd client && npx tsc --noEmit
+# → 0 エラーで完了することを確認
+```
 
 ---
 

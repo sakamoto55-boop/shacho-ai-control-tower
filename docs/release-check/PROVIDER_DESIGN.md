@@ -1,6 +1,34 @@
 # PROVIDER_DESIGN.md — Provider設計仕様
 
-> 最終更新: Phase 9 — v0.9.0（2026-06-27）
+> 最終更新: Phase 10 — v1.0.0（2026-06-27）
+
+---
+
+## Phase 10 Provider接続状況（v1.0.0 確定）
+
+全5Providerがデモ接続完了。Phase 11 で本番接続を予定。
+
+| Provider | 接続状態 | データソース | `readOnly` | `writeEnabled` |
+|---------|---------|------------|----------|--------------|
+| Inbox Provider | デモ接続 | Gmail（13件）+ LINE WORKS受信箱（4件）| true | false |
+| Schedule Provider | デモ接続 | Google Calendar（mockCalendar.ts）| true | false |
+| File Provider | デモ接続 | Google Drive（mockDrive.ts）| true | false |
+| BusinessData Provider | デモ接続 | Google Sheets（mockSheets.ts）| true | false |
+| Notification Provider | デモ接続 | LINE WORKS通知（5件）| true | false |
+
+### AI Orchestrator からの呼び出し（Phase 10）
+
+全Provider のデータは `aiOrchestrator.ts` の `runOrchestrator()` が一括取得し、AI Engine に渡します。
+
+```typescript
+// aiOrchestrator.ts — デモモック一括取得
+const gmailInboxItems = mockGmailMessages.map(mapToGmailDerivedTask).map(mapGmailDerivedTaskToUnifiedInboxItem)
+const lwInboxItems = mockLineWorksInboxMessages.map(mapLineWorksToUnifiedInboxItem)
+const schedule = mockCalendarEvents.filter(e => e.status !== 'cancelled').map(...)
+const files = mockDriveFiles.filter(f => !f.trashed).map(...)
+const metrics = mockBusinessDataset.metrics
+const notifications = mockLineWorksNotifications.map(mapLineWorksToUnifiedNotification)
+```
 
 ---
 

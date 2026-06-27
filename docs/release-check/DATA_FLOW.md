@@ -1,6 +1,52 @@
 # DATA_FLOW.md — データの流れ
 
-> 最終更新: Phase 9 — v0.9.0（2026-06-27）
+> 最終更新: Phase 10 — v1.0.0（2026-06-27）
+
+---
+
+## Phase 10 追加: AI Orchestrator 統合データフロー
+
+```
+────────── AI Orchestrator 統合フロー（aiOrchestrator.ts）──────────
+
+mockGmailMessages → gmailMapper → inboxProvider
+mockLineWorksInboxMessages → lineworksMapper ─────────┐
+                                                       │
+mockCalendarEvents → calendarMapper → scheduleItems   │
+                                                       │
+mockDriveFiles → driveMapper → fileItems              ├──→ AI Engine処理
+                                                       │
+mockBusinessDataset.metrics → businessMetrics         │
+                                                       │
+mockLineWorksNotifications → lineworksMapper → notifs ┘
+
+            ↓ AI Engine処理
+
+  1. buildCrossProviderContexts()  → CrossProviderContext[]
+                                     （銀行/請求/事故/人員/現場テーマ）
+  2. calculateCompanyHealth()      → CompanyHealthScore
+                                     （9カテゴリ / グレードA〜D）
+  3. detectNotificationRisks()     → UnifiedRisk[]
+     detectBusinessRisks()         → UnifiedRisk[]（変換済）
+  4. riskClusters（crossContexts×risks）
+  5. buildDecisionList()           → DecisionItem[] TOP7
+  6. buildApprovalQueue()          → ActionDraft[] 最大6件
+  7. generateExecutiveBriefing()   → ExecutiveBriefing
+  8. buildImmediateActions()       → DecisionItem[] TOP3
+  
+            ↓ OrchestratorResult
+
+  { briefing, todayPlan, healthScore, risks, riskClusters,
+    approvalQueue, crossContexts, generatedAt }
+
+            ↓ useMemo（各画面）
+
+  CockpitScreen → decisions / approvalQueue / healthScore / notifications
+  TodayActions  → decisions / inbox / notifications
+  AiChat        → orchestratorResult（全統合）
+  Dashboard     → healthScore / metrics
+  Home          → briefing / healthScore
+```
 
 ---
 

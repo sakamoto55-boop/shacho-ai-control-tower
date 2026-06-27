@@ -4,6 +4,45 @@
 
 ---
 
+## Phase 10 — v1.0.0（2026-06-27）
+
+### 変更テーマ
+全5Provider（Gmail / Calendar / Drive / Sheets / LINE WORKS）のデータを横断統合するAI Engineレイヤーを構築し、社長の今日の優先判断・会社健康スコア・承認フロー（UIと型のみ）を実装する。外部APIへの書き込みは一切なし。
+
+### 追加した機能
+
+**AI Engine新規6ファイル**
+- `client/src/core/ai-engine/crossProviderContext.ts`: 全Provider横断コンテキスト生成（`buildCrossProviderContexts()`）
+- `client/src/core/ai-engine/companyHealthEngine.ts`: 会社健康スコア算出（9カテゴリ・グレードA〜D・`calculateCompanyHealth()`）
+- `client/src/core/ai-engine/decisionEngine.ts`: 社長の今日の優先判断リスト TOP7生成（`buildDecisionList()`・`buildImmediateActions()`）
+- `client/src/core/ai-engine/actionDraftEngine.ts`: 社長承認用アクション下書き生成（最大6件・`buildApprovalQueue()`・`externalSendDisabled: true`）
+- `client/src/core/ai-engine/executiveBriefing.ts`: 朝ブリーフィングテキスト生成（`generateExecutiveBriefing()`）
+- `client/src/core/ai-engine/aiOrchestrator.ts`: 全Provider統合→AI Engine実行→`OrchestratorResult`返却（`runOrchestrator()`）
+
+### 変更した機能
+
+**画面更新（6ファイル）**
+- `CockpitScreen.tsx`: AI優先アクション TOP5・社長承認キュー（amber）追加（`runOrchestrator()` 統合）
+- `TodayActions.tsx`: AI優先順タブ（emerald）追加・`DecisionItem`カード表示
+- `AiChat.tsx`: 統合ショートカットバー（indigo・8件）追加・`OrchestratorResult`回答ロジック
+- `Dashboard.tsx`: 会社健康度カード（9カテゴリグリッド・グレード色分け）追加
+- `Settings.tsx`: `v1.0.0 Phase 10` 表記・フェーズ一覧に Phase 10 追加
+- `Home.tsx`: （Phase 9 実装済み・Phase 10 では変更なし）
+
+**TypeScript修正（4ファイル）**
+- `aiOrchestrator.ts`: `UnifiedRisk` フィールド修正（`sources`・`riskType`・`deadline`）
+- `decisionEngine.ts`: 未使用変数 `now` 削除
+- `actionDraftEngine.ts`: `categoryLabelMap` を `Record<string, string>` 型に修正
+- `CockpitScreen.tsx`: 未使用 `aiJudgement` import 削除・重複 `background` プロパティ修正
+
+### 削除した機能
+- なし
+
+### 外部サービス追加
+- なし（全Providerデモ接続のまま）
+
+---
+
 ## Phase 9 — v0.9.0（2026-06-27）
 
 ### 変更テーマ

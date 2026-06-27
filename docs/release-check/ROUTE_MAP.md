@@ -1,6 +1,57 @@
 # ROUTE_MAP.md — 画面遷移と主要導線
 
-> 最終更新: Phase 9 — v0.9.0（2026-06-27）
+> 最終更新: Phase 10 — v1.0.0（2026-06-27）
+
+---
+
+## Phase 10 追加: 画面更新内容
+
+### AIコックピット（CockpitScreen.tsx）— Phase 10 追加セクション
+
+```
+AIコックピット（CockpitScreen.tsx）
+├── [既存] 会社健康スコア（companyHealthEngine）
+├── [Phase 10] 🎯 今日の優先判断（DecisionItem TOP5・emerald強調なし）
+│      └── DecisionItem カード（rank / urgency / reason / suggestedAction）
+├── [Phase 10] ⚡ 今すぐ対応（immediateActions / critical=赤 / high=orange）
+├── [Phase 10] ✅ 社長承認キュー（ActionDraft amber セクション）
+│      └── ActionDraft カード（4ボタン：承認・修正・棄却・委任 / UIのみ）
+└── [既存] 💬 LINE WORKS通知セクション（ティール）
+```
+
+### 今日の要対応（TodayActions.tsx）— Phase 10 タブ追加
+
+```
+今日の要対応（TodayActions.tsx）
+├── タブ: [Phase 10] 🤖 AI優先順（emerald）← 新規
+│      └── DecisionItem カード（TOP7）
+├── タブ: Gmail（青）
+│      └── Gmailタスクカード
+└── タブ: 💬 LINE WORKS（ティール）
+       └── 通知カード / 受信箱カード
+```
+
+### AI相談（AiChat.tsx）— Phase 10 ショートカットバー追加
+
+```
+AI相談（AiChat.tsx）
+├── [Phase 10] indigo ショートカットバー（#EEF2FF）← 新規
+│      └── 8件ボタン（AI優先順位TOP5 / 健康スコア / 緊急対応 / 資金繰り 等）
+├── [既存] LINE WORKS ショートカットバー（ティール）
+├── [既存] Gmail ショートカットバー（青）
+└── テキスト入力 + 送信
+```
+
+### 経営ダッシュボード（Dashboard.tsx）— Phase 10 カード追加
+
+```
+経営ダッシュボード（Dashboard.tsx）
+├── [Phase 10] 🏢 会社健康度カード ← 新規
+│      ├── 総合グレード（A/B/C/D）+ スコア（0-100）
+│      ├── 9カテゴリグリッド（資金繰り/粗利率/未請求/未回収/事故/人員/売上/社内SOS/予定負荷）
+│      └── 主要リスク警告バー（amber）
+└── [既存] 月次サマリーセクション
+```
 
 ---
 
