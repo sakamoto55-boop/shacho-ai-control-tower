@@ -1,4 +1,18 @@
-# 社長AI管制塔 Phase 1
+# 社長AI管制塔 — AI社長室 v1.0.0 MVP
+
+> **まずはこちらを見てください**
+>
+> | | |
+> |--|--|
+> | 📱 **公開URL（スマホで開く）** | `https://sakamoto55-boop.github.io/shacho-ai-control-tower/` |
+> | 📖 **使い方ガイド** | [docs/HOW_TO_USE.md](docs/HOW_TO_USE.md) |
+> | ✅ **現在できること** | [docs/CURRENT_STATUS.md](docs/CURRENT_STATUS.md) |
+> | 🔧 **本番接続手順** | [docs/NEXT_SETUP_STEPS.md](docs/NEXT_SETUP_STEPS.md) |
+> | 📦 **納品物一覧** | [docs/DELIVERY_SUMMARY.md](docs/DELIVERY_SUMMARY.md) |
+
+> ⚠️ **URLが開かない場合**: GitHubリポジトリの Settings → Pages → Branch: gh-pages → Save で有効化してください（30秒で設定完了）。
+
+---
 
 会社メール、LINE WORKS、手入力された外部連絡をAI分析し、要約、タスク抽出、返信下書き、リスク判定、朝昼晩レポートを作るローカルMVPです。
 
