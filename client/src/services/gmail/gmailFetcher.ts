@@ -6,8 +6,9 @@ import { googleStorage } from '../google/googleStorage'
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me'
 
-// 既定の検索クエリ（受信トレイ・未読・過去3日）
-const DEFAULT_QUERY = 'is:unread newer_than:3d'
+// 既定の検索クエリ（受信トレイ・未読・過去24時間）
+// Phase 11: 本番接続は「過去24時間・未読」を対象とする
+const DEFAULT_QUERY = 'is:unread newer_than:1d'
 const MAX_RESULTS = 20
 
 interface GmailApiListMessage {

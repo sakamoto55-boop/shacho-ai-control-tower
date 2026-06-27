@@ -1,6 +1,47 @@
 # IMPLEMENTATION_REPORT.md — 実装内容・未実装項目・注意点
 
-> 最終更新: Phase 10 — v1.0.0（2026-06-27）
+> 最終更新: Phase 11 — Gmail ReadOnly 本番接続（2026-06-27）
+
+---
+
+## Phase 11 実装内容
+
+### ① Google OAuth（Gmail ReadOnly）本番接続 ✅ 完了
+
+| 項目 | 状態 |
+|------|------|
+| OAuth フロー（PKCE + state）| ✅ 既存実装を Phase 11 スコープに切替 |
+| 要求スコープ | ✅ `gmail.readonly` のみ（PHASE11_SCOPES）|
+| トークン交換・保存 | ✅ googleToken（localStorage）|
+| Gmail 実取得 | ✅ gmailFetcher（GET のみ・過去24時間・未読）|
+| キャッシュ | ✅ 5分TTL（gmailCache）|
+
+### ② デモ/本番モード切替 ✅ 完了
+
+| 画面 | 反映内容 |
+|------|---------|
+| 設定 | 接続状態 / モード（本番Gmail接続・デモ）/ 取得件数 / 最終取得日時 / 読み取り専用 / 書き込み禁止 |
+| AIコックピット | 接続時に実Gmailへ自動切替（gmailSource: demo→api）· 本番Gmail接続バッジ |
+
+### ③ 安全ガード再確認 ✅ 完了
+
+書き込み関数（sendMessage / replyMessage / createDraft / deleteMessage / archiveMessage / markAsRead / modifyLabels / addStar）は **すべて未実装**（git grep 検出ゼロ）。
+
+### ④ ログ ✅ 完了
+
+`googleStorage.appendLog()` で記録（設定画面「認証ログを見る」で確認）:
+oauth_start / oauth_success / oauth_error / fetch_start / fetch_success / fetch_error / token_refresh / disconnect
+
+### ⑤ ビルド ✅
+
+```
+cd client && npm run build → 0 エラー
+```
+
+### Phase 11 未実装（Phase 12 以降）
+- Calendar / Drive / Sheets の本番接続
+- LINE WORKS 本番接続（バックエンドProxy必須）
+- バックエンドProxy経由トークン管理（XSS対策強化）
 
 ---
 

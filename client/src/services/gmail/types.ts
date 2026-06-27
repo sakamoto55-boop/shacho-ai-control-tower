@@ -53,9 +53,11 @@ export interface GmailSummary {
 }
 
 export interface GmailConnectionStatus {
-  connected: false
+  // Phase 11: 本番 Gmail 接続時に true。書き込みは常に不可。
+  connected: boolean
   mode: 'demo' | 'production'
   lastFetchAt: Date | null
+  itemCount: number
   permission: '読み取り専用'
   writeEnabled: false
   scope: 'https://www.googleapis.com/auth/gmail.readonly'

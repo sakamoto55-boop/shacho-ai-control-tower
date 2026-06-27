@@ -4,6 +4,32 @@
 
 ---
 
+## Phase 11 — Gmail ReadOnly 本番接続（2026-06-27）
+
+### 変更テーマ
+AI社長室を、デモデータから実データ運用へ移行する第一段階。**Google OAuth + Gmail ReadOnly の本番接続**を実装。接続対象は Gmail のみ（Calendar/Drive/Sheets/LINE WORKS はデモのまま）。送信・返信・下書き・削除・既読化・ラベル変更は実装しない。
+
+### 追加した機能
+- **新規docs**: `docs/GOOGLE_OAUTH_SETUP.md`（OAuth設定手順）· `docs/release-check/PHASE11_GMAIL_PRODUCTION_CONNECT.md`（接続設計）· `docs/release-check/PRODUCTION_SECURITY_CHECK.md`（本番安全確認）
+- `googleScopes.ts`: `PHASE11_SCOPES`（gmail.readonly のみ）追加
+- `gmail/types.ts`: `GmailConnectionStatus.connected` を `boolean` 化・`itemCount` 追加
+
+### 変更した機能
+- `gmailFetcher.ts`: 取得クエリを `newer_than:3d` → `newer_than:1d`（過去24時間・未読）
+- `gmailClient.ts`: `getConnectionStatus()` を実接続状態（connected / mode / itemCount / lastFetchAt）反映に修正
+- `googleAuth.ts`: OAuth フローのスコープを `PHASE11_SCOPES`（gmail.readonly のみ）に変更
+- `client/.env.example`: `VITE_GOOGLE_SCOPES` を gmail.readonly のみに整理・Calendar/Drive/Sheets は将来用にコメント化
+- `Settings.tsx`: Gmail読み取りテストを本番/デモ反映（接続状態・モード・取得件数・最終取得日時）· 接続ボタン文言を「Gmail ReadOnly のみ」
+- `CockpitScreen.tsx`: Gmail 接続時に実データへ自動切替（gmailSource: demo/api）· 本番Gmail接続バッジ表示
+
+### 削除した機能
+- なし（書き込み関数は元々未実装。Phase 11でも不存在を再確認）
+
+### 外部サービス追加
+- Google Gmail API（読み取り専用 `gmail.readonly`・本番接続）
+
+---
+
 ## Phase 10 — v1.0.0（2026-06-27）
 
 ### 変更テーマ

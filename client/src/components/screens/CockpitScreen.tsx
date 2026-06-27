@@ -9,6 +9,9 @@ import {
 import { mockGmailMessages } from '../../services/gmail/mockGmail'
 import { mapToGmailDerivedTask } from '../../services/gmail/gmailMapper'
 import { createGmailSummary } from '../../services/gmail/gmailAnalyzer'
+import { fetchRawMessages } from '../../services/gmail/gmailClient'
+import { googleAuth } from '../../services/google/googleAuth'
+import type { GmailMessage } from '../../services/gmail/types'
 import { mockCalendarEvents } from '../../services/calendar/mockCalendar'
 import { mapGoogleCalendarEventToUnifiedScheduleItem } from '../../services/calendar/calendarMapper'
 import { createCalendarSummary } from '../../services/calendar/calendarAnalyzer'
@@ -60,9 +63,8 @@ const CATEGORY_COLORS: Record<string, string> = {
   'タスク':'#DC2626',
 }
 
-// Inbox Provider 経由 (将来: providerRegistry.getInboxItems() に切り替え)
-const gmailDerivedTasks = mockGmailMessages.map(mapToGmailDerivedTask)
-const gmailSummary = createGmailSummary(mockGmailMessages)
+// Inbox Provider 経由 (Phase 11: デモGmailまたは本番 Gmail ReadOnly)
+const demoGmailMessages = mockGmailMessages
 
 // Schedule Provider 経由 (Phase 6: デモCalendarまたは Google Calendar ReadOnly)
 const demoScheduleItems = mockCalendarEvents
@@ -86,6 +88,8 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
   const [scheduleSource, setScheduleSource] = useState<'demo' | 'api'>('demo')
   const [fileItems, setFileItems] = useState<UnifiedFileItem[]>(demoFileItems)
   const [fileSource, setFileSource] = useState<'demo' | 'api'>('demo')
+  const [gmailMessages, setGmailMessages] = useState<GmailMessage[]>(demoGmailMessages)
+  const [gmailSource, setGmailSource] = useState<'demo' | 'api'>('demo')
 
   // BusinessData Provider（Phase 8）
   const businessDataset = mockBusinessDataset
@@ -126,7 +130,22 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
         setFileSource('api')
       }
     }).catch(() => { /* デモデータを維持 */ })
+
+    // Phase 11: Gmail 本番接続済みなら実データに切り替え（読み取り専用）
+    // Calendar/Drive/Sheets/LINE WORKS はデモのまま
+    if (googleAuth.isConnected()) {
+      fetchRawMessages().then((messages) => {
+        if (messages.length > 0) {
+          setGmailMessages(messages)
+          setGmailSource('api')
+        }
+      }).catch(() => { /* デモデータを維持 */ })
+    }
   }, [])
+
+  // Phase 11: Gmail サマリー・タスクは接続状態に応じて実データ or デモから生成
+  const gmailDerivedTasks = useMemo(() => gmailMessages.map(mapToGmailDerivedTask), [gmailMessages])
+  const gmailSummary = useMemo(() => createGmailSummary(gmailMessages), [gmailMessages])
 
   const calendarSummary = scheduleSource === 'api'
     ? { totalCount: scheduleItems.length, importanceACount: scheduleItems.filter((e) => e.priority === 'A').length, deadlineRiskCount: scheduleItems.filter((e) => e.deadlineRisk).length, travelRequiredCount: scheduleItems.filter((e) => e.location && !e.location.includes('会議室')).length }
@@ -779,7 +798,11 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
             </span>
           </div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {demoMode !== false && (
+            {gmailSource === 'api' ? (
+              <span style={{ background: '#D1FAE5', color: '#065F46', borderRadius: 999, padding: '2px 7px', fontSize: 10, fontWeight: 800 }}>
+                本番Gmail接続
+              </span>
+            ) : (
               <span style={{ background: '#DBEAFE', color: '#1D4ED8', borderRadius: 999, padding: '2px 7px', fontSize: 10, fontWeight: 700 }}>
                 デモGmail
               </span>
@@ -848,7 +871,9 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
         </div>
 
         <div style={{ marginTop: 8, fontSize: 10, color: '#1D4ED8', fontWeight: 600 }}>
-          元データ：デモGmail · 本番Gmail未接続 · 返信未送信 · 社長承認待ち
+          {gmailSource === 'api'
+            ? '元データ：本番Gmail（gmail.readonly）· 実データ取得済み · 返信未送信 · 社長承認待ち · 外部送信なし'
+            : '元データ：デモGmail · 本番Gmail未接続 · 返信未送信 · 社長承認待ち'}
         </div>
       </div>
 

@@ -1,6 +1,31 @@
 # ROUTE_MAP.md — 画面遷移と主要導線
 
-> 最終更新: Phase 10 — v1.0.0（2026-06-27）
+> 最終更新: Phase 11 — Gmail ReadOnly 本番接続（2026-06-27）
+
+---
+
+## Phase 11 追加: Gmail 本番接続の導線
+
+```
+設定画面（Settings）
+├── Google アカウント接続カード
+│     └── 「🔐 Googleアカウントで接続（Gmail ReadOnly のみ）」
+│           ↓ googleAuth.startOAuthFlow()（scope = gmail.readonly）
+│         Google 認証画面 → 同意 → リダイレクト
+│           ↓ App.tsx → googleAuth.handleCallback()
+│         「✓ 接続済み」表示
+│
+└── Gmail読み取りテストカード
+      ├── バッジ: 本番Gmail / デモGmail（接続状態で切替）
+      ├── 接続状態 / モード / 取得件数 / 最終取得日時
+      └── 「📥 読み取りテスト」→ 実メール or デモを取得表示
+
+AIコックピット（CockpitScreen）
+└── Gmailからの要対応セクション
+      ├── 接続時: 「本番Gmail接続」バッジ・実データ表示
+      └── 未接続: 「デモGmail」バッジ・mockGmail表示
+      ※ Calendar/Drive/Sheets/LINE WORKS はデモのまま
+```
 
 ---
 

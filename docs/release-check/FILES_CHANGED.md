@@ -1,6 +1,39 @@
 # FILES_CHANGED.md — 変更・追加・削除ファイル一覧
 
-> 最終更新: Phase 10 — v1.0.0（2026-06-27）
+> 最終更新: Phase 11 — Gmail ReadOnly 本番接続（2026-06-27）
+
+---
+
+## Phase 11 変更ファイル
+
+### 新規作成 (3ファイル — docs)
+
+| ファイルパス | 役割 |
+|-------------|------|
+| `docs/GOOGLE_OAUTH_SETUP.md` | Google Cloud Console OAuth 設定手順（gmail.readonly のみ）|
+| `docs/release-check/PHASE11_GMAIL_PRODUCTION_CONNECT.md` | Gmail ReadOnly 本番接続 設計書 |
+| `docs/release-check/PRODUCTION_SECURITY_CHECK.md` | 本番接続セキュリティ確認書 |
+
+### 更新 (サービス層)
+
+| ファイルパス | 変更内容 |
+|-------------|---------|
+| `client/src/services/gmail/gmailFetcher.ts` | DEFAULT_QUERY を `newer_than:3d` → `newer_than:1d`（過去24時間）|
+| `client/src/services/gmail/gmailClient.ts` | `getConnectionStatus()` を実接続反映（connected/mode/itemCount/lastFetchAt）|
+| `client/src/services/gmail/types.ts` | `GmailConnectionStatus.connected` を boolean 化・`itemCount` 追加 |
+| `client/src/services/google/googleScopes.ts` | `PHASE11_SCOPES`（gmail.readonly のみ）追加 |
+| `client/src/services/google/googleAuth.ts` | OAuth スコープを `PHASE11_SCOPES` に変更 |
+| `client/.env.example` | `VITE_GOOGLE_SCOPES` を gmail.readonly のみに整理・Phase 11 ヘッダー |
+
+### 更新 (画面)
+
+| ファイルパス | 変更内容 |
+|-------------|---------|
+| `client/src/components/screens/Settings.tsx` | Gmail読み取りテストを本番/デモ反映・接続ボタン文言を「Gmail ReadOnly のみ」|
+| `client/src/components/screens/CockpitScreen.tsx` | Gmail 接続時に実データ自動切替（gmailSource）・本番Gmail接続バッジ |
+
+### 削除
+- なし
 
 ---
 

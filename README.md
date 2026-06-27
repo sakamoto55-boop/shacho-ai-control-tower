@@ -9,8 +9,16 @@
 > | ✅ **現在できること** | [docs/CURRENT_STATUS.md](docs/CURRENT_STATUS.md) |
 > | 🔧 **本番接続手順** | [docs/NEXT_SETUP_STEPS.md](docs/NEXT_SETUP_STEPS.md) |
 > | 📦 **納品物一覧** | [docs/DELIVERY_SUMMARY.md](docs/DELIVERY_SUMMARY.md) |
+> | 🔌 **Gmail本番接続手順** | [docs/GOOGLE_OAUTH_SETUP.md](docs/GOOGLE_OAUTH_SETUP.md) |
 
 > スマホ（Safari / Chrome）で上記URLを開くだけで使えます。アプリのインストールは不要です。
+
+> **🔔 Phase 11 — Gmail ReadOnly 本番接続を開始しました**
+> - ✅ **Gmail の実データ（読み取り専用）接続**に対応（要 Google OAuth 設定）
+> - ⏳ Calendar / Drive / Sheets / LINE WORKS は**まだ未接続**（デモのまま）
+> - ❌ 送信・返信・下書き・削除・既読化は**不可**（永久に実装しない）
+> - 本番運用には Google OAuth 設定が必要です → [docs/GOOGLE_OAUTH_SETUP.md](docs/GOOGLE_OAUTH_SETUP.md)
+> - 未設定の場合はデモデータで動作します（これまで通り）
 
 ---
 

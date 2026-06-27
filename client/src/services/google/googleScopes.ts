@@ -20,6 +20,10 @@ export type GoogleScope = (typeof GOOGLE_SCOPES)[keyof typeof GOOGLE_SCOPES]
 // Phase 5 で使用するスコープ（Gmail ReadOnly のみ）
 export const PHASE5_SCOPES: GoogleScope[] = [GOOGLE_SCOPES.GMAIL_READONLY]
 
+// Phase 11 本番接続スコープ（Gmail ReadOnly のみ）
+// Calendar / Drive / Sheets は本番接続しない。Gmail 読み取り専用のみを要求する。
+export const PHASE11_SCOPES: GoogleScope[] = [GOOGLE_SCOPES.GMAIL_READONLY]
+
 // Phase 6 で使用するスコープ（Gmail + Calendar ReadOnly）
 // 書き込みスコープは含まない
 export const PHASE6_SCOPES: GoogleScope[] = [

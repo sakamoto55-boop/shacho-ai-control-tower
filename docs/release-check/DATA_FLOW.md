@@ -1,6 +1,43 @@
 # DATA_FLOW.md — データの流れ
 
-> 最終更新: Phase 10 — v1.0.0（2026-06-27）
+> 最終更新: Phase 11 — Gmail ReadOnly 本番接続（2026-06-27）
+
+---
+
+## Phase 11 追加: Gmail 本番接続データフロー
+
+```
+─────────── Gmail 取得フロー（接続状態で分岐）───────────
+
+googleAuth.isConnected() / googleToken.hasToken()
+  │
+  ├── false（未接続）
+  │       └→ mockGmailMessages（デモGmailデータをそのままUI表示）
+  │
+  └── true（本番接続済み）
+          │
+          ├── gmailCache.get()（5分以内ならキャッシュ返却）
+          │
+          └── gmailFetcher.fetchMessages(accessToken)
+                  │ GET /gmail/v1/users/me/messages?q=is:unread newer_than:1d
+                  │ GET /gmail/v1/users/me/messages/{id}?format=full（並列最大10件）
+                  │ ← 読み取りのみ / 書き込みAPIなし
+                  ▼ GmailMessage[]（writeProtected: true）
+              gmailCache.set()
+
+─────────── UI 反映 ───────────
+
+GmailMessage[]
+  ├── mapToGmailDerivedTask() → GmailDerivedTask[]
+  └── createGmailSummary()    → GmailSummary
+      │
+      ▼
+  AIコックピット Inbox セクション
+    gmailSource = 'api' → 「本番Gmail接続」バッジ
+    gmailSource = 'demo' → 「デモGmail」バッジ
+
+  ※ Calendar / Drive / Sheets / LINE WORKS はデモのまま（変更なし）
+```
 
 ---
 

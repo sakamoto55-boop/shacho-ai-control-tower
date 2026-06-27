@@ -5,6 +5,44 @@
 
 ---
 
+## Phase 11 検収チェック（Gmail ReadOnly 本番接続）
+
+### ビルド・型
+- [ ] `cd client && npm run build` がゼロエラー
+- [ ] `npx tsc --noEmit` がゼロエラー
+
+### OAuth 設定（事前）
+- [ ] `docs/GOOGLE_OAUTH_SETUP.md` の手順で Client ID を取得した
+- [ ] `client/.env` に `VITE_GOOGLE_CLIENT_ID` を設定した
+- [ ] `VITE_GOOGLE_SCOPES` が `gmail.readonly` のみになっている
+- [ ] リダイレクトURIが Console と `.env` で一致している
+
+### 接続テスト（設定画面）
+- [ ] 「Googleアカウントで接続（Gmail ReadOnly のみ）」ボタンが表示される
+- [ ] 接続前チェックの「スコープ」が「gmail.readonly のみ（Phase 11）」と表示される
+- [ ] Google ログイン後、同意画面で gmail.readonly のみ要求される
+- [ ] 接続後「✓ 接続済み」が表示される
+- [ ] Gmail読み取りテストのバッジが「本番Gmail」に変わる
+- [ ] 「接続状態：本番接続済み」「データ元：Gmail API」「取得件数：N件」が表示される
+- [ ] 「📥 読み取りテスト」で実メールが取得される
+- [ ] 最終取得日時が実時刻で表示される
+
+### AIコックピット
+- [ ] 接続時、Gmailセクションのバッジが「本番Gmail接続」になる
+- [ ] フッターが「元データ：本番Gmail（gmail.readonly）…」になる
+- [ ] Calendar/Drive/Sheets/LINE WORKS はデモ表示のまま
+
+### 安全確認（コード）
+- [ ] `gmailFetcher.ts` に POST/PATCH/PUT/DELETE がない（GETのみ）
+- [ ] 書き込み関数 8種が存在しない（git grep 検出ゼロ）
+- [ ] `client/.env` がコミットされていない
+
+### 未接続時（デモ維持）
+- [ ] 未接続時はバッジが「デモGmail」のまま
+- [ ] 未接続時は mockGmail データが表示される
+
+---
+
 ## Phase 10 検収チェック（v1.0.0）
 
 ### TypeScript ビルド確認

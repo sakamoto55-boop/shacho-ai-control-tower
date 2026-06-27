@@ -302,7 +302,7 @@ export default function Settings({
           const rows = [
             { label: 'Client ID設定', ok: check.hasClientId, value: check.hasClientId ? (check.clientIdMasked ?? '設定済み') : '未設定' },
             { label: 'Redirect URI設定', ok: check.hasRedirectUri, value: check.hasRedirectUri ? check.redirectUri : '未設定' },
-            { label: 'スコープ', ok: true, value: 'gmail / calendar / drive / sheets .readonly' },
+            { label: 'スコープ', ok: true, value: 'gmail.readonly のみ（Phase 11）' },
             { label: '書き込みAPI', ok: true, value: '未実装' },
             { label: '本番接続準備', ok: check.isReadyToConnect, value: check.isReadyToConnect ? '完了' : '未完了' },
           ]
@@ -402,7 +402,7 @@ export default function Settings({
               fontWeight: 800,
             }}
           >
-            {gConnecting ? '⏳ Googleへ接続中...' : '🔐 Googleアカウントで接続（Gmail / Calendar / Drive / Sheets ReadOnly）'}
+            {gConnecting ? '⏳ Googleへ接続中...' : '🔐 Googleアカウントで接続（Gmail ReadOnly のみ）'}
           </button>
         )}
 
@@ -593,21 +593,35 @@ export default function Settings({
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--navy)' }}>Gmail読み取りテスト</div>
             <div style={{ fontSize: 10, color: '#3B82F6', fontWeight: 600 }}>
-              読み取り専用 · 書き込み禁止 · 外部未接続
+              {connectionStatus.connected
+                ? '読み取り専用 · 書き込み禁止 · 本番Gmail接続済み'
+                : '読み取り専用 · 書き込み禁止 · 外部未接続'}
             </div>
           </div>
-          <span style={{ background: '#DBEAFE', color: '#1D4ED8', borderRadius: 999, padding: '3px 8px', fontSize: 10, fontWeight: 800 }}>
-            デモGmail
+          <span style={{
+            background: connectionStatus.connected ? '#D1FAE5' : '#DBEAFE',
+            color: connectionStatus.connected ? '#065F46' : '#1D4ED8',
+            borderRadius: 999, padding: '3px 8px', fontSize: 10, fontWeight: 800,
+          }}>
+            {connectionStatus.connected ? '本番Gmail' : 'デモGmail'}
           </span>
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
           {[
-            { label: '接続状態', value: '未接続', alert: true },
+            { label: '接続状態', value: connectionStatus.connected ? '本番接続済み' : '未接続', alert: !connectionStatus.connected },
+            { label: 'モード', value: connectionStatus.mode === 'production' ? '本番Gmail接続' : 'デモモード', alert: false },
             { label: '権限', value: '読み取り専用', alert: false },
             { label: '書き込み', value: '禁止', alert: false },
-            { label: 'データ元', value: 'mockGmail', alert: false },
-            { label: '最終取得', value: '2026/06/27 08:15（仮）', alert: false },
+            { label: 'データ元', value: connectionStatus.connected ? 'Gmail API' : 'mockGmail', alert: false },
+            { label: '取得件数', value: connectionStatus.connected ? `${connectionStatus.itemCount}件` : '— (デモ)', alert: false },
+            {
+              label: '最終取得',
+              value: connectionStatus.lastFetchAt
+                ? connectionStatus.lastFetchAt.toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+                : (connectionStatus.connected ? '未取得' : '—（デモ）'),
+              alert: false,
+            },
           ].map((row) => (
             <div
               key={row.label}
@@ -630,12 +644,18 @@ export default function Settings({
 
         <div style={{ fontSize: 11, fontWeight: 700, color: '#1D4ED8', background: '#EFF6FF', borderRadius: 8, padding: '6px 10px', marginBottom: 10, lineHeight: 1.5 }}>
           取得対象：受信トレイ / 未読 / 重要そうなメール（過去24時間）
-          <br />現在の取得件数：{gmailSummary.totalCount}件 / 重要A：{gmailSummary.priorityACount}件 / 返信たたき台：{gmailSummary.replyDraftCount}件
+          <br />デモ集計：{gmailSummary.totalCount}件 / 重要A：{gmailSummary.priorityACount}件 / 返信たたき台：{gmailSummary.replyDraftCount}件
         </div>
 
-        <div style={{ fontSize: 10, color: '#92400E', background: '#FEF9C3', borderRadius: 8, padding: '6px 10px', marginBottom: 12 }}>
-          ⚠️ 本番Gmail未接続 · すべてデモデータ · 実際のメールは取得していません
-        </div>
+        {connectionStatus.connected ? (
+          <div style={{ fontSize: 10, color: '#065F46', background: '#D1FAE5', borderRadius: 8, padding: '6px 10px', marginBottom: 12 }}>
+            ✅ 本番Gmail接続済み · gmail.readonly · 読み取りテストで実メールを取得します · 送信/返信/削除は不可
+          </div>
+        ) : (
+          <div style={{ fontSize: 10, color: '#92400E', background: '#FEF9C3', borderRadius: 8, padding: '6px 10px', marginBottom: 12 }}>
+            ⚠️ 本番Gmail未接続 · すべてデモデータ · 実際のメールは取得していません
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button
@@ -658,7 +678,7 @@ export default function Settings({
         {gmailTestResult && (
           <div style={{ marginTop: 10, background: 'var(--bg)', borderRadius: 10, padding: '10px 12px' }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#065F46', marginBottom: 6 }}>
-              ✅ デモGmailから{gmailTestResult.length}件を読み取りました。書き込み処理は行っていません。
+              ✅ {connectionStatus.connected ? '本番Gmail' : 'デモGmail'}から{gmailTestResult.length}件を読み取りました。書き込み処理は行っていません。
             </div>
             {gmailTestResult.slice(0, 3).map((task) => (
               <div
@@ -680,7 +700,7 @@ export default function Settings({
               </div>
             ))}
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6 }}>
-              ※ デモデータ · 本番Gmail未接続 · 送信・返信・下書き保存なし
+              ※ {connectionStatus.connected ? '本番Gmail（gmail.readonly）' : 'デモデータ · 本番Gmail未接続'} · 送信・返信・下書き保存なし
             </div>
           </div>
         )}

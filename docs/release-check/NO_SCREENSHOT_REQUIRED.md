@@ -1,7 +1,41 @@
 # NO_SCREENSHOT_REQUIRED.md — スクリーンショット不要の検収フロー
 
 > このファイルは、スクリーンショットなしで変更点と安全性を確認できることを明記します。  
-> 最終更新: Phase 10 — v1.0.0（2026-06-27）
+> 最終更新: Phase 11 — Gmail ReadOnly 本番接続（2026-06-27）
+
+---
+
+## Phase 11 確認方法（Gmail ReadOnly 本番接続）
+
+### 秘密情報・安全確認（コマンド）
+```bash
+# .env がコミットされていない
+git ls-files | grep -E '\.env$'        # → 出力なし（.env.example のみ）
+
+# client/.env が無視される
+git -C client check-ignore .env        # → .env が返れば無視されている
+
+# 実APIキー混入チェック
+git grep -nE 'AIza[0-9A-Za-z_-]{20,}|GOCSPX-|ya29\.'   # → 検出なし
+
+# Gmail 書き込み関数が存在しない
+git grep -nE 'sendMessage|replyMessage|createDraft|deleteMessage|archiveMessage|markAsRead|modifyLabels|addStar' -- client/src/services/gmail/ client/src/services/google/   # → 検出なし
+
+# Gmail fetcher が GET のみ
+git grep -nE "method:\s*'(POST|PATCH|PUT|DELETE)'" -- client/src/services/gmail/   # → 検出なし
+```
+
+### スコープ確認（コード）
+```bash
+# OAuth が gmail.readonly のみを要求
+git grep -n "PHASE11_SCOPES" client/src/services/google/googleAuth.ts
+# googleScopes.ts: PHASE11_SCOPES = [GMAIL_READONLY]
+```
+
+### ビルド確認
+```bash
+cd client && npm run build   # → 0 エラー
+```
 
 ---
 

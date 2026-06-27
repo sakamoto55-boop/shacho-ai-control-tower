@@ -5,6 +5,24 @@
 
 ---
 
+## Phase 11 追加安全確認（Gmail ReadOnly 本番接続）
+
+| チェック項目 | 状態 |
+|------------|------|
+| 新規外部接続 | ✅ Google Gmail API（`gmail.readonly` のみ・本番）|
+| 要求スコープ | ✅ gmail.readonly のみ（calendar/drive/sheets/send/modify は要求しない）|
+| Gmail 書き込みAPI | ❌ なし（sendMessage/replyMessage/createDraft/deleteMessage/archiveMessage/markAsRead/modifyLabels/addStar すべて未実装）|
+| `gmailFetcher.ts` のHTTPメソッド | ✅ GET のみ |
+| POST の用途 | ✅ OAuth トークン交換・リフレッシュのみ（oauth2.googleapis.com/token）|
+| client_secret のフロント配置 | ❌ なし（SPA では使用しない）|
+| `.env` のコミット | ❌ なし（.gitignore で除外・public でも秘密情報なし）|
+| 取得データの用途 | ✅ 表示・AI判定のみ（外部書き込みなし）|
+| Calendar/Drive/Sheets/LINE WORKS | ✅ デモのまま（本番接続なし）|
+
+詳細は `PRODUCTION_SECURITY_CHECK.md` を参照。
+
+---
+
 ## Phase 10 追加安全確認
 
 | チェック項目 | 状態 |

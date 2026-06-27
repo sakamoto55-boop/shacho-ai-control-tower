@@ -10,11 +10,15 @@ import { googleStorage } from '../google/googleStorage'
 import type { GmailMessage, GmailDerivedTask, GmailConnectionStatus, GmailFetchRange } from './types'
 
 // 接続状態を返す（常に読み取り専用 / 書き込みなし）
+// Phase 11: トークンがあれば本番接続済み（connected: true）
 export function getConnectionStatus(): GmailConnectionStatus {
+  const hasToken = googleToken.hasToken()
+  const cached = hasToken ? gmailCache.get() : null
   return {
-    connected: false,
-    mode: googleToken.hasToken() ? 'production' : 'demo',
+    connected: hasToken,
+    mode: hasToken ? 'production' : 'demo',
     lastFetchAt: gmailCache.getLastFetchedAt(),
+    itemCount: cached?.length ?? 0,
     permission: '読み取り専用',
     writeEnabled: false,
     scope: 'https://www.googleapis.com/auth/gmail.readonly',
