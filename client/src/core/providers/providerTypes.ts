@@ -91,10 +91,24 @@ export interface UnifiedFileItem {
   providerType: 'file'
   name: string
   mimeType: string
-  modifiedAt: string // ISO 8601
+  fileType: string
+  webViewLink: string | null
+  createdAt: string   // ISO 8601
+  modifiedAt: string  // ISO 8601
+  ownerName: string | null
+  /** @deprecated use ownerName */
   owner: string | null
+  folderName: string | null
   category: string
+  relatedCompany: string | null
+  relatedPerson: string | null
+  relatedProject: string | null
+  importance: 'A' | 'B' | 'C'
   alertLevel: 'danger' | 'warning' | 'info' | null
+  riskFlag: boolean
+  suggestedAction: string | null
+  readOnly: true
+  writeEnabled: false
 }
 
 // ─── 統合経営指標（Sheets / freee / TKC） ────────────────────
