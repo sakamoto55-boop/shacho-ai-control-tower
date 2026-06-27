@@ -116,14 +116,71 @@ export interface UnifiedBusinessMetric {
   id: string
   source: string
   providerType: 'business-data'
-  category: '売上' | '粗利' | '資金繰り' | '請求' | '未回収' | '外注費' | 'その他'
-  label: string
+  metricKey: string
+  metricName: string
+  category: '売上' | '粗利' | '資金繰り' | '請求' | '未回収' | '外注費' | '事故' | '稼働率' | 'その他'
   value: number
   unit: string
   period: string
-  trend: 'up' | 'down' | 'neutral' | null
+  previousValue: number | null
+  changeAmount: number | null
+  changeRate: number | null
+  status: 'normal' | 'warning' | 'danger'
+  riskLevel: 'critical' | 'high' | 'medium' | 'low' | null
+  relatedCompany: string | null
+  relatedDepartment: string | null
+  relatedProject: string | null
+  suggestedAction: string | null
+  dataSourceName: string
+  lastUpdatedAt: string
   alertLevel: 'danger' | 'warning' | 'info' | null
   alertReason: string | null
+  label: string
+  trend: 'up' | 'down' | 'neutral' | null
+  readOnly: true
+  writeEnabled: false
+}
+
+// ─── 13週資金繰り週次データ ──────────────────────────────────
+export interface UnifiedCashflowWeek {
+  week: string
+  income: number
+  expense: number
+  balance: number
+  alert: boolean
+  alertLevel: 'danger' | 'warning' | null
+}
+
+// ─── 案件別粗利 ──────────────────────────────────────────────
+export interface UnifiedProjectProfit {
+  id: string
+  projectName: string
+  revenue: number
+  grossProfit: number
+  grossProfitRate: number
+  relatedCompany: string | null
+  relatedDepartment: string | null
+  alert: boolean
+}
+
+// ─── 部門別指標 ──────────────────────────────────────────────
+export interface UnifiedDepartmentMetric {
+  id: string
+  departmentName: string
+  revenue: number
+  profit: number
+  profitRate: number
+  headcount: number | null
+}
+
+// ─── 統合経営データセット ────────────────────────────────────
+export interface UnifiedBusinessDataset {
+  metrics: UnifiedBusinessMetric[]
+  cashflowWeeks: UnifiedCashflowWeek[]
+  projectProfits: UnifiedProjectProfit[]
+  departmentMetrics: UnifiedDepartmentMetric[]
+  source: 'mock' | 'cache' | 'api'
+  fetchedAt: string
 }
 
 // ─── 統合ワークフローアイテム（承認・下書き） ─────────────────
