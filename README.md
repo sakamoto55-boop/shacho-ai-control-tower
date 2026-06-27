@@ -402,8 +402,7 @@ Phase 6 スコープ（PHASE6_SCOPES）:
 
 ### 次フェーズ
 
-**Phase 8**: Google Sheets ReadOnly / BusinessData Provider 接続  
-スコープ: `spreadsheets.readonly`（現時点では未取得）
+**Phase 9**: LINE WORKS / Notification Provider 接続
 
 ---
 
@@ -535,8 +534,7 @@ Phase 7 スコープ（PHASE7_SCOPES）:
 
 ### 次フェーズ
 
-**Phase 8**: Google Sheets ReadOnly / BusinessData Provider 接続  
-スコープ: `spreadsheets.readonly`（現時点では未取得）
+**Phase 9**: LINE WORKS / Notification Provider 接続
 
 ---
 
