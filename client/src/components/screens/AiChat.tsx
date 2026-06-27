@@ -1,8 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import type { AiMode, ChatMessage } from '../../types'
 import type { Screen } from '../../types'
 import { aiModes, initialChatMessages, mockAiResponses } from '../../data/mockData'
 import DemoBanner from '../DemoBanner'
+import { runOrchestrator } from '../../core/ai-engine/aiOrchestrator'
+import type { OrchestratorResult } from '../../core/ai-engine/aiEngineTypes'
 import { mockCalendarEvents } from '../../services/calendar/mockCalendar'
 import { mapToCalendarDerivedEvent } from '../../services/calendar/calendarMapper'
 import { createCalendarSummary } from '../../services/calendar/calendarAnalyzer'
@@ -19,6 +21,78 @@ import { createNotificationSummary } from '../../services/lineworks/lineworksAna
 interface Props {
   onVoice: () => void
   onNavigate: (screen: Screen) => void
+}
+
+const INTEGRATED_SHORTCUTS = [
+  '今日30分でやることは？',
+  '会社で今一番危ないことは？',
+  'メール・予定・資料・数字・社内連絡をまとめて',
+  '社長承認が必要なものは？',
+  '今日の優先順位を理由付きで出して',
+  '銀行対応だけまとめて',
+  '未請求対応だけまとめて',
+  '事故対応だけまとめて',
+]
+
+function getIntegratedShortcutResponse(query: string, result: OrchestratorResult): string | null {
+  if (query.includes('30分') || query.includes('今すぐやること')) {
+    const actions = result.todayPlan.immediateActions
+    if (actions.length === 0) return '今すぐ対応が必要なアクションは検出されていません。'
+    const lines = actions.map((a, i) =>
+      `${i + 1}. 【${a.urgency === 'critical' ? '緊急' : '重要'}】${a.title}\n   → ${a.suggestedAction}（目安：${a.timeEstimate}）`
+    ).join('\n\n')
+    return `今日30分以内にやること ${actions.length}件です。\n\n${lines}\n\n全Provider横断分析（Phase 10 AI Engine） · 読み取り専用 · 外部実行なし`
+  }
+
+  if (query.includes('一番危ない') || (query.includes('危') && query.includes('こと'))) {
+    const topRisk = result.risks.find((r) => r.severity === 'critical') ?? result.risks[0]
+    if (!topRisk) return '現時点で重大なリスクは検出されていません。'
+    const health = result.healthScore
+    return `会社の最大リスク: 【${topRisk.severity}】${topRisk.title}\n\n${topRisk.description}\n\n会社健康度: ${health.total}点（グレード${health.grade}）\n要注意: ${health.topRisks.slice(0, 2).join('、') || 'なし'}\n\n全Provider横断リスク分析（Phase 10 AI Engine） · 読み取り専用`
+  }
+
+  if (query.includes('まとめて') && (query.includes('メール') || query.includes('予定') || query.includes('資料'))) {
+    const b = result.briefing
+    return `${b.greeting}、社長。\n\n${b.headline}\n\n${b.summaryText}\n\n本日フォーカス: ${b.todayFocusItems.join(' / ')}\n\n全Provider統合ブリーフィング（Phase 10 AI Engine） · 読み取り専用 · 外部実行なし`
+  }
+
+  if (query.includes('承認') && query.includes('必要')) {
+    const queue = result.approvalQueue
+    if (queue.length === 0) return '現時点で社長承認が必要なアクションはありません。'
+    const lines = queue.map((a, i) =>
+      `${i + 1}. 【${a.actionType}】${a.title}\n   対象：${a.targetName}\n   ⚠️ 外部への送信は行いません`
+    ).join('\n\n')
+    return `社長承認待ちアクション ${queue.length}件です。\n\n${lines}\n\n⚠️ 承認キューはUIと型のみです。外部実行はPhase 11以降。\n全Provider横断（Phase 10 AI Engine） · 外部送信禁止`
+  }
+
+  if (query.includes('優先順位') && query.includes('理由')) {
+    const decisions = result.todayPlan.decisions.slice(0, 5)
+    if (decisions.length === 0) return '優先判断対象が見つかりません。'
+    const lines = decisions.map((d) =>
+      `${d.rank}位: 【${d.importance}】${d.title}\n   理由: ${d.reason}\n   → ${d.suggestedAction}（${d.timeEstimate}）`
+    ).join('\n\n')
+    return `今日の優先順位 TOP${decisions.length}（理由付き）。\n\n${lines}\n\n全Provider横断分析（Phase 10 AI Engine） · 読み取り専用`
+  }
+
+  if (query.includes('銀行') && query.includes('まとめ')) {
+    const bankCtx = result.crossContexts.find((c) => c.theme === '銀行対応')
+    if (!bankCtx) return '現時点で銀行対応の横断コンテキストは検出されていません。'
+    return `銀行対応サマリー\n\n${bankCtx.title}\n${bankCtx.summary}\n\n推奨アクション: ${bankCtx.suggestedAction}\n\n証拠ソース: ${bankCtx.evidenceSources.map((e) => e.title).join('、')}\n\n全Provider横断（Phase 10 AI Engine） · 読み取り専用`
+  }
+
+  if (query.includes('未請求') && query.includes('まとめ')) {
+    const unbilledCtx = result.crossContexts.find((c) => c.theme === '未請求・未回収')
+    if (!unbilledCtx) return '現時点で未請求・未回収の横断コンテキストは検出されていません。'
+    return `未請求・未回収サマリー\n\n${unbilledCtx.title}\n${unbilledCtx.summary}\n\n推奨アクション: ${unbilledCtx.suggestedAction}\n\n全Provider横断（Phase 10 AI Engine） · 読み取り専用`
+  }
+
+  if (query.includes('事故') && query.includes('まとめ')) {
+    const accidentCtx = result.crossContexts.find((c) => c.theme === '事故対応')
+    if (!accidentCtx) return '現時点で事故対応の横断コンテキストは検出されていません。'
+    return `事故対応サマリー\n\n${accidentCtx.title}\n${accidentCtx.summary}\n\n推奨アクション: ${accidentCtx.suggestedAction}\n\n全Provider横断（Phase 10 AI Engine） · 読み取り専用`
+  }
+
+  return null
 }
 
 const GMAIL_SHORTCUTS = [
@@ -253,7 +327,13 @@ function getLineWorksShortcutResponse(input: string): string | null {
   return null
 }
 
-function getMockResponse(mode: AiMode, input: string): string {
+function getMockResponse(mode: AiMode, input: string, orchestratorData?: OrchestratorResult): string {
+  // 統合AI ショートカット回答を最優先（Phase 10）
+  if (orchestratorData) {
+    const integratedResponse = getIntegratedShortcutResponse(input, orchestratorData)
+    if (integratedResponse) return integratedResponse
+  }
+
   // LINE WORKS ショートカット回答を最優先
   const lwResponse = getLineWorksShortcutResponse(input)
   if (lwResponse) return lwResponse
@@ -286,6 +366,7 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
   const [isTyping, setIsTyping] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const tabBarRef = useRef<HTMLDivElement>(null)
+  const orchestratorResult = useMemo(() => runOrchestrator(), [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -307,7 +388,7 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: getMockResponse(activeMode, text),
+        content: getMockResponse(activeMode, text, orchestratorResult),
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, aiMsg])
@@ -389,6 +470,41 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
             </button>
           )
         })}
+      </div>
+
+      {/* ── 統合AI ショートカット（Phase 10）── */}
+      <div
+        style={{
+          flexShrink: 0,
+          background: '#EEF2FF',
+          borderBottom: '1px solid #C7D2FE',
+          padding: '6px 14px',
+        }}
+      >
+        <div style={{ fontSize: 10, fontWeight: 800, color: '#4338CA', marginBottom: 4 }}>
+          🤖 統合AI · 全Provider横断ショートカット
+        </div>
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+          {INTEGRATED_SHORTCUTS.map((s) => (
+            <button
+              key={s}
+              onClick={() => sendMessage(s)}
+              style={{
+                flexShrink: 0,
+                background: '#fff',
+                border: '1.5px solid #C7D2FE',
+                borderRadius: 999,
+                padding: '5px 12px',
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#4338CA',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── Gmailショートカット ── */}

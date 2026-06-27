@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   dashboardMetrics,
   cashflowWeeks,
@@ -9,6 +9,7 @@ import type { DashboardMetric, CashflowWeek, ProjectMetric } from '../../types'
 import { mockBusinessDataset } from '../../services/sheets/mockSheets'
 import { detectBusinessRisks } from '../../services/sheets/sheetsAnalyzer'
 import DemoBanner from '../DemoBanner'
+import { runOrchestrator } from '../../core/ai-engine/aiOrchestrator'
 
 const TODAY = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' })
 const MAX_BALANCE = Math.max(...cashflowWeeks.map((w) => w.balance))
@@ -17,13 +18,90 @@ const businessRisks = detectBusinessRisks(mockBusinessDataset.metrics)
 export default function Dashboard() {
   const [cfExpanded, setCfExpanded] = useState(true)
   const [projExpanded, setProjExpanded] = useState(true)
+  const orchestratorResult = useMemo(() => runOrchestrator(), [])
 
   const normal = dashboardMetrics.filter((m) => !m.alert)
   const alerts = dashboardMetrics.filter((m) => m.alert)
+  const health = orchestratorResult.healthScore
+
+  const gradeColor = health.grade === 'A' ? '#065F46' : health.grade === 'B' ? '#1D4ED8' : health.grade === 'C' ? '#92400E' : '#991B1B'
+  const gradeBg = health.grade === 'A' ? '#D1FAE5' : health.grade === 'B' ? '#DBEAFE' : health.grade === 'C' ? '#FEF3C7' : '#FEE2E2'
+  const gradeBorder = health.grade === 'A' ? '#86EFAC' : health.grade === 'B' ? '#93C5FD' : health.grade === 'C' ? '#FDE68A' : '#FCA5A5'
+
+  const categoryLabels: Record<string, string> = {
+    cashflow: '現金残高', grossProfit: '粗利率', unbilled: '未請求', uncollected: '未回収',
+    accident: '事故対応', personnel: '人員', sales: '売上', internalSOS: 'SOS通知', scheduleLoad: '予定負荷',
+  }
 
   return (
     <div className="screen-content">
       <DemoBanner />
+
+      {/* ── 会社健康度スコア（Phase 10）── */}
+      <div
+        style={{
+          background: '#fff',
+          border: `1.5px solid ${gradeBorder}`,
+          borderRadius: 'var(--radius)',
+          padding: '14px 16px',
+          marginBottom: 14,
+          boxShadow: 'var(--shadow)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#4338CA', marginBottom: 2 }}>
+              🤖 AI社長室 会社健康度スコア
+            </div>
+            <div style={{ fontSize: 10, color: '#6366F1', fontWeight: 600 }}>Phase 10 AI Engine · 全Provider横断 · 読み取り専用</div>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ fontSize: 28, fontWeight: 900, color: gradeColor }}>{health.total}</div>
+            <div
+              style={{
+                background: gradeBg,
+                color: gradeColor,
+                borderRadius: 8,
+                padding: '2px 10px',
+                fontSize: 13,
+                fontWeight: 900,
+                display: 'inline-block',
+              }}
+            >
+              グレード {health.grade}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 10 }}>
+          {(Object.entries(health.breakdown) as [string, { score: number; status: 'good' | 'warning' | 'danger'; comment: string }][]).map(([key, cat]) => (
+            <div
+              key={key}
+              style={{
+                background: cat.status === 'danger' ? '#FEF2F2' : cat.status === 'warning' ? '#FFFBEB' : '#F0FDF4',
+                borderRadius: 8,
+                padding: '6px 8px',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 2 }}>{categoryLabels[key] ?? key}</div>
+              <div style={{ fontSize: 14, fontWeight: 900, color: cat.status === 'danger' ? '#991B1B' : cat.status === 'warning' ? '#92400E' : '#065F46' }}>
+                {cat.score}
+              </div>
+              <div style={{ fontSize: 9, color: cat.status === 'danger' ? '#EF4444' : cat.status === 'warning' ? '#F59E0B' : '#10B981', fontWeight: 700 }}>
+                {cat.status === 'danger' ? '🔴' : cat.status === 'warning' ? '🟡' : '🟢'}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {health.topRisks.length > 0 && (
+          <div style={{ background: '#FEF2F2', borderRadius: 8, padding: '6px 10px', fontSize: 11, color: '#991B1B', fontWeight: 600 }}>
+            ⚠️ 要注意: {health.topRisks.slice(0, 2).join(' · ')}
+          </div>
+        )}
+      </div>
+
       {/* ── 月次サマリー ── */}
       <div
         style={{

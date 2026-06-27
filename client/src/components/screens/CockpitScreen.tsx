@@ -4,7 +4,6 @@ import {
   companyHealthScore,
   priorityActions,
   timelinePeriods,
-  aiJudgement,
   searchIndex,
 } from '../../data/mockData'
 import { mockGmailMessages } from '../../services/gmail/mockGmail'
@@ -25,6 +24,8 @@ import { mapLineWorksToUnifiedNotification } from '../../services/lineworks/line
 import { createNotificationSummary } from '../../services/lineworks/lineworksAnalyzer'
 import type { UnifiedScheduleItem, UnifiedFileItem } from '../../core/providers/providerTypes'
 import DemoBanner from '../DemoBanner'
+import { runOrchestrator } from '../../core/ai-engine/aiOrchestrator'
+import type { ActionDraft, DecisionItem } from '../../core/ai-engine/aiEngineTypes'
 
 // AI Engine: Schedule Provider (Phase 6) + File Provider (Phase 7) + BusinessData Provider (Phase 8) + Inbox Provider 横断参照
 
@@ -99,6 +100,14 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
   const lwSummary = useMemo(() => createNotificationSummary(lwNotifications), [lwNotifications])
   const lwCritical = lwNotifications.filter((n) => n.urgency === 'critical')
 
+  // AI Orchestrator（Phase 10）— 全Provider統合
+  const orchestratorResult = useMemo(() => runOrchestrator(), [])
+  const [approvalStatuses, setApprovalStatuses] = useState<Record<string, string>>({})
+
+  function setDraftStatus(id: string, status: string) {
+    setApprovalStatuses((prev) => ({ ...prev, [id]: status }))
+  }
+
   useEffect(() => {
     calendarClient.fetchEvents().then((result) => {
       if (result.source !== 'mock') {
@@ -161,7 +170,72 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
     <div className="screen-content">
       <DemoBanner />
 
-      {/* ── AI判断一言 ── */}
+      {/* ── 今日30分以内にやること（Phase 10）── */}
+      {orchestratorResult.todayPlan.immediateActions.length > 0 && (
+        <div
+          style={{
+            background: '#ECFDF5',
+            border: '2px solid #6EE7B7',
+            borderRadius: 16,
+            padding: '14px 16px',
+            marginBottom: 14,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 18 }}>⚡</span>
+            <span style={{ fontSize: 14, fontWeight: 900, color: '#065F46' }}>
+              今日30分以内にやること
+            </span>
+            <span style={{ background: '#D1FAE5', color: '#065F46', borderRadius: 999, padding: '2px 8px', fontSize: 11, fontWeight: 800, marginLeft: 'auto' }}>
+              {orchestratorResult.todayPlan.immediateActions.length}件
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {orchestratorResult.todayPlan.immediateActions.map((action, i) => (
+              <div
+                key={action.id}
+                style={{
+                  background: action.urgency === 'critical' ? '#FFF8F8' : '#fff',
+                  borderRadius: 12,
+                  padding: '12px 14px',
+                  border: action.urgency === 'critical' ? '1.5px solid #FCA5A5' : '1px solid #A7F3D0',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <span style={{
+                    background: '#065F46', color: '#fff',
+                    borderRadius: '50%', width: 22, height: 22,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, fontWeight: 900, flexShrink: 0,
+                  }}>
+                    {i + 1}
+                  </span>
+                  <span style={{ background: action.urgency === 'critical' ? '#FEE2E2' : '#D1FAE5', color: action.urgency === 'critical' ? '#991B1B' : '#065F46', borderRadius: 6, padding: '1px 7px', fontSize: 10, fontWeight: 800 }}>
+                    {action.urgency === 'critical' ? '🚨 緊急' : '⚡ 急務'}
+                  </span>
+                  <span style={{ fontSize: 10, color: '#059669', fontWeight: 700, marginLeft: 'auto' }}>
+                    {action.timeEstimate}
+                  </span>
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#065F46', marginBottom: 3 }}>
+                  {action.title}
+                </div>
+                <div style={{ fontSize: 11, color: '#374151', lineHeight: 1.5, marginBottom: 2 }}>
+                  {action.suggestedAction}
+                </div>
+                <div style={{ fontSize: 10, color: '#6B7280' }}>
+                  📌 {action.reason.slice(0, 60)}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: '#059669', marginTop: 8, fontWeight: 600 }}>
+            AI統合判断 · 全Provider横断 · 読み取り専用 · 外部実行なし
+          </div>
+        </div>
+      )}
+
+      {/* ── AI判断一言（Phase 10: 統合ブリーフィング）── */}
       <div
         style={{
           background: 'linear-gradient(135deg, #0f2647 0%, #1B3D6F 60%, #2d5a9e 100%)',
@@ -181,13 +255,16 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
           }}
         />
         <div style={{ fontSize: 11, opacity: 0.65, marginBottom: 6 }}>
-          🤖 AIからの一言 — {aiJudgement.generatedAt}
+          🤖 AIからの一言 — {orchestratorResult.briefing.greeting} · {orchestratorResult.briefing.generatedAt.slice(0, 10)}
         </div>
-        <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.6, marginBottom: 10 }}>
-          {aiJudgement.message}
+        <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.6, marginBottom: 6 }}>
+          {orchestratorResult.briefing.headline}
+        </div>
+        <div style={{ fontSize: 11, opacity: 0.8, lineHeight: 1.5, marginBottom: 10 }}>
+          {orchestratorResult.briefing.headlineReason}
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {aiJudgement.focusItems.map((item, i) => (
+          {orchestratorResult.briefing.todayFocusItems.map((item, i) => (
             <span
               key={i}
               style={{
@@ -331,10 +408,13 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
         </div>
       )}
 
-      {/* ── 今日の優先順位 TOP5 ── */}
-      <div className="section-label">🎯 今日の優先順位 TOP 5</div>
+      {/* ── 今日の優先順位 TOP5（Phase 10: AI統合版）── */}
+      <div className="section-label">🎯 今日の優先順位 TOP 5（AI統合判断）</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
-        {priorityActions.map((action) => (
+        {orchestratorResult.todayPlan.decisions.slice(0, 5).map((decision) => (
+          <DecisionCard key={decision.id} decision={decision} />
+        ))}
+        {orchestratorResult.todayPlan.decisions.length === 0 && priorityActions.map((action) => (
           <PriorityActionCard
             key={action.id}
             action={action}
@@ -1018,11 +1098,60 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
             fontSize: 12,
             color: 'var(--navy)',
             lineHeight: 1.6,
-            marginBottom: 20,
+            marginBottom: 14,
           }}
         >
           💡 「加藤」「銀行」「未請求」「事故」「お結び」「車両」などで検索できます。
           Gmail・LINE WORKS連携後はリアルタイムデータが表示されます。
+        </div>
+      )}
+
+      {/* ── 社長承認待ちアクション（Phase 10）── */}
+      {orchestratorResult.approvalQueue.length > 0 && (
+        <div
+          style={{
+            background: '#FFFBEB',
+            border: '2px solid #FDE68A',
+            borderRadius: 16,
+            padding: '14px 16px',
+            marginBottom: 20,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 18 }}>📋</span>
+            <span style={{ fontSize: 14, fontWeight: 900, color: '#92400E' }}>
+              社長承認待ちアクション
+            </span>
+            <span style={{ background: '#FEF3C7', color: '#92400E', borderRadius: 999, padding: '2px 8px', fontSize: 11, fontWeight: 800, marginLeft: 'auto' }}>
+              {orchestratorResult.approvalQueue.length}件
+            </span>
+          </div>
+          <div
+            style={{
+              background: '#FEF3C7',
+              borderRadius: 8,
+              padding: '8px 12px',
+              fontSize: 11,
+              color: '#92400E',
+              fontWeight: 700,
+              marginBottom: 10,
+            }}
+          >
+            ⚠️ 以下は下書きのみです。外部送信・保存は行われていません。承認後も実行はPhase 11以降です。
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {orchestratorResult.approvalQueue.map((draft) => (
+              <ApprovalDraftCard
+                key={draft.id}
+                draft={draft}
+                status={approvalStatuses[draft.id] ?? 'pending'}
+                onStatusChange={(s) => setDraftStatus(draft.id, s)}
+              />
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: '#B45309', marginTop: 8, fontWeight: 600 }}>
+            社長承認フロー · 外部送信なし · 保存なし · Phase 11以降で実行設計
+          </div>
         </div>
       )}
 
@@ -1033,6 +1162,177 @@ export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
           onClose={() => setActiveSuggestion(null)}
         />
       )}
+    </div>
+  )
+}
+
+// ── Phase 10: 統合決断カード ──────────────────────────────
+function DecisionCard({ decision }: { decision: DecisionItem }) {
+  const [expanded, setExpanded] = useState(false)
+  const urgencyColor = decision.urgency === 'critical' ? '#EF4444' : decision.urgency === 'high' ? '#F59E0B' : '#3B82F6'
+  const urgencyBg = decision.urgency === 'critical' ? '#FEE2E2' : decision.urgency === 'high' ? '#FEF3C7' : '#EFF6FF'
+  const urgencyLabel = decision.urgency === 'critical' ? '🚨 緊急' : decision.urgency === 'high' ? '⚠️ 重要' : '📋 通常'
+
+  return (
+    <div
+      style={{
+        background: '#fff',
+        borderRadius: 16,
+        boxShadow: 'var(--shadow)',
+        overflow: 'hidden',
+        border: decision.urgency === 'critical' ? '1.5px solid #FCA5A5' : '1.5px solid transparent',
+      }}
+    >
+      <button
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          width: '100%',
+          padding: '14px 16px',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 12,
+          textAlign: 'left',
+          background: decision.urgency === 'critical' ? '#FFF8F8' : '#fff',
+        }}
+      >
+        <div style={{
+          width: 28, height: 28, borderRadius: '50%',
+          background: decision.rank === 1 ? '#EF4444' : decision.rank === 2 ? '#F59E0B' : 'var(--navy)',
+          color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 13, fontWeight: 900, flexShrink: 0, marginTop: 1,
+        }}>
+          {decision.rank}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+            <span style={{ background: urgencyBg, color: urgencyColor, borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 800 }}>
+              {urgencyLabel}
+            </span>
+            <span style={{ background: '#F1F5F9', color: 'var(--text-secondary)', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+              {decision.category}
+            </span>
+            {decision.isImmediate && (
+              <span style={{ background: '#ECFDF5', color: '#065F46', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+                ⚡ 30分以内
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.4, marginBottom: 3 }}>
+            {decision.title}
+          </div>
+          <div style={{ fontSize: 11, color: urgencyColor, fontWeight: 700 }}>
+            {decision.timeEstimate}
+          </div>
+        </div>
+        <span style={{ color: 'var(--text-muted)', fontSize: 12, flexShrink: 0, marginTop: 6 }}>
+          {expanded ? '▲' : '▼'}
+        </span>
+      </button>
+      {expanded && (
+        <div style={{ borderTop: '1px solid var(--border)', padding: '14px 16px' }}>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>📌 なぜ優先すべきか</div>
+            <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.6, background: 'var(--bg)', borderRadius: 10, padding: '10px 12px' }}>
+              {decision.reason}
+            </div>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>✅ 推奨アクション</div>
+            <div style={{ fontSize: 12, color: 'var(--navy)', fontWeight: 600, lineHeight: 1.5, background: 'var(--blue-light)', borderRadius: 10, padding: '10px 12px' }}>
+              {decision.suggestedAction}
+            </div>
+          </div>
+          {decision.evidenceSources.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>🔗 根拠データ</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {decision.evidenceSources.slice(0, 3).map((src) => (
+                  <div key={src.id} style={{ background: '#F8FAFC', borderRadius: 8, padding: '6px 10px', fontSize: 11, color: '#374151', display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span style={{ background: '#E2E8F0', color: '#475569', borderRadius: 4, padding: '1px 5px', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{src.type}</span>
+                    <span style={{ fontWeight: 600 }}>{src.title}</span>
+                    {src.snippet && <span style={{ color: '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>— {src.snippet}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Phase 10: 社長承認待ちカード ─────────────────────────
+function ApprovalDraftCard({
+  draft,
+  status,
+  onStatusChange,
+}: {
+  draft: ActionDraft
+  status: string
+  onStatusChange: (s: string) => void
+}) {
+  const [showDraft, setShowDraft] = useState(false)
+  const statusConfig: Record<string, { bg: string; color: string; label: string }> = {
+    pending: { bg: '#FEF3C7', color: '#92400E', label: '未承認' },
+    approved: { bg: '#D1FAE5', color: '#065F46', label: '承認予定' },
+    rejected: { bg: '#FEE2E2', color: '#991B1B', label: '差し戻し' },
+    deferred: { bg: '#E0E7FF', color: '#3730A3', label: '保留' },
+  }
+  const cfg = statusConfig[status] ?? statusConfig.pending
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #FDE68A', overflow: 'hidden' }}>
+      <div style={{ padding: '12px 14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          <span style={{ background: '#FEF3C7', color: '#92400E', borderRadius: 6, padding: '1px 7px', fontSize: 10, fontWeight: 800 }}>
+            {draft.actionType === 'reply' ? '返信下書き' : draft.actionType === 'confirm' ? '確認依頼' : draft.actionType === 'report' ? '報告連絡' : draft.actionType}
+          </span>
+          <span style={{ background: cfg.bg, color: cfg.color, borderRadius: 6, padding: '1px 7px', fontSize: 10, fontWeight: 800, marginLeft: 'auto' }}>
+            {cfg.label}
+          </span>
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 800, color: '#1F2937', marginBottom: 3 }}>
+          {draft.title}
+        </div>
+        <div style={{ fontSize: 11, color: '#6B7280', marginBottom: 8 }}>
+          対象: {draft.targetName} · {draft.targetContext.slice(0, 40)}
+        </div>
+        <div style={{ fontSize: 11, color: '#92400E', lineHeight: 1.5, marginBottom: 8 }}>
+          📌 {draft.reason}
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setShowDraft(!showDraft)}
+            style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: '#F3F4F6', color: '#374151' }}
+          >
+            {showDraft ? '▲ 閉じる' : '👁 内容を見る'}
+          </button>
+          <button
+            onClick={() => onStatusChange('approved')}
+            style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: status === 'approved' ? '#D1FAE5' : '#F3F4F6', color: status === 'approved' ? '#065F46' : '#374151' }}
+          >
+            ✓ 承認予定
+          </button>
+          <button
+            onClick={() => onStatusChange('rejected')}
+            style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: status === 'rejected' ? '#FEE2E2' : '#F3F4F6', color: status === 'rejected' ? '#991B1B' : '#374151' }}
+          >
+            ✕ 差し戻し
+          </button>
+          <button
+            onClick={() => onStatusChange('deferred')}
+            style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: status === 'deferred' ? '#E0E7FF' : '#F3F4F6', color: status === 'deferred' ? '#3730A3' : '#374151' }}
+          >
+            ⏸ 保留
+          </button>
+        </div>
+        {showDraft && (
+          <div style={{ marginTop: 10, background: '#FAFBFC', borderRadius: 8, padding: '10px 12px', fontSize: 11, color: '#374151', lineHeight: 1.8, whiteSpace: 'pre-wrap', border: '1px solid #E2E8F0' }}>
+            {draft.draftText}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -13,6 +13,7 @@ import { createBusinessSummary, detectBusinessRisks } from '../../services/sheet
 import { mockLineWorksNotifications } from '../../services/lineworks/mockLineworks'
 import { mapLineWorksToUnifiedNotification } from '../../services/lineworks/lineworksMapper'
 import { createNotificationSummary } from '../../services/lineworks/lineworksAnalyzer'
+import { runOrchestrator } from '../../core/ai-engine/aiOrchestrator'
 
 interface Props {
   onNavigate: (screen: Screen) => void
@@ -25,6 +26,7 @@ const alertMetrics = dashboardMetrics.filter((m) => m.alert).length
 
 export default function Home({ onNavigate, onVoice }: Props) {
   const [briefingExpanded, setBriefingExpanded] = useState(true)
+  const orchestratorResult = useMemo(() => runOrchestrator(), [])
   const gmailSummary = useMemo(() => createGmailSummary(mockGmailMessages), [])
   const calendarSummary = useMemo(() => createCalendarSummary(mockCalendarEvents), [])
   const nextEvent = mockCalendarEvents.find((e) => e.status !== 'cancelled' && e.start.dateTime)
@@ -401,13 +403,23 @@ export default function Home({ onNavigate, onVoice }: Props) {
           }}
         />
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, opacity: 0.65, marginBottom: 3 }}>
-              {todayBriefing.date} — 朝ブリーフィング
+              {todayBriefing.date} — AI統合ブリーフィング（Phase 10）
             </div>
-            <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.4, whiteSpace: 'pre-line' }}>
-              {todayBriefing.greeting}
+            <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.4, whiteSpace: 'pre-line', marginBottom: 4 }}>
+              {orchestratorResult.briefing.greeting}、社長
             </div>
+            <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.5, opacity: 0.95 }}>
+              {orchestratorResult.briefing.headline}
+            </div>
+            {orchestratorResult.todayPlan.immediateActions.length > 0 && (
+              <div style={{ marginTop: 6 }}>
+                <span style={{ background: 'rgba(16,185,129,0.7)', color: '#fff', borderRadius: 999, padding: '2px 10px', fontSize: 11, fontWeight: 800 }}>
+                  ⚡ 今すぐやること {orchestratorResult.todayPlan.immediateActions.length}件
+                </span>
+              </div>
+            )}
           </div>
           <button
             onClick={() => setBriefingExpanded(!briefingExpanded)}
@@ -431,35 +443,38 @@ export default function Home({ onNavigate, onVoice }: Props) {
 
         {briefingExpanded && (
           <>
-            {/* 変化リスト */}
+            {/* AI統合サマリー（Phase 10）*/}
             <div style={{ marginBottom: 12 }}>
-              {todayBriefing.changes.map((c, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '7px 10px',
-                    borderRadius: 10,
-                    background:
-                      c.type === 'danger'
+              {orchestratorResult.briefing.summaryText.split('\n').filter(Boolean).map((line, i) => {
+                const isDanger = line.includes('🚨') || line.includes('🔴')
+                const isWarning = line.includes('⚠️') || line.includes('📊')
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 8,
+                      padding: '7px 10px',
+                      borderRadius: 10,
+                      background: isDanger
                         ? 'rgba(239,68,68,0.25)'
-                        : c.type === 'warning'
+                        : isWarning
                           ? 'rgba(245,158,11,0.25)'
                           : 'rgba(255,255,255,0.12)',
-                    marginBottom: 5,
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}
-                >
-                  <span>{c.icon}</span>
-                  <span>{c.text}</span>
-                </div>
-              ))}
+                      marginBottom: 5,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {line}
+                  </div>
+                )
+              })}
             </div>
 
-            {/* 今日最初にやること */}
+            {/* 今日フォーカス */}
             <div
               style={{
                 background: 'rgba(255,255,255,0.1)',
@@ -468,17 +483,24 @@ export default function Home({ onNavigate, onVoice }: Props) {
               }}
             >
               <div style={{ fontSize: 11, opacity: 0.75, marginBottom: 6, fontWeight: 700 }}>
-                今日最初にやること
+                今日のフォーカス
               </div>
-              {todayBriefing.topActions.map((a, i) => (
-                <div
-                  key={i}
-                  style={{ fontSize: 13, opacity: 0.92, padding: '3px 0', display: 'flex', gap: 6 }}
-                >
-                  <span style={{ opacity: 0.6 }}>{i + 1}.</span>
-                  <span>{a}</span>
-                </div>
-              ))}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {orchestratorResult.briefing.todayFocusItems.map((item, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      background: 'rgba(255,255,255,0.2)',
+                      borderRadius: 999,
+                      padding: '3px 10px',
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
             </div>
 
             {/* AIコックピットへ */}

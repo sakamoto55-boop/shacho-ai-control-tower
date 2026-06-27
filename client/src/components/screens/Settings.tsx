@@ -30,9 +30,10 @@ const INTEGRATION_PHASES = [
   { phase: 3, label: 'Google Drive検索', status: '実装済' },
   { phase: 4, label: 'Googleスプレッドシート読み取り', status: '実装済' },
   { phase: 5, label: 'LINE WORKS通知', status: '実装済' },
-  { phase: 6, label: 'Gmail下書き作成', status: '計画中' },
-  { phase: 7, label: 'Google Sheets保存', status: '計画中' },
-  { phase: 8, label: '各種書き込み処理', status: '将来' },
+  { phase: 10, label: 'AI Engine統合 · 全Provider横断 · 社長承認フロー', status: '実装済' },
+  { phase: 11, label: 'Gmail下書き作成', status: '計画中' },
+  { phase: 12, label: 'Google Sheets保存', status: '計画中' },
+  { phase: 13, label: '各種書き込み処理', status: '将来' },
 ]
 
 export default function Settings({
@@ -474,7 +475,7 @@ export default function Settings({
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--navy)' }}>AI社長室データ基盤</div>
                 <div style={{ fontSize: 10, color: '#6366F1', fontWeight: 600 }}>
-                  Phase 9 — LINE WORKS Notification 接続 · 書き込みなし
+                  Phase 10 — AI Engine統合 · 全Provider横断 · 社長承認フロー · 書き込みなし
                 </div>
               </div>
               <span
@@ -1167,9 +1168,9 @@ export default function Settings({
           lineHeight: 1.7,
         }}
       >
-        AI社長室 v0.9.0 Phase 9 — {selectedCompany?.name}
+        AI社長室 v1.0.0 Phase 10 — {selectedCompany?.name}
         <br />
-        フロントエンドMVP（仮データのみ · 外部書き込みなし）
+        Phase 10 — AI Engine統合 · 全Provider横断 · 社長承認フロー（UIと型のみ）
       </div>
     </div>
   )

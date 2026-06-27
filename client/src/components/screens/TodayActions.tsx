@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import type { ActionItem, Priority, GmailDerivedTask } from '../../types'
 import { actionItems } from '../../data/mockData'
 import { mockGmailMessages } from '../../services/gmail/mockGmail'
@@ -7,6 +7,7 @@ import { mockLineWorksNotifications, mockLineWorksInboxMessages } from '../../se
 import { mapLineWorksToUnifiedNotification, mapLineWorksToUnifiedInboxItem } from '../../services/lineworks/lineworksMapper'
 import type { UnifiedNotification, UnifiedInboxItem } from '../../core/providers/providerTypes'
 import DemoBanner from '../DemoBanner'
+import { runOrchestrator } from '../../core/ai-engine/aiOrchestrator'
 
 interface Props {
   demoMode?: boolean
@@ -42,7 +43,19 @@ const gmailTasks: GmailDerivedTask[] = mockGmailMessages.map(mapToGmailDerivedTa
 const lwNotifications: UnifiedNotification[] = mockLineWorksNotifications.map(mapLineWorksToUnifiedNotification)
 const lwInboxItems: UnifiedInboxItem[] = mockLineWorksInboxMessages.map(mapLineWorksToUnifiedInboxItem)
 
+type ActiveTab = 'ai' | 'mail' | 'schedule' | 'file' | 'metric' | 'notification'
+
+const TABS: { id: ActiveTab; label: string }[] = [
+  { id: 'ai', label: 'AI優先順' },
+  { id: 'mail', label: 'メール' },
+  { id: 'schedule', label: '予定' },
+  { id: 'file', label: '資料' },
+  { id: 'metric', label: '数字' },
+  { id: 'notification', label: '社内通知' },
+]
+
 export default function TodayActions({ demoMode }: Props) {
+  const [activeTab, setActiveTab] = useState<ActiveTab>('ai')
   const [expanded, setExpanded] = useState<Priority>('A')
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set())
   const [selectedItem, setSelectedItem] = useState<ActionItem | null>(null)
@@ -51,6 +64,7 @@ export default function TodayActions({ demoMode }: Props) {
   const [lwExpanded, setLwExpanded] = useState(true)
   const [selectedLwNotif, setSelectedLwNotif] = useState<UnifiedNotification | null>(null)
   const [selectedLwInbox, setSelectedLwInbox] = useState<UnifiedInboxItem | null>(null)
+  const orchestratorResult = useMemo(() => runOrchestrator(), [])
 
   function toggleDone(id: string) {
     setDoneIds((prev) => {
@@ -67,6 +81,105 @@ export default function TodayActions({ demoMode }: Props) {
     <>
       <div className="screen-content">
         <DemoBanner />
+
+        {/* ── タブバー（Phase 10）── */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 0,
+            marginBottom: 14,
+            background: '#F1F5F9',
+            borderRadius: 12,
+            padding: 3,
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+          }}
+        >
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                flexShrink: 0,
+                padding: '7px 12px',
+                borderRadius: 9,
+                fontSize: 12,
+                fontWeight: 700,
+                background: activeTab === tab.id ? '#fff' : 'transparent',
+                color: activeTab === tab.id ? 'var(--navy)' : 'var(--text-muted)',
+                boxShadow: activeTab === tab.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              }}
+            >
+              {tab.id === 'ai' && activeTab !== 'ai' && orchestratorResult.todayPlan.decisions.length > 0
+                ? `AI優先順 (${orchestratorResult.todayPlan.decisions.length})`
+                : tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── AI優先順タブ ── */}
+        {activeTab === 'ai' && (
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10, padding: '0 2px' }}>
+              🤖 全Provider横断 AI判断 · 読み取り専用 · 外部実行なし
+            </div>
+            {orchestratorResult.todayPlan.decisions.map((decision, i) => {
+              const urgencyColor = decision.urgency === 'critical' ? '#EF4444' : decision.urgency === 'high' ? '#F59E0B' : '#3B82F6'
+              const urgencyBg = decision.urgency === 'critical' ? '#FEE2E2' : decision.urgency === 'high' ? '#FEF3C7' : '#EFF6FF'
+              return (
+                <div
+                  key={decision.id}
+                  style={{
+                    background: '#fff',
+                    borderRadius: 14,
+                    padding: '14px',
+                    marginBottom: 10,
+                    boxShadow: 'var(--shadow)',
+                    border: decision.urgency === 'critical' ? '1.5px solid #FCA5A5' : '1px solid var(--border)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: i === 0 ? '#EF4444' : i === 1 ? '#F59E0B' : 'var(--navy)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900, flexShrink: 0 }}>
+                      {decision.rank}
+                    </div>
+                    <span style={{ background: urgencyBg, color: urgencyColor, borderRadius: 6, padding: '1px 7px', fontSize: 10, fontWeight: 800 }}>
+                      {decision.urgency === 'critical' ? '🚨 緊急' : decision.urgency === 'high' ? '⚠️ 重要' : '📋 通常'}
+                    </span>
+                    <span style={{ background: '#F1F5F9', color: '#475569', borderRadius: 6, padding: '1px 7px', fontSize: 10, fontWeight: 700 }}>
+                      {decision.category}
+                    </span>
+                    {decision.isImmediate && (
+                      <span style={{ background: '#ECFDF5', color: '#065F46', borderRadius: 6, padding: '1px 7px', fontSize: 10, fontWeight: 700 }}>⚡ 30分</span>
+                    )}
+                    <span style={{ marginLeft: 'auto', fontSize: 10, color: urgencyColor, fontWeight: 700 }}>{decision.timeEstimate}</span>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>
+                    {decision.title}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#6B7280', lineHeight: 1.5, marginBottom: 6 }}>
+                    📌 {decision.reason}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--navy)', fontWeight: 600, background: 'var(--blue-light)', borderRadius: 8, padding: '6px 10px' }}>
+                    ✅ {decision.suggestedAction}
+                  </div>
+                  {decision.evidenceSources.length > 0 && (
+                    <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {decision.evidenceSources.slice(0, 3).map((src) => (
+                        <span key={src.id} style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 6, padding: '1px 6px', fontSize: 10, color: '#475569', fontWeight: 600 }}>
+                          {src.type}: {src.title.slice(0, 20)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* ── 既存コンテンツ（メール/予定/資料/数字/社内通知タブ）── */}
+        {activeTab !== 'ai' && <>
         {SECTIONS.map((sec) => {
           const items = actionItems.filter((i) => i.priority === sec.priority)
           const isOpen = expanded === sec.priority
@@ -292,6 +405,7 @@ export default function TodayActions({ demoMode }: Props) {
             </div>
           )}
         </div>
+        </>}
       </div>
 
       {/* 既存タスク詳細モーダル */}
