@@ -1,7 +1,7 @@
 # NO_SCREENSHOT_REQUIRED.md — スクリーンショット不要の検収フロー
 
 > このファイルは、スクリーンショットなしで変更点と安全性を確認できることを明記します。  
-> 最終更新: Phase 5 — v0.5.0（2026-06-27）
+> 最終更新: Phase 5.1 — v0.5.1（2026-06-27）
 
 ---
 
@@ -24,6 +24,8 @@
 | `TEST_CHECKLIST.md` | 手動で確認すべきチェックリスト |
 | `ROUTE_MAP.md` | 画面遷移の全体像・OAuth フロー |
 | `DATA_FLOW.md` | データがどこから来てどこへ行くか |
+| `OAUTH_SECURITY_REVIEW.md` | OAuth安全設計・SPA リスク・本番化前注意事項（Phase 5.1追加） |
+| `GOOGLE_CONNECT_CHECKLIST.md` | Google Cloud Console 設定手順（Phase 5.1追加） |
 
 ---
 

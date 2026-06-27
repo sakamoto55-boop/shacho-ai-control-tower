@@ -1,6 +1,6 @@
 # SAFETY_REPORT.md — 外部API接続状況・安全設計確認書
 
-> 最終更新: Phase 5 — v0.5.0（2026-06-27）  
+> 最終更新: Phase 5.1 — v0.5.1（2026-06-27）  
 > このファイルは外部API接続・書き込み処理の有無を確認するための文書です。
 
 ---
@@ -113,6 +113,21 @@ export const PHASE5_SCOPES: GoogleScope[] = [
 
 ---
 
+## Phase 5.1 追加安全確認
+
+| チェック項目 | 状態 |
+|------------|------|
+| 新規外部サービス追加 | ❌ なし（既存構造の強化のみ） |
+| 書き込み API 追加 | ❌ なし |
+| スコープ追加 | ❌ なし（gmail.readonly のみ継続） |
+| client_secret のフロントエンド露出 | ❌ なし（SPA のため使用禁止、.env.example に記載のみ） |
+| .env の Git コミット | ❌ なし（.gitignore で除外済み） |
+| SPA OAuth リスク文書化 | ✅ OAUTH_SECURITY_REVIEW.md・README に記載 |
+| 接続前チェック UI | ✅ Settings.tsx に追加 |
+| Google Cloud Console 手順書 | ✅ GOOGLE_CONNECT_CHECKLIST.md として作成 |
+
+---
+
 ## 安全設計の原則（全フェーズ共通）
 
 1. **書き込み禁止**: Gmail への書き込み API（送信・返信・削除等）は実装しない
@@ -121,3 +136,4 @@ export const PHASE5_SCOPES: GoogleScope[] = [
 4. **自動送信禁止**: 金額・契約・謝罪・事故に関する内容は自動送信しない
 5. **ローカルのみ**: 取得データはクライアントのローカルにのみ保存
 6. **APIキー保護**: 認証情報をコードにハードコードしない（`.env` で管理）
+7. **SPA リスク周知**: client_secret 不使用・localStorage リスク・本番化前のバックエンドプロキシ推奨を文書化

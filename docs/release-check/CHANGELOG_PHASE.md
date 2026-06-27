@@ -4,6 +4,33 @@
 
 ---
 
+## Phase 5.1 — v0.5.1（2026-06-27）
+
+### 変更テーマ
+OAuth 安全性強化・接続前チェック UI・Google Cloud Console 設定手順書
+
+### 追加した機能
+- `googleConfig.ts`: OAuth 接続前チェック関数 `getOAuthPreConnectCheck()`
+- 設定画面（未接続時）に「🔍 接続前チェック」パネル追加
+  - Client ID設定 / Redirect URI設定 / スコープ / 書き込みAPI / 本番接続準備 を表示
+- `OAUTH_SECURITY_REVIEW.md`: スコープ検証・書き込みAPI不在・トークン保存・SPA リスク・本番化前注意事項
+- `GOOGLE_CONNECT_CHECKLIST.md`: Google Cloud Console の Step-by-Step 設定チェックリスト
+- README に「SPA OAuth セキュリティリスクと対応方針」セクション追加
+- README 検収ドキュメント表に 2 ファイル追加
+
+### 変更した機能
+- `Settings.tsx`: 接続前チェック UI 追加、バージョン v0.5.0 → v0.5.1
+- `README.md`: バージョン更新、Phase 5.1 セクション・SPA OAuth リスク追加
+- `docs/release-check/` 全 9 ファイル: Phase 5.1 内容に更新
+
+### 削除した機能
+- なし
+
+### 外部サービス追加
+- なし（既存構造の強化のみ）
+
+---
+
 ## Phase 5 — v0.5.0（2026-06-27）
 
 ### 変更テーマ

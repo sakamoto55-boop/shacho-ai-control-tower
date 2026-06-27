@@ -8,7 +8,7 @@
 
 `client/` ディレクトリに、**iPhone最優先のスマホ対応Webアプリ**が含まれています。
 
-> **現在のバージョン：v0.5.0 Phase 5**
+> **現在のバージョン：v0.5.1 Phase 5.1**
 > すべての数値・メッセージは仮データです。Gmail読み取り専用連携の構造を追加しましたが、実際の認証情報は未設定のため mockGmail を使用しています。Gmailへの書き込み（送信・返信・削除・ラベル変更等）は未実装です。
 
 ### 検収ドキュメント
@@ -24,6 +24,8 @@
 | [ROUTE_MAP.md](docs/release-check/ROUTE_MAP.md) | 画面遷移と主要導線 |
 | [DATA_FLOW.md](docs/release-check/DATA_FLOW.md) | データの流れ |
 | [NO_SCREENSHOT_REQUIRED.md](docs/release-check/NO_SCREENSHOT_REQUIRED.md) | スクリーンショット不要の検収フロー |
+| [OAUTH_SECURITY_REVIEW.md](docs/release-check/OAUTH_SECURITY_REVIEW.md) | OAuth安全設計レビュー（Phase 5.1追加） |
+| [GOOGLE_CONNECT_CHECKLIST.md](docs/release-check/GOOGLE_CONNECT_CHECKLIST.md) | Google Cloud Console 設定チェックリスト（Phase 5.1追加） |
 
 ---
 
@@ -205,6 +207,81 @@ VITE_GOOGLE_READONLY_SCOPE=https://www.googleapis.com/auth/gmail.readonly
 - トークン: localStorage に保存（HttpOnly Cookie は SPA では使用不可）
 - リフレッシュトークン: `google.accounts.oauth2` を通じて取得
 - 本番運用推奨: バックエンド Proxy 経由でのトークン交換（Phase 6 以降で対応予定）
+
+---
+
+## Phase 5.1 で追加した内容（OAuth安全性強化・接続前チェックUI）
+
+### 概要
+
+Phase 5.1 では、Phase 5 で構築した OAuth 基盤に対して**安全性レビューと接続前検証 UI** を追加しました。  
+新しい外部サービス連携は追加していません。
+
+### 追加したもの
+
+| 追加内容 | ファイル |
+|---------|--------|
+| OAuth接続前チェック機能 | `client/src/services/google/googleConfig.ts` |
+| 接続前チェックUI（設定画面） | `client/src/components/screens/Settings.tsx` |
+| OAuth安全設計レビュー | `docs/release-check/OAUTH_SECURITY_REVIEW.md` |
+| Google Cloud Console設定手順 | `docs/release-check/GOOGLE_CONNECT_CHECKLIST.md` |
+
+### 接続前チェック UI
+
+設定画面の Google 接続カード（未接続状態時）に「🔍 接続前チェック」パネルを追加しました。
+
+| チェック項目 | 内容 |
+|------------|------|
+| Client ID設定 | `VITE_GMAIL_CLIENT_ID` の設定有無（設定済みは末尾のみ表示） |
+| Redirect URI設定 | `VITE_GOOGLE_REDIRECT_URI` の設定有無と現在値 |
+| スコープ | `gmail.readonly` のみであることを表示 |
+| 書き込みAPI | 未実装であることを表示 |
+| 本番接続準備 | Client ID と Redirect URI が両方設定済みなら「完了」 |
+
+### SPA における OAuth セキュリティリスクと対応方針
+
+#### 現行 SPA フローの制約
+
+```
+⚠️ SPA（ブラウザのみ）での OAuth には以下の制約があります：
+
+1. client_secret をフロントエンドに含められない
+   → VITE_GMAIL_CLIENT_SECRET は設定禁止（ビルド後に公開される）
+   → Google Cloud Console で「ウェブ アプリケーション」タイプを選択し、
+     SPA として登録することで client_secret なしで動作します
+
+2. アクセストークン・リフレッシュトークンが localStorage に存在する
+   → XSS 攻撃を受けた場合にトークンが窃取されるリスクがある
+
+3. VITE_ 変数はビルド時にバンドルに含まれる
+   → VITE_GMAIL_CLIENT_ID は公開リポジトリの .env にコミット禁止
+```
+
+#### 絶対に行ってはいけないこと
+
+```
+❌ .env ファイルを Git にコミットしない（.gitignore に含まれています）
+❌ VITE_GMAIL_CLIENT_SECRET をコードや .env.example 以外に記載しない
+❌ VITE_GMAIL_CLIENT_ID を README やコードコメントに直書きしない
+❌ client_secret をフロントエンドコードに埋め込まない
+```
+
+#### 本番化前に推奨するアーキテクチャ変更
+
+```
+[現行] SPA がトークンを localStorage に直接保管
+  ブラウザ → Google OAuth → ブラウザ（localStorage にトークン保管）
+
+[本番推奨] バックエンドプロキシ経由でトークン管理
+  ブラウザ → バックエンド → Google OAuth → バックエンド
+                                                 ↓
+                                     HttpOnly Cookie でセッション管理
+                                     （ブラウザ JS からアクセス不可）
+```
+
+詳細は [OAUTH_SECURITY_REVIEW.md](docs/release-check/OAUTH_SECURITY_REVIEW.md) を参照してください。
+
+---
 
 ### Phase 6 予定
 

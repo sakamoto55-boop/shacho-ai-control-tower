@@ -6,6 +6,7 @@ import { createGmailSummary } from '../../services/gmail/gmailAnalyzer'
 import { googleAuth } from '../../services/google/googleAuth'
 import { googleSession } from '../../services/google/googleSession'
 import { GOOGLE_SCOPES, getScopeLabel } from '../../services/google/googleScopes'
+import { getOAuthPreConnectCheck } from '../../services/google/googleConfig'
 import type { GoogleSession } from '../../services/google/googleSession'
 import type { GmailFetchRange, GmailDerivedTask } from '../../types'
 
@@ -281,6 +282,65 @@ export default function Settings({
             {gConnectError ?? gSession.lastError}
           </div>
         )}
+
+        {/* 接続前チェック（未接続時のみ表示） */}
+        {gSession.status !== 'connected' && (() => {
+          const check = getOAuthPreConnectCheck()
+          const rows = [
+            { label: 'Client ID設定', ok: check.hasClientId, value: check.hasClientId ? (check.clientIdMasked ?? '設定済み') : '未設定' },
+            { label: 'Redirect URI設定', ok: check.hasRedirectUri, value: check.hasRedirectUri ? check.redirectUri : '未設定' },
+            { label: 'スコープ', ok: true, value: 'gmail.readonly のみ' },
+            { label: '書き込みAPI', ok: true, value: '未実装' },
+            { label: '本番接続準備', ok: check.isReadyToConnect, value: check.isReadyToConnect ? '完了' : '未完了' },
+          ]
+          return (
+            <div
+              style={{
+                background: 'var(--bg)',
+                borderRadius: 10,
+                padding: '10px 12px',
+                marginBottom: 12,
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                🔍 接続前チェック
+              </div>
+              {rows.map((row) => (
+                <div
+                  key={row.label}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '5px 0',
+                    borderBottom: '1px solid var(--border)',
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, flexShrink: 0 }}>
+                    {row.label}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: row.ok ? '#065F46' : '#991B1B',
+                      background: row.ok ? '#D1FAE5' : '#FEE2E2',
+                      borderRadius: 6,
+                      padding: '2px 7px',
+                      maxWidth: '55%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {row.ok ? '✅ ' : '❌ '}{row.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
 
         {/* 接続・切断ボタン */}
         {gSession.status === 'connected' ? (
@@ -967,7 +1027,7 @@ export default function Settings({
           lineHeight: 1.7,
         }}
       >
-        AI社長室 v0.5.0 Phase 5 — {selectedCompany?.name}
+        AI社長室 v0.5.1 Phase 5.1 — {selectedCompany?.name}
         <br />
         フロントエンドMVP（仮データのみ · 外部書き込みなし）
       </div>

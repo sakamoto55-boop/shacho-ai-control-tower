@@ -1,6 +1,55 @@
 # IMPLEMENTATION_REPORT.md — 実装内容・未実装項目・注意点
 
-> 最終更新: Phase 5 — v0.5.0（2026-06-27）
+> 最終更新: Phase 5.1 — v0.5.1（2026-06-27）
+
+---
+
+## Phase 5.1 実装内容
+
+### ① OAuth 接続前チェック機能 ✅ 完了（googleConfig.ts）
+
+```
+getOAuthPreConnectCheck() が返す情報：
+  hasClientId         VITE_GMAIL_CLIENT_ID の設定有無
+  hasRedirectUri      VITE_GOOGLE_REDIRECT_URI の設定有無と現在値
+  scope               現在設定されているスコープ文字列
+  isReadOnly          常に true（設計上）
+  hasWriteScope       常に false（書き込みスコープ取得禁止）
+  writeApiImplemented 常に false（書き込み API 未実装）
+  isReadyToConnect    hasClientId && hasRedirectUri
+  clientIdMasked      末尾8文字のみ表示（XSS 対策）
+```
+
+### ② 接続前チェック UI ✅ 完了（Settings.tsx）
+
+未接続時のみ表示されるパネル「🔍 接続前チェック」:
+
+| 項目 | 設定なし | 設定済み |
+|------|---------|---------|
+| Client ID設定 | ❌ 未設定（赤） | ✅ ****XXXXXXXX（緑） |
+| Redirect URI設定 | ❌ 未設定（赤） | ✅ http://localhost:5173/（緑） |
+| スコープ | ✅ gmail.readonly のみ（緑・常時） | — |
+| 書き込みAPI | ✅ 未実装（緑・常時） | — |
+| 本番接続準備 | ❌ 未完了（赤） | ✅ 完了（緑） |
+
+### ③ OAUTH_SECURITY_REVIEW.md ✅ 完了
+
+スコープ検証・書き込み API 不在・トークン保存場所・トークン期限・ログアウト挙動・エラー処理・SPA リスク・本番化前注意事項を文書化。
+
+### ④ GOOGLE_CONNECT_CHECKLIST.md ✅ 完了
+
+Google Cloud Console の Step 1〜8（プロジェクト作成 → API 有効化 → OAuth 同意画面 → クライアント ID 作成 → 環境変数設定 → 接続前チェック → 接続テスト → 安全確認）を手順書化。
+
+### ⑤ README SPA OAuth リスクセクション ✅ 完了
+
+- SPA における OAuth の制約（client_secret 不使用・localStorage リスク・VITE_ 変数のバンドル）
+- 絶対に行ってはいけないこと（.env コミット禁止・client_secret 埋め込み禁止等）
+- 本番推奨アーキテクチャ（バックエンドプロキシ + HttpOnly Cookie）
+
+### ⑥ バージョン更新 ✅ 完了
+
+- `Settings.tsx`: v0.5.0 → v0.5.1（「AI社長室 v0.5.1 Phase 5.1」）
+- `README.md`: v0.5.0 → v0.5.1
 
 ---
 
@@ -117,6 +166,7 @@ Phase 5 セクション追加（OAuth構造・フロー図・書き込みなし�
 | 本番 Gmail API への実接続 | `VITE_GMAIL_CLIENT_ID` が未設定。設定後は即時動作。 |
 | バックエンド Proxy 経由のトークン交換 | SPA で直接トークン交換するため client_secret がフロントに露出する点の改善（Phase 6 以降） |
 | アクセストークンの自動リフレッシュ UI 表示 | 内部では `googleToken.refresh()` が実装済み。画面表示は未追加。 |
+| XSS 対策の完全実装 | CSP 設定・DOMPurify は本番化前に実施予定 |
 | Googleカレンダー ReadOnly | Phase 6 予定 |
 | Google Drive / Sheets | 未定 |
 | LINE WORKS | 未定 |

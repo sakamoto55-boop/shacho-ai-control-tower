@@ -1,6 +1,38 @@
 # FILES_CHANGED.md — 変更・追加・削除ファイル一覧
 
-> 最終更新: Phase 5 — v0.5.0（2026-06-27）
+> 最終更新: Phase 5.1 — v0.5.1（2026-06-27）
+
+---
+
+## Phase 5.1 変更ファイル
+
+### 新規作成 (3ファイル)
+
+| ファイルパス | 役割 |
+|-------------|------|
+| `client/src/services/google/googleConfig.ts` | OAuth接続前チェック関数（Client ID/Redirect URI/スコープ検証） |
+| `docs/release-check/OAUTH_SECURITY_REVIEW.md` | OAuth安全設計レビュー（スコープ・書き込みなし・SPA リスク） |
+| `docs/release-check/GOOGLE_CONNECT_CHECKLIST.md` | Google Cloud Console 設定チェックリスト（Step 1〜8） |
+
+### 更新 (11ファイル)
+
+| ファイルパス | 変更内容 |
+|-------------|---------|
+| `client/src/components/screens/Settings.tsx` | 接続前チェック UI 追加、v0.5.1 バージョン更新 |
+| `README.md` | Phase 5.1 セクション・SPA OAuth リスク追加、バージョン更新 |
+| `docs/release-check/CHANGELOG_PHASE.md` | Phase 5.1 変更履歴追加 |
+| `docs/release-check/FILES_CHANGED.md` | Phase 5.1 ファイル一覧追加（本ファイル） |
+| `docs/release-check/IMPLEMENTATION_REPORT.md` | Phase 5.1 実装内容追加 |
+| `docs/release-check/SAFETY_REPORT.md` | Phase 5.1 安全確認追加 |
+| `docs/release-check/SCREEN_LIST.md` | Phase 5.1 画面追加（接続前チェックパネル） |
+| `docs/release-check/TEST_CHECKLIST.md` | Phase 5.1 テスト項目追加 |
+| `docs/release-check/ROUTE_MAP.md` | Phase 5.1 更新日時更新 |
+| `docs/release-check/DATA_FLOW.md` | Phase 5.1 更新日時更新 |
+| `docs/release-check/NO_SCREENSHOT_REQUIRED.md` | Phase 5.1 更新日時更新 |
+
+### 削除 (0ファイル)
+
+なし
 
 ---
 
@@ -74,7 +106,7 @@
 | `TodayActions.tsx` | Phase 4.1 |
 | `CreateRequest.tsx` | Phase 1 |
 | `Dashboard.tsx` | Phase 2 |
-| `Settings.tsx` | Phase 5 |
+| `Settings.tsx` | Phase 5.1 |
 | `CockpitScreen.tsx` | Phase 4.1 |
 
 ### client/src/components/ (Phase 1〜3.5)
@@ -94,4 +126,4 @@
 | `client/src/types/index.ts` | Phase 1 |
 | `client/.env.example` | Phase 5 |
 | `.env.example` | Phase 5 |
-| `README.md` | Phase 5 |
+| `README.md` | Phase 5.1 |
