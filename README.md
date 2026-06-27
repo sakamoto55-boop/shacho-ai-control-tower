@@ -10,6 +10,16 @@
 > | 🔧 **本番接続手順** | [docs/NEXT_SETUP_STEPS.md](docs/NEXT_SETUP_STEPS.md) |
 > | 📦 **納品物一覧** | [docs/DELIVERY_SUMMARY.md](docs/DELIVERY_SUMMARY.md) |
 > | 🔌 **Gmail本番接続手順** | [docs/GOOGLE_OAUTH_SETUP.md](docs/GOOGLE_OAUTH_SETUP.md) |
+>
+> **📐 最終設計書（本番運用前の確定版）**
+>
+> | | |
+> |--|--|
+> | 🏛 **最終アーキテクチャ** | [docs/FINAL_ARCHITECTURE.md](docs/FINAL_ARCHITECTURE.md) |
+> | 🗺 **運用ロードマップ** | [docs/OPERATION_ROADMAP.md](docs/OPERATION_ROADMAP.md) |
+> | 🤝 **ツール役割分担** | [docs/ROLE_SEPARATION.md](docs/ROLE_SEPARATION.md) |
+> | 🔧 **本番接続計画** | [docs/PRODUCTION_CONNECT_PLAN.md](docs/PRODUCTION_CONNECT_PLAN.md) |
+> | ✅ **最終意思決定ガイド** | [docs/FINAL_DECISION.md](docs/FINAL_DECISION.md) |
 
 > スマホ（Safari / Chrome）で上記URLを開くだけで使えます。アプリのインストールは不要です。
 
