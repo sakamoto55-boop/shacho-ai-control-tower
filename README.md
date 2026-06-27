@@ -11,6 +11,22 @@
 > **現在のバージョン：v0.5.0 Phase 5**
 > すべての数値・メッセージは仮データです。Gmail読み取り専用連携の構造を追加しましたが、実際の認証情報は未設定のため mockGmail を使用しています。Gmailへの書き込み（送信・返信・削除・ラベル変更等）は未実装です。
 
+### 検収ドキュメント
+
+| ファイル | 内容 |
+|---------|------|
+| [CHANGELOG_PHASE.md](docs/release-check/CHANGELOG_PHASE.md) | フェーズ別変更履歴 |
+| [FILES_CHANGED.md](docs/release-check/FILES_CHANGED.md) | 変更・追加・削除ファイル一覧 |
+| [IMPLEMENTATION_REPORT.md](docs/release-check/IMPLEMENTATION_REPORT.md) | 実装内容・未実装項目・注意点 |
+| [SAFETY_REPORT.md](docs/release-check/SAFETY_REPORT.md) | 外部API接続状況・書き込み禁止確認 |
+| [SCREEN_LIST.md](docs/release-check/SCREEN_LIST.md) | 変更画面・確認すべき画面・想定表示 |
+| [TEST_CHECKLIST.md](docs/release-check/TEST_CHECKLIST.md) | 手動検収チェックリスト |
+| [ROUTE_MAP.md](docs/release-check/ROUTE_MAP.md) | 画面遷移と主要導線 |
+| [DATA_FLOW.md](docs/release-check/DATA_FLOW.md) | データの流れ |
+| [NO_SCREENSHOT_REQUIRED.md](docs/release-check/NO_SCREENSHOT_REQUIRED.md) | スクリーンショット不要の検収フロー |
+
+---
+
 ### 画面一覧
 
 | 画面 | 説明 |
