@@ -35,6 +35,8 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('home')
   const [company, setCompany] = useState('lcc')
   const [showVoice, setShowVoice] = useState(false)
+  const [demoMode, setDemoMode] = useState(true)
+  const [productionReady, setProductionReady] = useState(false)
 
   const companyData = companies.find((c) => c.id === company)
   const sub = screen === 'home' ? (companyData?.name ?? 'LCC株式会社') : SCREEN_SUBS[screen]
@@ -75,7 +77,7 @@ export default function App() {
           <Home onNavigate={navigate} company={companyData?.name ?? 'LCC株式会社'} onVoice={() => setShowVoice(true)} />
         )}
         {screen === 'chat' && <AiChat onVoice={() => setShowVoice(true)} onNavigate={navigate} />}
-        {screen === 'actions' && <TodayActions />}
+        {screen === 'actions' && <TodayActions demoMode={demoMode} />}
         {screen === 'create' && <CreateRequest onNavigateToChat={() => navigate('chat')} />}
         {screen === 'dashboard' && <Dashboard />}
         {screen === 'settings' && (
@@ -85,9 +87,13 @@ export default function App() {
               setCompany(id)
               navigate('home')
             }}
+            demoMode={demoMode}
+            productionReady={productionReady}
+            onDemoModeChange={setDemoMode}
+            onProductionReadyChange={setProductionReady}
           />
         )}
-        {screen === 'cockpit' && <CockpitScreen />}
+        {screen === 'cockpit' && <CockpitScreen demoMode={demoMode} />}
       </main>
 
       {/* フローティングマイクボタン（チャット画面以外） */}

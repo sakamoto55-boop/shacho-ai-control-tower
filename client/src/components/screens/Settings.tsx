@@ -1,15 +1,21 @@
 import { useState } from 'react'
 import { companies, integrations, apiIntegrationPoints } from '../../data/mockData'
+import { getConnectionStatus, fetchInboxMessages } from '../../services/gmail/gmailClient'
+import type { GmailFetchRange, GmailDerivedTask } from '../../types'
 
 interface Props {
   company: string
   onCompanyChange: (id: string) => void
+  demoMode: boolean
+  productionReady: boolean
+  onDemoModeChange: (v: boolean) => void
+  onProductionReadyChange: (v: boolean) => void
 }
 
 const ROLES = ['社長専用', '管理者', '事務', '現場']
 
 const INTEGRATION_PHASES = [
-  { phase: 1, label: 'Gmail読み取り', status: '未接続' },
+  { phase: 1, label: 'Gmail読み取り', status: '実装済' },
   { phase: 2, label: 'Googleカレンダー読み取り', status: '未接続' },
   { phase: 3, label: 'Google Drive検索', status: '未接続' },
   { phase: 4, label: 'Googleスプレッドシート読み取り', status: '未接続' },
@@ -19,16 +25,43 @@ const INTEGRATION_PHASES = [
   { phase: 8, label: '各種書き込み処理', status: '将来' },
 ]
 
-export default function Settings({ company, onCompanyChange }: Props) {
+export default function Settings({
+  company,
+  onCompanyChange,
+  demoMode,
+  productionReady,
+  onDemoModeChange,
+  onProductionReadyChange,
+}: Props) {
   const [activeRole, setActiveRole] = useState('社長専用')
   const [showApiPoints, setShowApiPoints] = useState(false)
   const [showPhaseRoadmap, setShowPhaseRoadmap] = useState(false)
+  const [gmailRange, setGmailRange] = useState<GmailFetchRange>('24h')
+  const [gmailTestResult, setGmailTestResult] = useState<GmailDerivedTask[] | null>(null)
+  const [gmailTesting, setGmailTesting] = useState(false)
 
   const selectedCompany = companies.find((c) => c.id === company)
+  const connectionStatus = getConnectionStatus()
+
+  async function handleGmailReadTest() {
+    setGmailTesting(true)
+    setGmailTestResult(null)
+    const results = await fetchInboxMessages(gmailRange)
+    setGmailTestResult(results)
+    setGmailTesting(false)
+  }
+
+  const MODE_ROWS = [
+    { label: 'デモモード',     value: demoMode ? 'ON' : 'OFF',  on: demoMode,     toggle: () => onDemoModeChange(!demoMode) },
+    { label: '本番準備モード', value: productionReady ? 'ON' : 'OFF', on: productionReady, toggle: () => onProductionReadyChange(!productionReady) },
+    { label: '外部接続',       value: '未接続', on: false, toggle: undefined },
+    { label: '読み取り専用予定', value: 'ON', on: true, toggle: undefined },
+    { label: '書き込み禁止',   value: 'ON', on: true, toggle: undefined },
+  ]
 
   return (
     <div className="screen-content">
-      {/* ── デモモード表示 ── */}
+      {/* ── 動作モード設定 ── */}
       <div
         style={{
           background: '#FEF9C3',
@@ -41,13 +74,7 @@ export default function Settings({ company, onCompanyChange }: Props) {
         <div style={{ fontSize: 12, fontWeight: 800, color: '#92400E', marginBottom: 10 }}>
           ⚠️ 動作モード設定
         </div>
-        {[
-          { label: 'デモモード',     value: 'ON',  on: true },
-          { label: '本番準備モード', value: 'OFF', on: false },
-          { label: '外部接続',       value: '未接続', on: false },
-          { label: '読み取り専用予定', value: 'ON', on: true },
-          { label: '書き込み禁止',   value: 'ON',  on: true },
-        ].map((row) => (
+        {MODE_ROWS.map((row) => (
           <div
             key={row.label}
             style={{
@@ -59,18 +86,36 @@ export default function Settings({ company, onCompanyChange }: Props) {
             }}
           >
             <span style={{ fontSize: 13, fontWeight: 600, color: '#92400E' }}>{row.label}</span>
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 800,
-                color: row.on ? '#065F46' : '#991B1B',
-                background: row.on ? '#D1FAE5' : '#FEE2E2',
-                borderRadius: 6,
-                padding: '2px 8px',
-              }}
-            >
-              {row.value}
-            </span>
+            {row.toggle ? (
+              <button
+                onClick={row.toggle}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: row.on ? '#065F46' : '#991B1B',
+                  background: row.on ? '#D1FAE5' : '#FEE2E2',
+                  borderRadius: 6,
+                  padding: '2px 8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                {row.value}
+              </button>
+            ) : (
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: row.on ? '#065F46' : '#991B1B',
+                  background: row.on ? '#D1FAE5' : '#FEE2E2',
+                  borderRadius: 6,
+                  padding: '2px 8px',
+                }}
+              >
+                {row.value}
+              </span>
+            )}
           </div>
         ))}
       </div>
@@ -95,6 +140,154 @@ export default function Settings({ company, onCompanyChange }: Props) {
           現在はフロントエンドMVPです。すべての外部サービスへの書き込みは行っていません。既存のGmail・Drive・スプレッドシート・LINE WORKSのデータは変更されていません。
         </div>
       </div>
+
+      {/* ── Gmail連携（本番準備モードON時のみ表示） ── */}
+      {productionReady && (
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 'var(--radius)',
+            padding: '16px',
+            marginBottom: 18,
+            boxShadow: 'var(--shadow)',
+            border: '1.5px solid #BFDBFE',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 22 }}>📧</span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--navy)' }}>Gmail連携</div>
+              <div style={{ fontSize: 11, color: '#3B82F6', fontWeight: 600 }}>読み取り専用 · 書き込み禁止</div>
+            </div>
+          </div>
+
+          {[
+            { label: '接続状態', value: '未接続（認証情報未設定）', alert: true },
+            { label: '権限', value: connectionStatus.permission, alert: false },
+            { label: '書き込み', value: '禁止', alert: false },
+            { label: 'スコープ', value: 'gmail.readonly', alert: false },
+            { label: '最終取得', value: '未接続のため表示なし', alert: false },
+            { label: '取得対象', value: '受信トレイ・未読・重要メール', alert: false },
+          ].map((row) => (
+            <div
+              key={row.label}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '7px 0',
+                borderBottom: '1px solid var(--border)',
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
+                {row.label}
+              </span>
+              <span
+                style={{
+                  fontSize: 12,
+                  color: row.alert ? '#991B1B' : 'var(--text-primary)',
+                  fontWeight: 700,
+                  textAlign: 'right',
+                }}
+              >
+                {row.value}
+              </span>
+            </div>
+          ))}
+
+          {/* 取得期間ボタン */}
+          <div style={{ marginTop: 14, marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
+              取得期間
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {(['24h', '3d', '7d'] as GmailFetchRange[]).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setGmailRange(r)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 999,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    background: gmailRange === r ? 'var(--navy)' : 'var(--bg)',
+                    color: gmailRange === r ? '#fff' : 'var(--text-secondary)',
+                    border: gmailRange === r ? 'none' : '1.5px solid var(--border)',
+                  }}
+                >
+                  {r === '24h' ? '過去24時間' : r === '3d' ? '過去3日' : '過去7日'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 読み取りテストボタン */}
+          <button
+            onClick={handleGmailReadTest}
+            disabled={gmailTesting}
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: 12,
+              background: gmailTesting ? 'var(--border)' : '#1B3D6F',
+              color: '#fff',
+              fontSize: 14,
+              fontWeight: 700,
+              marginBottom: 10,
+            }}
+          >
+            {gmailTesting ? '取得中...' : '📥 読み取りテスト（デモデータ）'}
+          </button>
+
+          {/* テスト結果 */}
+          {gmailTestResult && (
+            <div
+              style={{
+                background: 'var(--bg)',
+                borderRadius: 10,
+                padding: '10px 12px',
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--navy)', marginBottom: 8 }}>
+                デモ結果 — {gmailTestResult.length}件取得
+              </div>
+              {gmailTestResult.map((task) => (
+                <div
+                  key={task.id}
+                  style={{
+                    padding: '6px 0',
+                    borderBottom: '1px solid var(--border)',
+                    display: 'flex',
+                    gap: 8,
+                    alignItems: 'center',
+                  }}
+                >
+                  <span
+                    style={{
+                      background: task.priority === 'A' ? '#FEE2E2' : '#FFFBEB',
+                      color: task.priority === 'A' ? '#991B1B' : '#92400E',
+                      borderRadius: 4,
+                      padding: '1px 6px',
+                      fontSize: 10,
+                      fontWeight: 800,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {task.priority}
+                  </span>
+                  <span style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                    {task.subject}
+                  </span>
+                </div>
+              ))}
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8 }}>
+                ※ デモデータです。実接続ではありません。
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── 会社選択 ── */}
       <div className="section-label">会社選択</div>
@@ -285,8 +478,13 @@ export default function Settings({ company, onCompanyChange }: Props) {
                   width: 26,
                   height: 26,
                   borderRadius: '50%',
-                  background: p.status === '未接続' ? 'var(--bg)' : p.status === '計画中' ? 'var(--warning-light)' : 'var(--blue-light)',
-                  color: p.status === '計画中' ? '#92400E' : 'var(--text-muted)',
+                  background:
+                    p.status === '実装済' ? '#D1FAE5' :
+                    p.status === '未接続' ? 'var(--bg)' :
+                    p.status === '計画中' ? 'var(--warning-light)' : 'var(--blue-light)',
+                  color:
+                    p.status === '実装済' ? '#065F46' :
+                    p.status === '計画中' ? '#92400E' : 'var(--text-muted)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -306,7 +504,10 @@ export default function Settings({ company, onCompanyChange }: Props) {
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  color: p.status === '未接続' ? 'var(--text-muted)' : p.status === '計画中' ? '#92400E' : 'var(--blue)',
+                  color:
+                    p.status === '実装済' ? '#065F46' :
+                    p.status === '未接続' ? 'var(--text-muted)' :
+                    p.status === '計画中' ? '#92400E' : 'var(--blue)',
                 }}
               >
                 {p.status}
@@ -401,7 +602,7 @@ export default function Settings({ company, onCompanyChange }: Props) {
           lineHeight: 1.7,
         }}
       >
-        AI社長室 v0.3.5 Phase 3.5 — {selectedCompany?.name}
+        AI社長室 v0.4.0 Phase 4 — {selectedCompany?.name}
         <br />
         フロントエンドMVP（仮データのみ · 外部書き込みなし）
       </div>

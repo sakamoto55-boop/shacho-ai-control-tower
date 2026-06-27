@@ -40,7 +40,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   'タスク':'#DC2626',
 }
 
-export default function CockpitScreen() {
+export default function CockpitScreen({ demoMode: _demoMode }: { demoMode?: boolean } = {}) {
   const [expandedActionId, setExpandedActionId] = useState<string | null>('pa1')
   const [activeSuggestion, setActiveSuggestion] = useState<ActionSuggestion | null>(null)
   const [activeTimeline, setActiveTimeline] = useState<TimelinePeriod>('today')

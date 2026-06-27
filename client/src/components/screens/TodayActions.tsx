@@ -29,7 +29,7 @@ const STATUS_CONFIG: Record<string, { bg: string; color: string }> = {
   '完了': { bg: '#ECFDF5', color: '#065F46' },
 }
 
-export default function TodayActions() {
+export default function TodayActions({ demoMode: _demoMode }: { demoMode?: boolean } = {}) {
   const [expanded, setExpanded] = useState<Priority>('A')
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set())
   const [selectedItem, setSelectedItem] = useState<ActionItem | null>(null)
