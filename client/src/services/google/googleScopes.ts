@@ -24,6 +24,15 @@ export const PHASE5_SCOPES: GoogleScope[] = [GOOGLE_SCOPES.GMAIL_READONLY]
 // Calendar / Drive / Sheets は本番接続しない。Gmail 読み取り専用のみを要求する。
 export const PHASE11_SCOPES: GoogleScope[] = [GOOGLE_SCOPES.GMAIL_READONLY]
 
+// Mission 1.3 本番接続スコープ（Google 4サービスすべて読み取り専用）
+// 書き込みスコープは一切含まない。送信・作成・更新・削除は永久に不可。
+export const GOOGLE_REAL_SCOPES: GoogleScope[] = [
+  GOOGLE_SCOPES.GMAIL_READONLY,
+  GOOGLE_SCOPES.CALENDAR_READONLY,
+  GOOGLE_SCOPES.DRIVE_READONLY,
+  GOOGLE_SCOPES.SHEETS_READONLY,
+]
+
 // Phase 6 で使用するスコープ（Gmail + Calendar ReadOnly）
 // 書き込みスコープは含まない
 export const PHASE6_SCOPES: GoogleScope[] = [

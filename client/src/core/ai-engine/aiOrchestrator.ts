@@ -45,8 +45,8 @@ import { buildDecisionList, buildImmediateActions } from './decisionEngine'
 import { buildApprovalQueue } from './actionDraftEngine'
 import { generateExecutiveBriefing } from './executiveBriefing'
 
-// データソース種別（実データ=api/cache、デモ=mock）
-export type DataSource = 'mock' | 'cache' | 'api'
+// データソース種別（実データ=api/cache、デモ=mock、未設定=unconfigured、取得失敗=error）
+export type DataSource = 'mock' | 'cache' | 'api' | 'unconfigured' | 'error'
 
 // 全Provider統合の入力データセット
 export interface OrchestratorInput {

@@ -4,8 +4,8 @@
 import { googleStorage } from './googleStorage'
 import { googleToken, type GoogleTokenResponse } from './googleToken'
 import { GoogleAuthError } from './googleErrors'
-// Phase 11: 本番接続スコープは gmail.readonly のみ（PHASE11_SCOPES）
-import { PHASE11_SCOPES } from './googleScopes'
+// Mission 1.3: Google 4サービス読み取り専用スコープ（gmail/calendar/drive/sheets readonly）
+import { GOOGLE_REAL_SCOPES } from './googleScopes'
 
 // ── PKCE ユーティリティ ──
 
@@ -61,14 +61,14 @@ export const googleAuth = {
     googleStorage.appendLog({
       timestamp: new Date().toISOString(),
       event: 'oauth_start',
-      detail: `OAuth認証フロー開始（PKCE / scope=${PHASE11_SCOPES.join(',')}）`,
+      detail: `OAuth認証フロー開始（PKCE / scope=${GOOGLE_REAL_SCOPES.join(',')}）`,
     })
 
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: clientId,
       redirect_uri: getRedirectUri(),
-      scope: PHASE11_SCOPES.join(' '),
+      scope: GOOGLE_REAL_SCOPES.join(' '),
       code_challenge: challenge,
       code_challenge_method: 'S256',
       state,

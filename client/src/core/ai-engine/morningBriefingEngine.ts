@@ -22,8 +22,8 @@ export interface BriefingInput {
   notificationCount: number
 }
 
-// 各Providerのデータ取得状況（実データ / デモ / 取得中）
-export type ProviderSourceState = 'loading' | 'api' | 'cache' | 'mock'
+// 各Providerのデータ取得状況（実データ / デモ / 取得中 / 未設定 / 取得失敗）
+export type ProviderSourceState = 'loading' | 'api' | 'cache' | 'mock' | 'unconfigured' | 'error'
 
 export interface ProviderStatusMap {
   inbox: ProviderSourceState
@@ -239,10 +239,19 @@ export function buildMorningBriefing(
 
 // ── 整形（Project SHOGUN 標準UI）────────────────────────────────
 
+function sourceLabel(st: ProviderSourceState): string {
+  switch (st) {
+    case 'loading': return '取得中'
+    case 'api':
+    case 'cache': return '実データ'
+    case 'unconfigured': return '未設定'
+    case 'error': return '取得失敗'
+    default: return 'デモ'
+  }
+}
+
 function formatDataStatus(s: ProviderStatusMap): string {
-  const label = (st: ProviderSourceState): string =>
-    st === 'loading' ? '取得中' : st === 'mock' ? 'デモ' : '実データ'
-  return `📡 データ：受信箱=${label(s.inbox)} / 予定=${label(s.schedule)} / ファイル=${label(s.file)} / 数字=${label(s.business)} / 通知=${label(s.notification)}`
+  return `📡 データ：受信箱=${sourceLabel(s.inbox)} / 予定=${sourceLabel(s.schedule)} / ファイル=${sourceLabel(s.file)} / 数字=${sourceLabel(s.business)} / 通知=${sourceLabel(s.notification)}`
 }
 
 export function isAllRealData(s: ProviderStatusMap): boolean {

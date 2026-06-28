@@ -1,6 +1,43 @@
 # IMPLEMENTATION_REPORT.md — 実装内容・未実装項目・注意点
 
-> 最終更新: Phase 11 — Gmail ReadOnly 本番接続（2026-06-27）
+> 最終更新: Mission 1.3 — Google Providers Real Data（2026-06-28）
+
+---
+
+## Mission 1.3 実装内容（Google 4サービス 実データ化）
+
+### ① OAuthスコープ拡張 ✅
+- `GOOGLE_REAL_SCOPES`（gmail/calendar/drive/spreadsheets readonly）追加・googleAuth が使用
+- `client/.env.example` の `VITE_GOOGLE_SCOPES` を4スコープへ
+
+### ② Calendar 実データ化 ✅
+- `calendarClient.fetchEvents()`（今日〜+7日 GET）→ Schedule Provider
+- 失敗時はデモへフォールバック（loadScheduleItems）
+
+### ③ Drive 実データ化 ✅
+- `driveClient.fetchFiles()`（最近更新50件 GET）→ File Provider
+- 銀行/契約/請求/事故/お結び/資金繰り は driveAnalyzer/driveSearch で分類
+- 失敗時はデモへフォールバック（loadFileItems）
+
+### ④ Sheets 実データ化 ✅（新規実装）
+- `sheetsMapper.mapSheetValuesToMetrics()` を実装（行→UnifiedBusinessMetric）
+- `sheetsClient.fetchDataset()` を実取得に変更（設定シートのみ GET）
+- 状態: 実データ(api) / 未設定(unconfigured) / 取得失敗(error) / デモ(mock)
+- フォーマット: `docs/SHEETS_DATA_FORMAT.md`
+
+### ⑤ Overnight Review 反映 ✅
+- データ取得状況に「未設定」「取得失敗」を追加表示
+  `📡 データ：受信箱=実データ / 予定=実データ / ファイル=実データ / 数字=未設定 / 通知=デモ`
+
+### ⑥ Settings 接続状態 ✅
+- 「🛰️ SHOGUN データ接続状態」カード（Gmail/Calendar/Drive/Sheets/LINE WORKS）
+- 実データ接続済み / 設定不足 / 取得失敗 / 未接続(デモ) / デモ(バックエンド必須)
+
+### ⑦ ビルド ✅ 0エラー
+
+### 残課題
+- LINE WORKS 実データ化はバックエンド必須（対象外・デモ維持）
+- 旧 gmail-only トークンは要再接続（Calendar/Drive/Sheets が取得失敗になる）
 
 ---
 

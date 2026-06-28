@@ -9,6 +9,13 @@ import { GOOGLE_SCOPES, getScopeLabel } from '../../services/google/googleScopes
 import { getOAuthPreConnectCheck } from '../../services/google/googleConfig'
 import { providerRegistry } from '../../core/providers/providerRegistry'
 import { providerHealth } from '../../core/providers/providerHealth'
+import { googleToken } from '../../services/google/googleToken'
+import {
+  loadScheduleItems,
+  loadFileItems,
+  loadMetricItems,
+  type DataSource,
+} from '../../core/ai-engine/aiOrchestrator'
 import type { GoogleSession } from '../../services/google/googleSession'
 import type { GmailFetchRange, GmailDerivedTask } from '../../types'
 import type { ProviderDescriptor } from '../../core/providers/providerTypes'
@@ -56,11 +63,33 @@ export default function Settings({
   const [gConnectError, setGConnectError] = useState<string | null>(null)
   const [providerDescriptors, setProviderDescriptors] = useState<ProviderDescriptor[]>([])
 
+  // Mission 1.3: SHOGUN データ接続状態（Calendar/Drive/Sheets を実取得して判定）
+  type SourceState = DataSource | 'loading'
+  const [shogunSources, setShogunSources] = useState<{ calendar: SourceState; drive: SourceState; sheets: SourceState }>({
+    calendar: 'loading', drive: 'loading', sheets: 'loading',
+  })
+
   // OAuth コールバック後や再マウント時に最新セッション状態を反映
   useEffect(() => {
     setGSession(googleSession.get())
     setProviderDescriptors(providerRegistry.getAllDescriptors())
+
+    loadScheduleItems().then((r) => setShogunSources((s) => ({ ...s, calendar: r.source }))).catch(() => setShogunSources((s) => ({ ...s, calendar: 'error' })))
+    loadFileItems().then((r) => setShogunSources((s) => ({ ...s, drive: r.source }))).catch(() => setShogunSources((s) => ({ ...s, drive: 'error' })))
+    loadMetricItems().then((r) => setShogunSources((s) => ({ ...s, sheets: r.source }))).catch(() => setShogunSources((s) => ({ ...s, sheets: 'error' })))
   }, [])
+
+  // データソース → 表示ラベル＋色
+  function connStateLabel(source: SourceState, hasToken: boolean): { text: string; color: string; bg: string } {
+    if (source === 'loading') return { text: '確認中…', color: '#475569', bg: '#F1F5F9' }
+    if (source === 'api' || source === 'cache') return { text: '実データ接続済み', color: '#065F46', bg: '#D1FAE5' }
+    if (source === 'unconfigured') return { text: '設定不足', color: '#92400E', bg: '#FEF3C7' }
+    if (source === 'error') return { text: '取得失敗', color: '#991B1B', bg: '#FEE2E2' }
+    // mock
+    return hasToken
+      ? { text: '取得失敗（要再接続）', color: '#991B1B', bg: '#FEE2E2' }
+      : { text: '未接続（デモ）', color: '#475569', bg: '#F1F5F9' }
+  }
 
   const selectedCompany = companies.find((c) => c.id === company)
   const connectionStatus = getConnectionStatus()
@@ -572,6 +601,64 @@ export default function Settings({
                   </div>
                 )
               })}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── SHOGUN データ接続状態（Mission 1.3）── */}
+      {(() => {
+        const hasToken = googleToken.hasToken()
+        const gmailState: SourceState = connectionStatus.connected ? 'api' : 'mock'
+        const rows: Array<{ name: string; state: SourceState; demoOnly?: boolean }> = [
+          { name: 'Gmail', state: gmailState },
+          { name: 'Calendar', state: shogunSources.calendar },
+          { name: 'Drive', state: shogunSources.drive },
+          { name: 'Sheets', state: shogunSources.sheets },
+          { name: 'LINE WORKS', state: 'mock', demoOnly: true },
+        ]
+        return (
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 'var(--radius)',
+              padding: '14px 16px',
+              marginBottom: 14,
+              boxShadow: 'var(--shadow)',
+              border: '1.5px solid #C7D2FE',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 20 }}>🛰️</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#4338CA' }}>SHOGUN データ接続状態</div>
+                <div style={{ fontSize: 10, color: '#6366F1', fontWeight: 600 }}>
+                  読み取り専用 · 書き込み禁止 · LINE WORKSはデモ
+                </div>
+              </div>
+            </div>
+            {rows.map((row) => {
+              const label = row.demoOnly
+                ? { text: 'デモ（バックエンド必須）', color: '#0F766E', bg: '#CCFBF1' }
+                : connStateLabel(row.state, hasToken)
+              return (
+                <div
+                  key={row.name}
+                  style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '7px 0', borderBottom: '1px solid var(--border)', gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{row.name}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: label.color, background: label.bg, borderRadius: 6, padding: '3px 9px' }}>
+                    {label.text}
+                  </span>
+                </div>
+              )
+            })}
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
+              ※ Calendar/Drive/Sheets は Google接続（4スコープ）後に実データ化。
+              Sheets は .env のシートID設定が必要（未設定は「設定不足」）。
             </div>
           </div>
         )

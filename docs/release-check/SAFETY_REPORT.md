@@ -5,6 +5,26 @@
 
 ---
 
+## Mission 1.3 追加安全確認（Google 4サービス ReadOnly）
+
+| チェック項目 | 状態 |
+|------------|------|
+| 使用スコープ | ✅ gmail/calendar/drive/spreadsheets の readonly 4つのみ（GOOGLE_REAL_SCOPES）|
+| 書き込みスコープ | ❌ なし（send/modify/calendar/drive/spreadsheets 書き込みは要求しない）|
+| Calendar 書き込み | ❌ なし（createEvent/updateEvent/deleteEvent 未実装・GETのみ）|
+| Drive 書き込み | ❌ なし（createFile/updateFile/deleteFile/shareFile 未実装・GETのみ）|
+| Sheets 書き込み | ❌ なし（updateCell/appendRow/deleteRow/createSheet 未実装・GETのみ）|
+| Sheets 実取得 | ✅ fetchSpreadsheet/fetchSheetValues（GET）+ mapSheetValuesToMetrics |
+| シートID管理 | ✅ `.env` のみ（コード直書きなし・.gitignore 済み）|
+| バックエンド/Cloud Run/Firebase/外部DB/Webhook | ❌ 作成なし |
+| 有料クラウドリソース | ❌ 作成なし（費用ゼロ）|
+| LINE WORKS 本番接続 | ❌ なし（デモのまま）|
+| 取得データの用途 | ✅ 表示・AI判定のみ（外部書き込みなし）|
+
+詳細は `PROJECT_SHOGUN_GOOGLE_REAL_DATA.md` / `PRODUCTION_SECURITY_CHECK.md` を参照。
+
+---
+
 ## Phase 11 追加安全確認（Gmail ReadOnly 本番接続）
 
 | チェック項目 | 状態 |

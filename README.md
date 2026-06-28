@@ -10,6 +10,9 @@
 > | 🔧 **本番接続手順** | [docs/NEXT_SETUP_STEPS.md](docs/NEXT_SETUP_STEPS.md) |
 > | 📦 **納品物一覧** | [docs/DELIVERY_SUMMARY.md](docs/DELIVERY_SUMMARY.md) |
 > | 🔌 **Gmail本番接続手順** | [docs/GOOGLE_OAUTH_SETUP.md](docs/GOOGLE_OAUTH_SETUP.md) |
+> | 🛰 **Google 4スコープ設定** | [docs/GOOGLE_SCOPES_SETUP.md](docs/GOOGLE_SCOPES_SETUP.md) |
+> | 📊 **Sheets データ形式** | [docs/SHEETS_DATA_FORMAT.md](docs/SHEETS_DATA_FORMAT.md) |
+> | 🗾 **Google実データ化(SHOGUN)** | [docs/PROJECT_SHOGUN_GOOGLE_REAL_DATA.md](docs/PROJECT_SHOGUN_GOOGLE_REAL_DATA.md) |
 >
 > **📐 最終設計書（本番運用前の確定版）**
 >
@@ -23,12 +26,13 @@
 
 > スマホ（Safari / Chrome）で上記URLを開くだけで使えます。アプリのインストールは不要です。
 
-> **🔔 Phase 11 — Gmail ReadOnly 本番接続を開始しました**
-> - ✅ **Gmail の実データ（読み取り専用）接続**に対応（要 Google OAuth 設定）
-> - ⏳ Calendar / Drive / Sheets / LINE WORKS は**まだ未接続**（デモのまま）
-> - ❌ 送信・返信・下書き・削除・既読化は**不可**（永久に実装しない）
-> - 本番運用には Google OAuth 設定が必要です → [docs/GOOGLE_OAUTH_SETUP.md](docs/GOOGLE_OAUTH_SETUP.md)
-> - 未設定の場合はデモデータで動作します（これまで通り）
+> **🔔 Mission 1.3 — Google 4サービスを実データ化しました**
+> - ✅ **Gmail / Calendar / Drive / Sheets の実データ（読み取り専用）接続**に対応
+> - ⏳ LINE WORKS は当面デモのまま（バックエンド必須）
+> - ❌ 送信・返信・作成・更新・削除・既読化・共有変更は**不可**（永久に実装しない）
+> - 使用スコープは4つすべて readonly。バックエンド・有料リソースは作りません（費用ゼロ）
+> - 設定手順 → [docs/GOOGLE_SCOPES_SETUP.md](docs/GOOGLE_SCOPES_SETUP.md) ／ Sheets形式 → [docs/SHEETS_DATA_FORMAT.md](docs/SHEETS_DATA_FORMAT.md)
+> - 未接続・ID未設定のProviderはデモデータで動作します（朝のブリーフィングに取得状況を表示）
 
 ---
 
