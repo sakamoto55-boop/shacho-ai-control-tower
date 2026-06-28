@@ -116,12 +116,34 @@
           </div>
         </div>
         <div class="text-right leading-tight">
-          <div class="text-[10px] text-blue-200 truncate max-w-[150px]">{{ activeProject ? (activeProject.name || '無題案件') : '案件未選択' }}</div>
-          <div class="text-base font-bold" style="color:var(--lcc-orange)">{{ yen(grand.total) }}</div>
+          <div class="text-[10px] text-blue-200 truncate max-w-[160px]">{{ activeProject ? (customerName(activeProject.customerId)||'顧客未設定') : '顧客未設定' }}</div>
+          <div class="text-[12px] font-bold text-white truncate max-w-[160px]">{{ activeProject ? (activeProject.name || '無題案件') : '案件未選択' }}</div>
+          <div class="text-sm font-bold" style="color:var(--lcc-orange)">{{ activeProject ? yen(grand.total) : '' }}</div>
         </div>
       </div>
+      <!-- 全画面コンテキストバー（必須改修6：顧客・案件・見積・ステータスを全画面表示） -->
+      <div class="mt-1.5 flex items-center gap-1.5 text-[10px] bg-white/10 rounded-lg px-2 py-1 flex-wrap">
+        <template v-if="activeProject">
+          <span class="text-blue-300 shrink-0">案件ID:</span>
+          <span class="text-white font-mono text-[9px] shrink-0">#{{ activeProject.id.slice(-8) }}</span>
+          <template v-if="activeEstimate">
+            <span class="text-blue-400 shrink-0">/</span>
+            <span class="text-blue-300 shrink-0">見積:</span>
+            <span class="text-white font-mono text-[9px] shrink-0">#{{ activeEstimate.id.slice(-6) }}<span v-if="activeEstimate.version"> v{{ activeEstimate.version }}</span></span>
+          </template>
+          <span v-else class="text-blue-300 text-[9px]">/ 見積未作成</span>
+          <span class="ml-auto shrink-0 flex items-center gap-1">
+            <span class="pill text-white" :style="'background:'+stageColor(activeProject.status)+';font-size:9px;padding:1px 6px'">{{ stageLabel(activeProject.status) }}</span>
+            <span v-if="isContractLocked" class="pill text-white" style="background:#dc2626;font-size:9px;padding:1px 6px">🔒受注済</span>
+          </span>
+        </template>
+        <template v-else>
+          <span class="font-bold" style="color:#fbbf24">案件未選択</span>
+          <span class="text-blue-300 ml-1 text-[9px]">← 案件を選択または新規作成</span>
+        </template>
+      </div>
       <!-- 社内向け原価粗利バー（案件ハブで見積がある時のみ） -->
-      <div v-if="inProjectHub && activeEstimate && !vendorMode" class="mt-1.5 flex items-center gap-2 text-[10px] bg-white/10 rounded-lg px-2 py-1">
+      <div v-if="inProjectHub && activeEstimate && !vendorMode" class="mt-1 flex items-center gap-2 text-[10px] bg-white/10 rounded-lg px-2 py-1">
         <span>売上 <b>{{ yen(grand.sell) }}</b></span>
         <span class="text-blue-200">原価 {{ yen(grand.cost) }}</span>
         <span style="color:var(--lcc-orange-soft)">粗利 <b>{{ yen(grand.profit) }}</b></span>
@@ -137,8 +159,18 @@
     <section v-show="tab==='projects' && !inProjectHub">
       <div class="flex items-center justify-between mb-2">
         <h2 class="font-bold text-gray-800 flex items-center gap-2"><span class="w-1.5 h-5 rounded" style="background:var(--lcc-orange)"></span>案件一覧</h2>
-        <button class="text-white text-sm font-bold rounded-xl px-4 py-2.5 big-btn" style="background:var(--lcc-navy)" @click="lccNewProject">＋ 新規案件</button>
+        <button class="text-white text-sm font-bold rounded-xl px-4 py-2.5 big-btn" style="background:var(--lcc-navy)" @click="lccNewProject">＋ 詳細入力</button>
       </div>
+
+      <!-- 必須改修1・2：クイック案件登録（帰り道・電話直後に30秒登録） -->
+      <button @click="lccOpenQuickProj" class="w-full rounded-2xl p-4 mb-3 flex items-center gap-3 text-left shadow-md" style="background:linear-gradient(135deg,#ff7a18,#d95a00);border:none">
+        <span class="text-3xl shrink-0">⚡</span>
+        <div class="flex-1 min-w-0">
+          <div class="font-black text-white text-base leading-tight">クイック案件登録</div>
+          <div class="text-orange-100 text-xs mt-0.5">帰り道・電話直後に30秒で登録</div>
+        </div>
+        <span class="text-white text-2xl shrink-0">›</span>
+      </button>
 
       <!-- 要フォローサマリー -->
       <div v-if="followCount>0" class="rounded-xl px-3 py-2.5 mb-2 text-sm font-bold flex items-center gap-2" style="background:#fff7e0;border:1px solid #f3e0a8;color:#a36a00">
@@ -243,7 +275,7 @@
       </div>
 
       <!-- サブタブバー -->
-      <div class="subtab-bar scrollbar-hide mb-3 sticky top-[58px] z-20 bg-[#eef1f6] py-1">
+      <div class="subtab-bar scrollbar-hide mb-3 sticky top-[92px] z-20 bg-[#eef1f6] py-1">
         <button v-for="st in projectSubtabs" :key="st.key" @click="lccSetSub(st.key)" class="subtab-btn" :class="projectSub===st.key?'on':''">
           {{ st.icon }} {{ st.label }}
         </button>
@@ -362,6 +394,35 @@
 
       <!-- ========== 積算サブタブ ========== -->
       <div v-show="projectSub==='estimate'">
+
+        <!-- 必須改修5・7：見積バージョン管理バー -->
+        <div v-if="activeProject" class="card p-3 mb-2">
+          <div class="flex items-center gap-2 mb-2">
+            <h3 class="font-bold text-gray-700 text-sm flex-1">見積（{{ (activeProject.estimates||[]).length }}件）</h3>
+            <button v-if="!isContractLocked" @click="lccAddEstimate" class="text-white text-xs font-bold rounded-xl px-3 py-2 btn-sm" style="background:var(--lcc-navy)">＋ 新バージョン</button>
+            <span v-else class="text-xs text-red-500 font-bold">🔒受注済み・編集ロック</span>
+          </div>
+          <div v-if="(activeProject.estimates||[]).length===0" class="text-xs text-gray-400 text-center py-2">見積がありません。「＋新バージョン」から作成してください。</div>
+          <div class="flex gap-1.5 overflow-x-auto scrollbar-hide">
+            <button v-for="e in (activeProject.estimates||[])" :key="e.id"
+              @click="selectEstimate(e.id)"
+              class="shrink-0 rounded-full px-3 py-1.5 text-xs font-bold border whitespace-nowrap"
+              :class="activeEstimateId===e.id?'text-white border-transparent':'bg-white text-gray-600 border-gray-300'"
+              :style="activeEstimateId===e.id?'background:var(--lcc-navy)':''">
+              {{ e.label }}<span v-if="e.version"> v{{ e.version }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 受注済み・ロック状態の表示（必須改修5） -->
+        <div v-if="isContractLocked" class="rounded-xl px-4 py-3 mb-2 flex items-center gap-2" style="background:#fff1f2;border:1px solid #fecdd3">
+          <span class="text-xl">🔒</span>
+          <div>
+            <div class="font-bold text-red-600 text-sm">受注済み・見積ロック中</div>
+            <div class="text-xs text-red-400">ステータスが「{{ stageLabel(activeProject.status) }}」のため、見積の編集はできません。内容確認のみ可能です。</div>
+          </div>
+        </div>
+
         <!-- 工事種別ハブ（クイック積算未選択時） -->
         <template v-if="!quickTrade">
           <h2 class="font-bold text-gray-800 mb-1 flex items-center gap-2"><span class="w-1.5 h-5 rounded" style="background:var(--lcc-orange)"></span>工事種別を選んでください</h2>
@@ -920,8 +981,10 @@
         <div class="card p-4 mb-2">
           <div class="flex items-center justify-between mb-2">
             <h3 class="font-bold text-gray-700 flex items-center gap-2"><span class="w-1.5 h-5 rounded" style="background:var(--lcc-orange)"></span>この顧客の案件</h3>
-            <button class="text-xs text-white rounded-lg px-3 py-2 btn-sm" style="background:var(--lcc-navy)" @click="lccNewProjectForCustomer(activeCustomer.id)">＋ 新規案件</button>
+            <button class="text-xs text-white rounded-lg px-3 py-2 btn-sm font-bold" style="background:var(--lcc-orange)" @click="lccNewProjectForCustomer(activeCustomer.id)">＋ 新規案件を作成</button>
           </div>
+          <!-- 必須改修4：既存顧客から新規案件の導線説明 -->
+          <div class="text-[11px] text-gray-400 mb-2 px-1">「新規案件を作成」をタップすると、この顧客の<b class="text-gray-600">新しい案件ID</b>が発行されます。過去の見積には影響しません。</div>
           <div v-if="customerProjects(activeCustomer.id).length===0" class="text-sm text-gray-400 text-center py-4">この顧客の案件はまだありません。</div>
           <div v-for="p in customerProjects(activeCustomer.id)" :key="p.id" class="flex items-center gap-2 border-b border-gray-100 py-2.5 last:border-0 cursor-pointer" @click="lccOpenProject(p.id)">
             <span class="pill text-white text-[10px] shrink-0" :style="'background:'+stageColor(p.status)">{{ stageLabel(p.status) }}</span>
@@ -1084,6 +1147,133 @@
     </transition>
 
     <!-- ====================================================== -->
+    <!-- ====================================================== -->
+    <!-- ============ 必須改修1・2：クイック案件登録モーダル ============ -->
+    <!-- ====================================================== -->
+    <div v-if="quickProjOpen" class="fixed inset-0 z-50 bg-white overflow-y-auto" style="padding-bottom:env(safe-area-inset-bottom)">
+      <!-- モーダルヘッダー -->
+      <div class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white" style="padding-top:calc(env(safe-area-inset-top)+10px)">
+        <button @click="lccCloseQuickProj" class="text-gray-500 font-bold px-2 py-1 text-sm border border-gray-300 rounded-lg">✕ キャンセル</button>
+        <div class="font-black text-base" style="color:var(--lcc-navy)">⚡ クイック案件登録</div>
+        <button @click="lccSaveQuickProj" class="text-white font-black px-4 py-2 rounded-xl text-sm" style="background:var(--lcc-orange)">保存</button>
+      </div>
+
+      <div class="max-w-2xl mx-auto px-4 pt-4 pb-32">
+        <!-- 顧客名 -->
+        <div class="mb-4">
+          <label class="block font-bold text-gray-700 mb-1.5 text-base">顧客名 <span class="text-xs text-gray-400 font-normal">未定でも可</span></label>
+          <div class="flex gap-2">
+            <input v-model="quickProjForm.customerName" placeholder="例：山田 太郎 / 出雲建設（株）" class="flex-1 border border-gray-300 rounded-xl px-3 py-3 text-base">
+            <select v-model="quickProjForm.existingCustomerId" class="border border-gray-300 rounded-xl px-2 py-3 text-sm bg-white min-w-[70px]" @change="quickProjSelectExistingCustomer">
+              <option value="">既存顧客↓</option>
+              <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.name||'(無名)' }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 電話番号 -->
+        <div class="mb-4">
+          <label class="block font-bold text-gray-700 mb-1.5 text-base">電話番号 <span class="text-xs text-gray-400 font-normal">未定でも可</span></label>
+          <input v-model="quickProjForm.customerTel" placeholder="例：090-xxxx-xxxx" type="tel" inputmode="tel" class="w-full border border-gray-300 rounded-xl px-3 py-3 text-base">
+        </div>
+
+        <!-- 現場住所 -->
+        <div class="mb-4">
+          <label class="block font-bold text-gray-700 mb-1.5 text-base">現場住所 <span class="text-xs text-gray-400 font-normal">分かる範囲で可</span></label>
+          <input v-model="quickProjForm.site" placeholder="例：出雲市知井宮町〇〇番地" class="w-full border border-gray-300 rounded-xl px-3 py-3 text-base">
+        </div>
+
+        <!-- 案件種別 -->
+        <div class="mb-4">
+          <label class="block font-bold text-gray-700 mb-1.5 text-base">案件種別</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button v-for="k in ['解体','外構','草刈り','伐採','残置物','修繕','その他']" :key="k"
+              class="rounded-xl py-3 text-sm font-bold border"
+              :class="quickProjForm.kind===k?'text-white border-transparent':'bg-white text-gray-600 border-gray-300'"
+              :style="quickProjForm.kind===k?'background:var(--lcc-navy)':''"
+              @click="quickProjForm.kind=k">{{ k }}</button>
+          </div>
+        </div>
+
+        <!-- 受付日 -->
+        <div class="mb-4">
+          <label class="block font-bold text-gray-700 mb-1.5 text-base">受付日</label>
+          <input v-model="quickProjForm.receivedAt" type="date" class="w-full border border-gray-300 rounded-xl px-3 py-3 text-base bg-white">
+        </div>
+
+        <!-- 担当者 -->
+        <div class="mb-4">
+          <label class="block font-bold text-gray-700 mb-1.5 text-base">担当者</label>
+          <input v-model="quickProjForm.responsible" placeholder="例：田中" class="w-full border border-gray-300 rounded-xl px-3 py-3 text-base">
+        </div>
+
+        <!-- メモ -->
+        <div class="mb-4">
+          <label class="block font-bold text-gray-700 mb-1.5 text-base">メモ・備考</label>
+          <textarea v-model="quickProjForm.note" rows="3" placeholder="現場状況・顧客の要望・気づいたことを自由に入力" class="w-full border border-gray-300 rounded-xl px-3 py-3 text-base leading-6"></textarea>
+        </div>
+
+        <!-- 写真 -->
+        <div class="mb-4">
+          <label class="block font-bold text-gray-700 mb-1.5 text-base">写真</label>
+          <div v-if="quickProjPhotoData" class="mb-2 relative">
+            <img :src="quickProjPhotoData" class="w-full max-h-48 object-cover rounded-xl border border-gray-200">
+            <button class="absolute top-2 right-2 bg-black/60 text-white rounded-full w-8 h-8 text-sm flex items-center justify-center" @click="quickProjPhotoData=''">✕</button>
+          </div>
+          <label class="flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 rounded-xl py-5 text-gray-500 cursor-pointer bg-gray-50">
+            <span class="text-2xl">📷</span><span class="font-bold">写真を追加</span>
+            <input type="file" accept="image/*" capture="environment" class="hidden" @change="onQuickProjPhoto">
+          </label>
+        </div>
+
+        <!-- 次アクション -->
+        <div class="mb-6">
+          <label class="block font-bold text-gray-700 mb-1.5 text-base">次アクション</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button v-for="a in ['現調する','見積を作る','後で確認','保留']" :key="a"
+              class="rounded-xl py-3 text-sm font-bold border"
+              :class="quickProjForm.nextAction===a?'text-white border-transparent':'bg-white text-gray-600 border-gray-300'"
+              :style="quickProjForm.nextAction===a?'background:var(--lcc-blue)':''"
+              @click="quickProjForm.nextAction=a">{{ a }}</button>
+          </div>
+        </div>
+
+        <button @click="lccSaveQuickProj" class="w-full text-white font-black rounded-xl py-4 text-lg" style="background:var(--lcc-orange)">
+          案件を登録する
+        </button>
+        <p class="text-center text-xs text-gray-400 mt-2">登録後に続けて見積作成・現調予定登録ができます</p>
+      </div>
+    </div>
+
+    <!-- 登録後アクション選択シート -->
+    <div v-if="quickProjAfterOpen" class="fixed inset-0 z-50 flex items-end" style="background:rgba(0,0,0,.55)">
+      <div class="w-full max-w-2xl mx-auto bg-white rounded-t-3xl px-5 pt-6" style="padding-bottom:calc(28px + env(safe-area-inset-bottom))">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="w-12 h-12 rounded-full flex items-center justify-center text-2xl shrink-0" style="background:#dcfce7">✅</div>
+          <div>
+            <div class="font-black text-lg" style="color:var(--lcc-navy)">案件を登録しました</div>
+            <div class="text-sm text-gray-500">次のアクションを選んでください</div>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <button class="rounded-2xl py-4 text-sm font-bold text-white flex flex-col items-center gap-2" style="background:var(--lcc-orange)" @click="lccQuickProjGoEstimate">
+            <span class="text-2xl">📄</span>続けて見積を作成
+          </button>
+          <button class="rounded-2xl py-4 text-sm font-bold text-white flex flex-col items-center gap-2" style="background:var(--lcc-blue)" @click="lccQuickProjGoVisit">
+            <span class="text-2xl">📅</span>現調予定を登録
+          </button>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <button class="rounded-2xl py-4 text-sm font-bold bg-gray-100 text-gray-700 flex flex-col items-center gap-2" @click="lccQuickProjBackToList">
+            <span class="text-2xl">📋</span>案件一覧へ戻る
+          </button>
+          <button class="rounded-2xl py-4 text-sm font-bold bg-gray-100 text-gray-700 flex flex-col items-center gap-2" @click="lccQuickProjEditLater">
+            <span class="text-2xl">✏️</span>後で編集
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- ============ 下部タブバー（3つにシンプル化） ============ -->
     <!-- ====================================================== -->
     <nav class="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 nav-safe no-print" style="box-shadow:0 -2px 12px rgba(0,0,0,.06)">
@@ -1386,6 +1576,23 @@ createApp({
       voiceOn:false, voiceMsg:'', voiceErr:false,
       vendorMode:false,
 
+      // ===== 必須改修1・2：クイック案件登録 =====
+      quickProjOpen: false,
+      quickProjAfterOpen: false,
+      quickProjSavedId: '',
+      quickProjPhotoData: '',
+      quickProjForm: {
+        customerName: '',
+        customerTel: '',
+        existingCustomerId: '',
+        site: '',
+        kind: '',
+        receivedAt: '',
+        responsible: '',
+        note: '',
+        nextAction: '',
+      },
+
       // ===== A4プレビュー自動縮小 =====
       a4Scale:1,
 
@@ -1446,6 +1653,8 @@ createApp({
     // ===== アクティブ要素 =====
     activeProject(){ return this.projects.find(p=>p.id===this.activeProjectId)||null; },
     activeEstimate(){ const p=this.activeProject; if(!p) return null; return (p.estimates||[]).find(e=>e.id===this.activeEstimateId)||(p.estimates&&p.estimates[0])||null; },
+    // 必須改修5：受注済み・施工中・完了は見積ロック
+    isContractLocked(){ return !!(this.activeProject && ['contract','inprogress','done'].includes(this.activeProject.status)); },
     activeCustomer(){ return this.customers.find(c=>c.id===this.activeCustomerId)||null; },
     projectComments(){ const p=this.activeProject; if(!p) return []; return (p.comments||[]).slice().sort((a,b)=>(a.ts||0)-(b.ts||0)); },
 
@@ -1689,7 +1898,8 @@ createApp({
 
     // ===== 永続化（LocalStorage） =====
     save(){
-      const db={ settings:this.settings, rates:this.rates, customers:this.customers, projects:this.projects, templates:this.templates, activeProjectId:this.activeProjectId, activeEstimateId:this.activeEstimateId, vendorMode:this.vendorMode };
+      // 必須改修3：activeProjectId/activeEstimateIdは永続化しない（起動時に前回案件を自動復元しないため）
+      const db={ settings:this.settings, rates:this.rates, customers:this.customers, projects:this.projects, templates:this.templates, vendorMode:this.vendorMode };
       try{ localStorage.setItem(STORE, JSON.stringify(db)); }catch(e){ console.warn('保存失敗',e); }
     },
     load(){
@@ -1703,7 +1913,8 @@ createApp({
         const customRates=(db.rates||[]).filter(r=>!builtIds.has(r.id));
         this.rates=[...buildRates(), ...customRates];
         this.customers=db.customers||[]; this.projects=db.projects||[]; this.templates=db.templates||[];
-        this.activeProjectId=db.activeProjectId||''; this.activeEstimateId=db.activeEstimateId||''; this.vendorMode=!!db.vendorMode;
+        // 必須改修3：activeProjectId/activeEstimateIdは復元しない（新規登録時に過去データを引き継がない）
+        this.activeProjectId=''; this.activeEstimateId=''; this.vendorMode=!!db.vendorMode;
         // 顧客の新フィールドを補完（旧データ互換）
         this.customers.forEach(c=>{
           if(c.kind==null) c.kind = c.ctype==='法人'?'corp':'person'; // 旧ctype→新kind変換
@@ -1711,13 +1922,19 @@ createApp({
           if(c.kana==null) c.kana='';
           if(c.contactPerson==null) c.contactPerson='';
         });
-        // 案件の新フィールドを補完
+        // 案件の新フィールドを補完（旧データ互換・必須改修7）
         this.projects.forEach(p=>{
           if(!Array.isArray(p.comments)) p.comments=[];
           if(!Array.isArray(p.photos)) p.photos=[];
           if(!Array.isArray(p.estimates)) p.estimates=[];
           if(!Array.isArray(p.approvals)) p.approvals=[{step:'担当者作成',status:'未承認'},{step:'上長確認',status:'未承認'},{step:'社長承認',status:'未承認'}];
           if(!Array.isArray(p.shareLog)) p.shareLog=[];
+          if(p.kind==null) p.kind='';
+          if(p.receivedAt==null) p.receivedAt='';
+          if(p.responsible==null) p.responsible='';
+          if(p.nextAction==null) p.nextAction='';
+          // 見積にversionフィールドがない場合は補完
+          (p.estimates||[]).forEach((e,i)=>{ if(e.version==null) e.version=i+1; if(e.copySourceId==null) e.copySourceId=''; });
           p.comments.forEach(cm=>{ if(!cm.id) cm.id=uid(); if(cm.img==null) cm.img=''; });
           // 既存見積ツリーの単価を単価マスタに合わせて更新
           const rateMap={}; this.rates.forEach(r=>{ rateMap[r.label]=r; });
@@ -1727,18 +1944,18 @@ createApp({
             else if(it.price>0){ it.marginPct=Math.round((1-it.cost/it.price)*1000)/10; }
           }); }); });
         });
-        // activeEstimateIdが空の場合、最初の見積を選択
-        if(!this.activeEstimateId && this.activeProject){ const e=(this.activeProject.estimates||[])[0]; if(e) this.activeEstimateId=e.id; }
+        // activeEstimateIdの自動補完は行わない（案件を明示的に開いた時にlccOpenProject()が設定する）
       }catch(e){ console.warn('読込失敗',e); this.rates=buildRates(); }
     },
     seedDemo(){
-      // 初回起動時のサンプルデータ
+      // 初回起動時のサンプルデータ（必須改修3：activeProjectId/activeEstimateIdは設定しない）
       const c={ id:uid(), name:'サンプル太郎', kana:'サンプルタロウ', tel:'090-0000-0000', address:'島根県出雲市知井宮町', note:'', kind:'person', referral:'チラシ', contactPerson:'' };
       this.customers=[c];
       const p=this.newProjectObj(); p.name='サンプル様邸 木造解体工事'; p.customerId=c.id; p.site='出雲市知井宮町'; p.status='quote';
-      const e={ id:uid(), label:'見積', tree:[], createdAt:Date.now() };
+      const e={ id:uid(), label:'見積1', version:1, copySourceId:'', tree:[], createdAt:Date.now() };
       p.estimates.push(e);
-      this.projects=[p]; this.activeProjectId=p.id; this.activeEstimateId=e.id;
+      this.projects=[p];
+      // activeProjectId/activeEstimateIdは設定しない（起動時は案件一覧から開始）
       this.save();
     },
 
@@ -1754,7 +1971,7 @@ createApp({
     lccOpenProject(id){
       const p=this.projects.find(x=>x.id===id); if(!p) return;
       this.activeProjectId=id;
-      if(!Array.isArray(p.estimates)||p.estimates.length===0){ p.estimates=[{ id:uid(), label:'見積', tree:[], createdAt:Date.now() }]; }
+      if(!Array.isArray(p.estimates)||p.estimates.length===0){ p.estimates=[{ id:uid(), label:'見積1', version:1, copySourceId:'', tree:[], createdAt:Date.now() }]; }
       if(!Array.isArray(p.comments)) p.comments=[];
       if(!Array.isArray(p.photos)) p.photos=[];
       this.activeEstimateId=(p.estimates[0]||{}).id||'';
@@ -1794,16 +2011,17 @@ createApp({
     },
     // 顧客詳細から、その顧客の新規案件を作成して案件ハブへ
     lccNewProjectForCustomer(customerId){
+      // 必須改修4：既存顧客から「新規」案件を作成（過去案件・過去見積には触れない）
       const p=this.newProjectObj(); p.customerId=customerId;
       const c=this.customers.find(x=>x.id===customerId);
       if(c) p.name=(c.name||'新規顧客')+'様 ';
-      const e={ id:uid(), label:'見積', tree:[], createdAt:Date.now() };
+      const e={ id:uid(), label:'見積1', version:1, copySourceId:'', tree:[], createdAt:Date.now() };
       p.estimates.push(e);
       this.projects.unshift(p);
       this.activeProjectId=p.id; this.activeEstimateId=e.id;
       this.inProjectHub=true; this.projectSub='overview';
       this.tab='projects';
-      this.save(); this.toastMsg('案件を作成しました');
+      this.save(); this.toastMsg('新規案件ID #'+p.id.slice(-6)+' を作成しました（過去案件とは別の案件です）');
       window.scrollTo({top:0,behavior:'smooth'});
     },
     // 案件削除
@@ -1825,16 +2043,30 @@ createApp({
 
     // ===== 案件 =====
     newProjectObj(){
-      return { id:uid(), customerId:'', name:'', site:'', lat:null, lng:null, status:'lead',
-        createdAt:Date.now(), updatedAt:Date.now(),
-        estimates:[], photos:[], comments:[],
-        approvals:[{step:'担当者作成',status:'未承認'},{step:'上長確認',status:'未承認'},{step:'社長承認',status:'未承認'}],
-        shareLog:[] };
+      return {
+        id: uid(),           // 案件ID（必須改修7：案件IDを独立発行）
+        customerId: '',      // 顧客ID（顧客1件に対して案件は複数）
+        name: '',
+        site: '',
+        lat: null, lng: null,
+        status: 'lead',
+        kind: '',            // 案件種別（解体/外構/草刈り/伐採/残置物/修繕/その他）
+        receivedAt: '',      // 受付日
+        responsible: '',     // 担当者
+        nextAction: '',      // 次アクション
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        estimates: [],       // 見積ID一覧（案件1件に対して見積は複数）
+        photos: [],
+        comments: [],
+        approvals: [{step:'担当者作成',status:'未承認'},{step:'上長確認',status:'未承認'},{step:'社長承認',status:'未承認'}],
+        shareLog: []
+      };
     },
     // ＋新規案件ボタン（案件一覧から）
     lccNewProject(){
       const p=this.newProjectObj();
-      const e={ id:uid(), label:'見積', tree:[], createdAt:Date.now() };
+      const e={ id:uid(), label:'見積1', version:1, copySourceId:'', tree:[], createdAt:Date.now() };
       p.estimates.push(e);
       this.projects.unshift(p);
       this.activeProjectId=p.id; this.activeEstimateId=e.id;
@@ -2186,6 +2418,112 @@ createApp({
       localStorage.removeItem(STORE);
       location.reload();
     },
+
+    // ===== 必須改修1・2：クイック案件登録 =====
+    lccOpenQuickProj(){
+      const today=new Date();
+      const ds=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+      this.quickProjForm={ customerName:'', customerTel:'', existingCustomerId:'', site:'', kind:'', receivedAt:ds, responsible:this.settings.company.person||'', note:'', nextAction:'' };
+      this.quickProjPhotoData='';
+      this.quickProjOpen=true;
+      window.scrollTo({top:0,behavior:'instant'});
+    },
+    lccCloseQuickProj(){ this.quickProjOpen=false; },
+    quickProjSelectExistingCustomer(){
+      const cid=this.quickProjForm.existingCustomerId; if(!cid) return;
+      const c=this.customers.find(x=>x.id===cid); if(!c) return;
+      if(!this.quickProjForm.customerName) this.quickProjForm.customerName=c.name||'';
+      if(!this.quickProjForm.customerTel) this.quickProjForm.customerTel=c.tel||'';
+    },
+    onQuickProjPhoto(e){
+      const f=e.target.files&&e.target.files[0]; if(!f) return;
+      const r=new FileReader(); r.onload=(ev)=>{ this.quickProjPhotoData=ev.target.result; }; r.readAsDataURL(f); e.target.value='';
+    },
+    lccSaveQuickProj(){
+      const f=this.quickProjForm;
+      let customerId=f.existingCustomerId;
+      // 既存顧客が未選択で名前または電話番号がある場合は新規顧客作成
+      if(!customerId){
+        const name=(f.customerName||'').trim(); const tel=(f.customerTel||'').trim();
+        if(name||tel){
+          const c={ id:uid(), name:name||'(未定)', kana:'', tel:tel, address:'', note:'', kind:'person', referral:'', contactPerson:'' };
+          this.customers.unshift(c); customerId=c.id;
+        }
+      }
+      // 必ず新規案件IDを発行（過去データを引き継がない）
+      const p=this.newProjectObj();
+      p.customerId=customerId;
+      p.site=(f.site||'').trim();
+      p.kind=f.kind;
+      p.receivedAt=f.receivedAt;
+      p.responsible=(f.responsible||'').trim();
+      p.nextAction=f.nextAction;
+      p.status=f.nextAction==='見積を作る'?'quote':f.nextAction==='現調する'?'visit':'lead';
+      // 案件名を自動生成（後で自由に変更可能）
+      const cname=customerId?(this.customerName(customerId)||'(未定)'):'(未定)';
+      const siteShort=(f.site||'').trim().replace('島根県','').replace('出雲市','').slice(0,12);
+      p.name=cname+'様'+(f.kind?' '+f.kind:'')+(siteShort?' ('+siteShort+')':'');
+      // メモをコメントとして登録
+      if((f.note||'').trim()){
+        p.comments=[{ id:uid(), name:(f.responsible||'').trim()||'担当者', text:f.note.trim(), img:'', ts:Date.now() }];
+      }
+      // 写真を追加
+      if(this.quickProjPhotoData){
+        p.photos=[{ id:uid(), dataUrl:this.quickProjPhotoData, kind:'現場写真', memo:'クイック登録時', ts:Date.now() }];
+      }
+      this.projects.unshift(p);
+      this.quickProjSavedId=p.id;
+      this.save();
+      this.quickProjOpen=false;
+      this.quickProjAfterOpen=true;
+    },
+    lccQuickProjGoEstimate(){
+      this.quickProjAfterOpen=false;
+      this.lccOpenProject(this.quickProjSavedId);
+      this.lccSetSub('estimate');
+    },
+    lccQuickProjGoVisit(){
+      this.quickProjAfterOpen=false;
+      const p=this.projects.find(x=>x.id===this.quickProjSavedId);
+      if(p){ p.status='visit'; this.save(); }
+      this.lccOpenProject(this.quickProjSavedId);
+      this.toastMsg('案件を開きました。概要タブのメモ欄に現調予定を記入できます');
+    },
+    lccQuickProjBackToList(){
+      this.quickProjAfterOpen=false;
+      this.tab='projects'; this.inProjectHub=false;
+      window.scrollTo({top:0,behavior:'smooth'});
+    },
+    lccQuickProjEditLater(){
+      this.quickProjAfterOpen=false;
+      this.lccOpenProject(this.quickProjSavedId);
+    },
+
+    // ===== 必須改修5・7：見積バージョン追加 =====
+    lccAddEstimate(){
+      const p=this.activeProject; if(!p) return;
+      if(!Array.isArray(p.estimates)) p.estimates=[];
+      const versionNum=p.estimates.length+1;
+      const e={ id:uid(), label:'見積'+versionNum, version:versionNum, tree:[], createdAt:Date.now(), copySourceId:'' };
+      p.estimates.push(e);
+      this.activeEstimateId=e.id;
+      this.touch(p);
+      this.toastMsg('新しい見積 v'+versionNum+' を追加しました');
+    },
+
+    // ===== テンプレート補完：不足していたメソッド =====
+    // 写真追加（概要タブで使用）
+    addPhotos(e){ this.onPhotoFiles(e); },
+    // コメント写真添付
+    attachCommentPhoto(e){ this.onCommentImg(e); },
+    // Excel/CSVエクスポート（見積書タブで使用）
+    exportExcel(){ this.exportEstExcel(); },
+    exportCSV(){ this.exportEstCsv(); },
+    // 写真タグカラー
+    tagColor(t){
+      const map={ '現場写真':'#0a2a5e','施工前':'#6b7280','施工中':'#f59e0b','施工後':'#1f8f4e','図面':'#7c3aed','残置物':'#dc2626' };
+      return map[t]||'#94a3b8';
+    },
   },
 
   // ===== マウント =====
@@ -2194,10 +2532,10 @@ createApp({
     // A4プレビュー縮小（リサイズ対応）
     this.fitA4();
     window.addEventListener('resize',()=>this.fitA4());
-    // activeProjectIdが設定済みなら案件ハブを開く
-    if(this.activeProjectId && this.projects.find(p=>p.id===this.activeProjectId)){
-      this.inProjectHub=true; this.projectSub='overview';
-    }
+    // 必須改修3：起動時は必ず案件一覧から開始（前回の案件を自動復元しない）
+    this.inProjectHub=false;
+    this.activeProjectId='';
+    this.activeEstimateId='';
   },
 }).mount('#app');
 </script>
