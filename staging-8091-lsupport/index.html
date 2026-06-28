@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="LCC業務">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a2a5e">
+<meta name="description" content="LCC株式会社 統合業務システム ポータル。見積システムと原価管理アプリへの入口。">
+<title>LCC株式会社 統合業務システム</title>
+
+<!-- ============================================================
+     PWA manifest（インライン / 外部ファイル不使用）
+     - icons に SVG データURIを2サイズ登録し、ホーム追加時にアイコンが出るよう修正
+       （元ファイルは icons:[] で空だったためアイコンが表示されない不具合があった）
+     ============================================================ -->
+<link rel="manifest" href='data:application/manifest+json,{"name":"LCC統合業務システム","short_name":"LCC業務","start_url":"./index.html","scope":"./","display":"standalone","orientation":"portrait","background_color":"%230a2a5e","theme_color":"%230a2a5e","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27192%27 height=%27192%27%3E%3Crect width=%27192%27 height=%27192%27 rx=%2738%27 fill=%27%230a2a5e%27/%3E%3Ctext x=%2796%27 y=%27126%27 font-size=%2796%27 font-weight=%27900%27 text-anchor=%27middle%27 fill=%27white%27 font-family=%27sans-serif%27%3EL%3Ctspan fill=%27%23ff7a18%27%3EC%3C/tspan%3EC%3C/text%3E%3C/svg%3E","sizes":"192x192","type":"image/svg+xml","purpose":"any maskable"},{"src":"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27512%27 height=%27512%27%3E%3Crect width=%27512%27 height=%27512%27 rx=%27102%27 fill=%27%230a2a5e%27/%3E%3Ctext x=%27256%27 y=%27336%27 font-size=%27256%27 font-weight=%27900%27 text-anchor=%27middle%27 fill=%27white%27 font-family=%27sans-serif%27%3EL%3Ctspan fill=%27%23ff7a18%27%3EC%3C/tspan%3EC%3C/text%3E%3C/svg%3E","sizes":"512x512","type":"image/svg+xml","purpose":"any maskable"}]}'>
+
+<!-- iOS ホーム追加用アイコン（apple-touch-icon） -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Crect width='180' height='180' fill='%230a2a5e'/%3E%3Ctext x='90' y='118' font-size='90' font-weight='900' text-anchor='middle' fill='white' font-family='sans-serif'%3EL%3Ctspan fill='%23ff7a18'%3EC%3C/tspan%3EC%3C/text%3E%3C/svg%3E">
+<!-- ブラウザタブ用 favicon（SVG） -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' rx='12' fill='%230a2a5e'/%3E%3Ctext x='32' y='44' font-size='34' font-weight='900' text-anchor='middle' fill='white' font-family='sans-serif'%3EL%3Ctspan fill='%23ff7a18'%3EC%3C/tspan%3EC%3C/text%3E%3C/svg%3E">
+
+<!-- Vue 3 / Tailwind は CDN 読み込み（ビルドツール不使用） -->
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+  /* ============================================================
+     カラーパレット（紺グラデ + オレンジアクセント）
+     ============================================================ */
+  :root{
+    --lcc-navy:#0a2a5e;        /* 基調の紺 */
+    --lcc-navy-deep:#06183a;   /* 深い紺（グラデの終点） */
+    --lcc-blue:#1d6fe0;        /* 補助のブルー */
+    --lcc-orange:#ff7a18;      /* アクセントのオレンジ */
+    --lcc-orange-soft:#ffb066; /* やわらかいオレンジ */
+    --lcc-green:#16a34a;       /* 完了・正常を表す緑 */
+  }
+
+  /* タップ時のハイライトを消す／ボックスモデル統一 */
+  *{ -webkit-tap-highlight-color:transparent; box-sizing:border-box; }
+  html,body{
+    margin:0;
+    /* 全面の紺グラデ背景 */
+    background:linear-gradient(160deg,var(--lcc-navy) 0%,var(--lcc-navy-deep) 100%);
+    background-attachment:fixed;
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    color:#1f2937;
+    min-height:100vh;
+  }
+  html,body{ max-width:100%; overflow-x:hidden; } /* 横スクロール禁止 */
+
+  /* iOSのズーム防止：入力系は16px以上 */
+  input,select,textarea,button{ font-size:16px; }
+
+  /* 本文の基準フォントを底上げ（現場・高齢者向けに最低14px以上を確保） */
+  body{ font-size:15px; line-height:1.6; }
+
+  /* タップ領域を44px以上に（押しやすさ最優先） */
+  button{ min-height:44px; cursor:pointer; }
+
+  /* ============================================================
+     タップフィードバック共通クラス（.tap）
+     - 指でタップした瞬間に軽く縮むアニメーションで「押した感」を統一
+     - ボタン／カード／チップなど押せる要素に付与する
+     ============================================================ */
+  .tap{ transition:transform .12s cubic-bezier(0.23,1,0.32,1), filter .12s; }
+  .tap:active{ transform:scale(.96); filter:brightness(.97); }
+
+  [v-cloak]{ display:none; }
+
+  /* ============================================================
+     オープニングアニメーション
+     紺背景 → LCCロゴ ポップアップ → スイープ光 → 社名表示 → フェードアウト
+     ============================================================ */
+  .opening{
+    position:fixed; inset:0; z-index:9999;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:linear-gradient(160deg,var(--lcc-navy) 0%,var(--lcc-navy-deep) 100%);
+    overflow:hidden;
+  }
+  /* フェードアウト用クラス（2秒後に付与） */
+  .opening.fade-out{ animation:openingFade .6s ease forwards; }
+  @keyframes openingFade{ to{ opacity:0; visibility:hidden; } }
+
+  /* ロゴ枠（L[オレンジのC]C）がポップアップ */
+  .op-logo{
+    position:relative;
+    font-weight:900; letter-spacing:.06em;
+    font-size:64px; line-height:1;
+    color:#fff;
+    padding:14px 26px;
+    border:4px solid var(--lcc-orange);
+    border-radius:18px;
+    opacity:0;
+    transform:scale(.4);
+    animation:logoPop .7s cubic-bezier(0.18,1.25,0.4,1) .15s forwards;
+    overflow:hidden;
+  }
+  .op-logo .c{ color:var(--lcc-orange); }
+  @keyframes logoPop{
+    0%{ opacity:0; transform:scale(.4); }
+    70%{ opacity:1; transform:scale(1.08); }
+    100%{ opacity:1; transform:scale(1); }
+  }
+
+  /* スイープ光（ロゴの上を斜めに通過する光の帯） */
+  .op-logo::after{
+    content:"";
+    position:absolute; top:0; left:-130%;
+    width:60%; height:100%;
+    background:linear-gradient(100deg,transparent 0%,rgba(255,255,255,.0) 20%,rgba(255,255,255,.55) 50%,rgba(255,255,255,0) 80%,transparent 100%);
+    transform:skewX(-18deg);
+    animation:logoSweep .8s ease-in-out .85s forwards;
+  }
+  @keyframes logoSweep{ 0%{ left:-130%; } 100%{ left:130%; } }
+
+  /* 社名（LCC株式会社） */
+  .op-name{
+    margin-top:22px;
+    color:#fff; font-weight:800; font-size:22px; letter-spacing:.08em;
+    opacity:0; transform:translateY(10px);
+    animation:nameIn .6s ease 1.05s forwards;
+  }
+  /* 英字サブ（SHIMANE IZUMO） */
+  .op-sub{
+    margin-top:6px;
+    color:var(--lcc-orange-soft); font-weight:700; font-size:12px; letter-spacing:.32em;
+    opacity:0; transform:translateY(10px);
+    animation:nameIn .6s ease 1.3s forwards;
+  }
+  @keyframes nameIn{ to{ opacity:1; transform:translateY(0); } }
+
+  /* オープニングをスキップするための小さなヒント */
+  .op-skip{
+    position:absolute; bottom:calc(24px + env(safe-area-inset-bottom));
+    color:rgba(255,255,255,.5); font-size:11px; letter-spacing:.1em;
+    opacity:0; animation:nameIn .6s ease 1.6s forwards;
+  }
+
+  /* ============================================================
+     システムカード（見積システム / 原価管理）
+     ============================================================ */
+  .sys-card{
+    display:block; text-decoration:none;
+    background:#ffffff; border-radius:20px;
+    padding:18px;
+    box-shadow:0 8px 24px rgba(0,0,0,.18);
+    border:1px solid rgba(255,255,255,.5);
+    transition:transform .16s cubic-bezier(0.23,1,0.32,1), box-shadow .16s;
+  }
+  /* .tapと重複しないよう:activeは維持（より強い視覚フィードバック） */
+  .sys-card:active{ transform:scale(.97); box-shadow:0 4px 14px rgba(0,0,0,.22); }
+  .sys-icon{
+    width:56px; height:56px; border-radius:16px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:28px; flex-shrink:0;
+  }
+  /* カード内のクイックリンク（チップ） */
+  /* タップ領域を44px以上に拡大し、本文サイズも14pxへ底上げ（押しやすさ最優先） */
+  .chip{
+    display:inline-flex; align-items:center; gap:6px;
+    border-radius:999px; padding:10px 14px;
+    font-size:14px; font-weight:700;
+    text-decoration:none;
+    transition:transform .12s, filter .12s;
+    min-height:44px;
+  }
+  .chip:active{ transform:scale(.94); filter:brightness(.96); }
+
+  /* ============================================================
+     業務フロー（今やるべきこと）ステップ
+     ============================================================ */
+  .flow-step{
+    display:flex; align-items:center; gap:14px;
+    background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:16px;
+    padding:14px;
+  }
+  .flow-badge{
+    width:46px; height:46px; flex-shrink:0;
+    border-radius:14px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:22px; font-weight:900; color:#fff;
+    background:linear-gradient(135deg,var(--lcc-orange) 0%,#e85d00 100%);
+    box-shadow:0 4px 10px rgba(255,122,24,.35);
+  }
+  .flow-jump{
+    flex-shrink:0;
+    border:none; border-radius:12px;
+    padding:0 18px; min-height:48px;
+    font-weight:800; font-size:15px; color:#fff;
+    background:var(--lcc-blue);
+    box-shadow:0 3px 8px rgba(29,111,224,.4);
+    transition:transform .12s;
+  }
+  .flow-jump:active{ transform:scale(.94); }
+
+  /* ============================================================
+     お知らせ / 更新履歴セクション 共通パネル
+     ============================================================ */
+  .panel{
+    background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:16px;
+    padding:14px 16px;
+  }
+  /* お知らせ1件 */
+  .news-item{
+    display:flex; gap:10px; align-items:flex-start;
+    padding:11px 0;
+    border-bottom:1px dashed rgba(255,255,255,.14);
+  }
+  .news-item:last-child{ border-bottom:none; }
+  /* 種別ラベル（重要 / 更新 / 案内） */
+  .news-tag{
+    flex-shrink:0; font-size:12px; font-weight:800; color:#fff;
+    border-radius:6px; padding:4px 9px; line-height:1.3; letter-spacing:.02em;
+  }
+
+  /* 更新履歴のタイムライン */
+  .log-item{
+    display:flex; gap:12px; padding:9px 0;
+    border-bottom:1px dashed rgba(255,255,255,.12);
+  }
+  .log-item:last-child{ border-bottom:none; }
+  .log-ver{
+    flex-shrink:0; width:64px;
+    font-size:13px; font-weight:800; color:var(--lcc-orange-soft);
+  }
+
+  /* 折りたたみの開閉アイコン回転 */
+  .chevron{ transition:transform .2s; }
+  .chevron.open{ transform:rotate(180deg); }
+
+  /* safe-area 対応の下部余白 */
+  .safe-bottom{ padding-bottom:calc(28px + env(safe-area-inset-bottom)); }
+
+  /* PWAインストール案内バー */
+  .install-bar{
+    background:linear-gradient(135deg,var(--lcc-orange) 0%,#e85d00 100%);
+    border-radius:14px; padding:12px 14px;
+    box-shadow:0 6px 16px rgba(255,122,24,.35);
+  }
+</style>
+</head>
+<body>
+<div id="app" v-cloak>
+
+  <!-- ============================================================
+       オープニングアニメーション
+       showOpening が true の間だけ表示。2秒後に fadeOut → 非表示
+       画面タップで即スキップできる（現場の方の待ち時間短縮）
+       ============================================================ -->
+  <div v-if="showOpening" class="opening" :class="{ 'fade-out': openingFade }" @click="skipOpening">
+    <div class="op-logo">L<span class="c">C</span>C</div>
+    <div class="op-name">LCC株式会社</div>
+    <div class="op-sub">SHIMANE IZUMO</div>
+    <div class="op-skip">タップでスキップ</div>
+  </div>
+
+  <!-- ============================================================
+       メイン：統合トップ画面（分岐ハブ）
+       ============================================================ -->
+  <main class="safe-bottom" style="padding-top:calc(env(safe-area-inset-top) + 22px)">
+    <div class="mx-auto px-4" style="max-width:620px">
+
+      <!-- ヘッダー（ロゴ + 社名 + 日付） -->
+      <header class="flex items-center gap-3 mb-5 text-white">
+        <span class="font-black text-xl px-2.5 py-1 rounded-lg"
+              style="border:2.5px solid var(--lcc-orange); letter-spacing:.05em">
+          L<span style="color:var(--lcc-orange)">C</span>C
+        </span>
+        <div class="leading-tight flex-1 min-w-0">
+          <div class="text-lg font-bold">LCC株式会社</div>
+          <div class="text-[11px] tracking-[.25em]" style="color:var(--lcc-orange-soft)">SHIMANE IZUMO</div>
+        </div>
+        <!-- 今日の日付（自動表示） -->
+        <div class="text-right leading-tight">
+          <div class="text-[12px] text-blue-200">{{ today.dow }}</div>
+          <div class="text-[15px] font-bold">{{ today.md }}</div>
+        </div>
+      </header>
+
+      <!-- 見出し -->
+      <h1 class="text-white font-bold text-[22px] mb-1">統合業務システム</h1>
+      <p class="text-blue-200 text-[13px] mb-5">使うシステムを選んでください</p>
+
+      <!-- ============================================================
+           PWAインストール案内（ホーム追加未済のときだけ表示）
+           - Android/Chrome: beforeinstallprompt を捕捉してワンタップ追加
+           - iOS Safari: 手順を案内
+           ============================================================ -->
+      <div v-if="showInstall" class="install-bar mb-5 flex items-center gap-3 text-white">
+        <div class="text-2xl">📲</div>
+        <div class="flex-1 min-w-0 leading-snug">
+          <div class="font-bold text-[14px]">ホーム画面に追加すると便利です</div>
+          <div class="text-[11.5px] opacity-90">{{ installHint }}</div>
+        </div>
+        <button v-if="canPrompt" @click="doInstall"
+                class="bg-white/95 rounded-lg px-4 py-2 font-bold text-[14px] tap" style="color:#e85d00; min-height:44px">追加</button>
+        <button @click="dismissInstall"
+                class="text-white/80 text-2xl px-2 py-1 tap" aria-label="閉じる" style="min-height:44px">×</button>
+      </div>
+
+      <!-- ============================================================
+           2つのシステムカード（概要 + クイックアクセスチップ）
+           ============================================================ -->
+      <div class="grid grid-cols-1 gap-4 mb-7">
+
+        <!-- ---------- 見積システム → lcc.html ---------- -->
+        <div class="sys-card">
+          <!-- カード本体（タップで見積システムトップへ） -->
+          <a href="lcc.html" class="flex items-center gap-4 no-underline">
+            <div class="sys-icon" style="background:#fff2e6; color:var(--lcc-orange)">🧮</div>
+            <div class="flex-1 min-w-0">
+              <div class="font-bold text-[17px]" style="color:var(--lcc-navy)">見積システム</div>
+              <div class="text-[12.5px] text-gray-500 mt-0.5">案件登録・見積書作成・実行予算</div>
+            </div>
+            <div class="text-gray-300 text-2xl">›</div>
+          </a>
+          <!-- 概要説明 -->
+          <p class="text-[12px] text-gray-500 mt-3 leading-relaxed">
+            お客様向けの見積書と、社内用の実行予算（積算）を同時に作成。粗利率は設定値を初期値として、明細ごとに調整できます。運搬費は見積書では「一式」表示、社内では個別表示に切り替わります。
+          </p>
+          <!-- クイックアクセスチップ（主要機能へ直接ジャンプ） -->
+          <div class="flex flex-wrap gap-2 mt-3">
+            <a v-for="q in estimateQuick" :key="q.label" :href="q.url"
+               class="chip tap" style="background:#fff2e6; color:#e85d00">
+              <span>{{ q.icon }}</span>{{ q.label }}
+            </a>
+          </div>
+        </div>
+
+        <!-- ---------- 原価管理 → lcc-cost.html ---------- -->
+        <div class="sys-card">
+          <a href="lcc-cost.html" class="flex items-center gap-4 no-underline">
+            <div class="sys-icon" style="background:#e6f0ff; color:var(--lcc-blue)">📊</div>
+            <div class="flex-1 min-w-0">
+              <div class="font-bold text-[17px]" style="color:var(--lcc-navy)">原価管理</div>
+              <div class="text-[12.5px] text-gray-500 mt-0.5">日報・請求書仕分け・予実突合せ</div>
+            </div>
+            <div class="text-gray-300 text-2xl">›</div>
+          </a>
+          <p class="text-[12px] text-gray-500 mt-3 leading-relaxed">
+            現場の人工・車両・産廃を日報でタップ入力し、業者請求を現場ごとに仕分け。実行予算（見積）と実績原価を並べて突合せ、利益を確認できます。
+          </p>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <a v-for="q in costQuick" :key="q.label" :href="q.url"
+               class="chip tap" style="background:#e6f0ff; color:#1558b0">
+              <span>{{ q.icon }}</span>{{ q.label }}
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           今やるべきこと（業務フロー案内）
+           ① 見積作成 → ② 日報入力 → ③ 請求書仕分け → ④ 突合せ確認
+           ============================================================ -->
+      <section class="mb-7">
+        <h2 class="text-white font-bold text-[16px] mb-1 flex items-center gap-2">
+          <span>✅</span> 今やるべきこと
+        </h2>
+        <p class="text-blue-200 text-[12px] mb-3">上から順に進めると業務が完了します</p>
+
+        <div class="grid grid-cols-1 gap-2.5">
+          <div v-for="step in flowSteps" :key="step.no" class="flow-step">
+            <div class="flow-badge">{{ step.no }}</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-white font-bold text-[15px]">{{ step.title }}</div>
+              <div class="text-blue-200 text-[12px] mt-0.5 leading-snug">{{ step.desc }}</div>
+            </div>
+            <button class="flow-jump tap" @click="lccGo(step.url)">開く</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           お知らせ（社内連絡・システム案内）
+           ============================================================ -->
+      <section class="mb-7">
+        <h2 class="text-white font-bold text-[16px] mb-3 flex items-center gap-2">
+          <span>📢</span> お知らせ
+        </h2>
+        <div class="panel">
+          <div v-for="n in news" :key="n.date + n.title" class="news-item">
+            <span class="news-tag" :style="{ background:n.color }">{{ n.tag }}</span>
+            <div class="flex-1 min-w-0">
+              <div class="text-white font-bold text-[13.5px] leading-snug">{{ n.title }}</div>
+              <div class="text-blue-200 text-[12px] mt-0.5 leading-snug">{{ n.body }}</div>
+              <div class="text-blue-300/70 text-[11px] mt-1">{{ n.date }}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           更新履歴（折りたたみ）
+           - 初期は閉じておき、必要な人だけ開く（画面をすっきり保つ）
+           ============================================================ -->
+      <section class="mb-7">
+        <button @click="logOpen = !logOpen"
+                class="w-full flex items-center gap-2 text-white font-bold text-[16px] mb-3 bg-transparent border-0 p-0 tap">
+          <span>🛠️</span>
+          <span>更新履歴</span>
+          <span class="text-[12px] font-normal text-blue-300 ml-1">v{{ changelog[0].ver }} 最新</span>
+          <span class="ml-auto text-blue-200 text-sm chevron" :class="{ open: logOpen }">▼</span>
+        </button>
+        <div v-show="logOpen" class="panel">
+          <div v-for="c in changelog" :key="c.ver" class="log-item">
+            <div class="log-ver">v{{ c.ver }}</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-white text-[13px] font-bold leading-snug">{{ c.title }}</div>
+              <ul class="text-blue-200 text-[12px] mt-1 leading-snug list-disc pl-4">
+                <li v-for="(item, i) in c.items" :key="i">{{ item }}</li>
+              </ul>
+              <div class="text-blue-300/70 text-[11px] mt-1">{{ c.date }}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           サポート / 連絡先（現場で困ったときの導線）
+           ============================================================ -->
+      <section class="mb-7">
+        <div class="panel flex items-center gap-3">
+          <div class="text-2xl">🆘</div>
+          <div class="flex-1 min-w-0 leading-snug">
+            <div class="text-white font-bold text-[13.5px]">使い方で困ったら</div>
+            <div class="text-blue-200 text-[12px] mt-0.5">事務所までご連絡ください（内線・電話）</div>
+          </div>
+          <!-- 電話発信（スマホでタップすると発信画面が開く） -->
+          <a href="tel:0853000000"
+             class="chip tap" style="background:var(--lcc-green); color:#fff">📞 電話</a>
+        </div>
+      </section>
+
+      <!-- フッター -->
+      <footer class="text-center text-blue-300 text-[11px] mt-8">
+        © LCC株式会社 / 島根県出雲市<br>
+        <span class="text-blue-300/60">統合業務システム ポータル v{{ changelog[0].ver }}</span>
+      </footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   統合トップ画面（分岐ハブ）の Vue アプリ
+   - ビルドツールは使わず、CDN の Vue 3 をそのまま利用
+   - すべて1ファイル完結（外部assets不使用）
+   ============================================================ */
+const { createApp, ref, reactive, computed, onMounted } = Vue;
+
+createApp({
+  setup(){
+    /* ---------- オープニング表示制御 ---------- */
+    const showOpening = ref(true);  // 起動直後は表示
+    const openingFade = ref(false); // フェードアウト開始フラグ
+
+    /* 今日の日付（ヘッダー右上に表示） */
+    const today = reactive({ md:'', dow:'' });
+
+    /* ============================================================
+       クイックアクセス（見積システム lcc.html の主要機能）
+       ※ 各 url のハッシュ（#new 等）は、lcc.html 側が
+         location.hash を見て該当画面/タブを開く前提。
+         ハッシュ未対応でも lcc.html トップが開くので安全。
+       ============================================================ */
+    const estimateQuick = [
+      { icon:'➕', label:'新規案件',   url:'lcc.html#new' },
+      { icon:'📄', label:'見積書作成', url:'lcc.html#estimate' },
+      { icon:'📁', label:'案件一覧',   url:'lcc.html#list' },
+    ];
+
+    /* クイックアクセス（原価管理 lcc-cost.html の主要機能） */
+    const costQuick = [
+      { icon:'📝', label:'日報入力',     url:'lcc-cost.html#daily' },
+      { icon:'🧾', label:'請求書仕分け', url:'lcc-cost.html#invoice' },
+      { icon:'⚖️', label:'予実突合せ',   url:'lcc-cost.html#match' },
+    ];
+
+    /* ============================================================
+       今やるべきこと：4ステップの業務フロー
+       ============================================================ */
+    const flowSteps = [
+      { no:1, title:'見積作成',     desc:'案件を登録し、見積書（実行予算）を作る', url:'lcc.html#new' },
+      { no:2, title:'日報入力',     desc:'現場の人工・車両・産廃をタップ入力',     url:'lcc-cost.html#daily' },
+      { no:3, title:'請求書仕分け', desc:'業者請求を現場ごとに金額を振り分ける',   url:'lcc-cost.html#invoice' },
+      { no:4, title:'突合せ確認',   desc:'予算と実績を並べて確認し承認する',       url:'lcc-cost.html#match' },
+    ];
+
+    /* ============================================================
+       お知らせ（社内連絡・運用案内）
+       ※ 実運用では事務所の方が date/title/body を書き換えて使う。
+         色（color）は重要=赤系 / 更新=青 / 案内=緑 で統一。
+       ============================================================ */
+    const news = [
+      { date:'2026-06-25', tag:'重要', color:'#dc2626',
+        title:'月末の日報入力をお願いします',
+        body:'当月分の日報は月末までに入力を完了してください。未入力があると突合せができません。' },
+      { date:'2026-06-20', tag:'更新', color:'#1d6fe0',
+        title:'見積書PDFの運搬費表示を改善',
+        body:'お客様向け見積書では車両費を「運搬費一式」にまとめて表示するようになりました。' },
+      { date:'2026-06-10', tag:'案内', color:'#16a34a',
+        title:'ホーム画面への追加を推奨',
+        body:'スマホのホーム画面に追加すると、アプリのように1タップで起動できます。' },
+    ];
+
+    /* ============================================================
+       更新履歴（changelog）— 先頭が最新
+       ============================================================ */
+    const changelog = [
+      { ver:'1.2.0', date:'2026-06-26', title:'ポータル機能強化',
+        items:[
+          'お知らせ・更新履歴セクションを追加',
+          '各アプリへのクイックアクセス（直接リンク）を追加',
+          'PWAアイコンを設定し、ホーム追加に対応',
+          'PC表示の最適化とデザイン調整',
+        ] },
+      { ver:'1.1.0', date:'2026-05-15', title:'業務フロー案内を追加',
+        items:[ '「今やるべきこと」4ステップを追加', '各ステップから該当画面へジャンプ可能に' ] },
+      { ver:'1.0.0', date:'2026-04-01', title:'統合ポータル公開',
+        items:[ '見積システムと原価管理アプリへの入口を統合', 'オープニングアニメーションを実装' ] },
+    ];
+
+    /* ---------- 更新履歴の開閉 ---------- */
+    const logOpen = ref(false);
+
+    /* ============================================================
+       PWAインストール案内
+       ============================================================ */
+    const showInstall = ref(false);   // 案内バーを出すか
+    const canPrompt = ref(false);     // ネイティブの追加プロンプトが使えるか
+    const installHint = ref('');      // 端末別の案内文
+    let deferredPrompt = null;        // beforeinstallprompt を保持
+
+    /* スタンドアロン（既にホームから起動）かどうか判定 */
+    function isStandalone(){
+      return window.matchMedia('(display-mode: standalone)').matches
+          || window.navigator.standalone === true;
+    }
+    /* iOS / iPadOS Safari かどうかの判定
+       ※ iPadOS 13 以降は UA が Mac を名乗るため、
+         「Macintosh かつタッチ操作可能」を iPad とみなして補完する */
+    function isiOS(){
+      const ua = navigator.userAgent || '';
+      if(/iphone|ipad|ipod/i.test(ua)) return true;
+      // iPadOS（デスクトップ表示）判定：Macかつタッチポイントあり
+      const isIpadOS = /Macintosh/.test(ua) && typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 1;
+      return isIpadOS;
+    }
+    /* OSのアニメーション低減設定（prefers-reduced-motion）が有効か */
+    function prefersReducedMotion(){
+      try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+      catch(e){ return false; }
+    }
+
+    /* ============================================================
+       画面遷移関数
+       ※ Manusスペースエディタが window.go を上書きする不具合を避けるため、
+         グローバル関数名は "go" を使わず "lccGo" とする。
+       ============================================================ */
+    function lccGo(url){ window.location.href = url; }
+
+    /* オープニングを閉じる処理を一本化（タイマー重複・二重発火を防ぐ）
+       once=true のときは既に閉じ処理が走っていれば何もしない */
+    let openingClosing = false;
+    function closeOpening(){
+      if(openingClosing) return;       // 二重発火ガード
+      openingClosing = true;
+      openingFade.value = true;
+      setTimeout(() => { showOpening.value = false; }, 450);
+    }
+    /* オープニングを即スキップ（クリック時） */
+    function skipOpening(){ closeOpening(); }
+
+    /* インストール案内を閉じる（この端末では当面出さない） */
+    function dismissInstall(){
+      showInstall.value = false;
+      try { localStorage.setItem('lcc_install_dismissed', String(Date.now())); } catch(e){}
+    }
+
+    /* ネイティブの追加プロンプトを実行（Android/Chrome）
+       outcome を確認し、追加されたら以後出さないよう記録する */
+    async function doInstall(){
+      if(!deferredPrompt) return;
+      try{
+        deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        // 追加された場合は「閉じた」扱いで記録し、再表示を防ぐ
+        if(choice && choice.outcome === 'accepted'){
+          try { localStorage.setItem('lcc_install_dismissed', String(Date.now())); } catch(e){}
+        }
+      }catch(e){ /* prompt 失敗時は何もしない（案内バーは閉じる） */ }
+      finally{
+        deferredPrompt = null;
+        canPrompt.value = false;
+        showInstall.value = false;
+      }
+    }
+
+    /* ============================================================
+       起動時処理
+       ============================================================ */
+    onMounted(() => {
+      /* --- 日付の組み立て --- */
+      const d = new Date();
+      const dows = ['日','月','火','水','木','金','土'];
+      today.md  = (d.getMonth() + 1) + '月' + d.getDate() + '日';
+      today.dow = dows[d.getDay()] + '曜日';
+
+      /* --- オープニング再生 → フェードアウト ---
+         アニメーション低減設定が有効な端末では即座に閉じる（視覚負荷の配慮）
+         それ以外は約2秒後に自動で閉じる。閉じ処理は closeOpening に一本化 */
+      if(prefersReducedMotion()){
+        closeOpening();
+      }else{
+        setTimeout(() => { closeOpening(); }, 2200);
+      }
+
+      /* --- PWAインストール案内の判定 --- */
+      // 既にホームから起動済み、または以前に閉じた場合は出さない
+      let dismissed = false;
+      try { dismissed = !!localStorage.getItem('lcc_install_dismissed'); } catch(e){}
+      if(!isStandalone() && !dismissed){
+        if(isiOS()){
+          // iOS は beforeinstallprompt 非対応のため手順を案内
+          installHint.value = '共有ボタン → 「ホーム画面に追加」';
+          canPrompt.value = false;
+          showInstall.value = true;
+        }
+      }
+
+      /* Android/Chrome：追加可能になったらワンタップ追加を提示 */
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        let dis = false;
+        try { dis = !!localStorage.getItem('lcc_install_dismissed'); } catch(err){}
+        if(!isStandalone() && !dis){
+          installHint.value = 'ワンタップでアプリのように使えます';
+          canPrompt.value = true;
+          showInstall.value = true;
+        }
+      });
+
+      /* 追加完了したら案内を消す */
+      window.addEventListener('appinstalled', () => {
+        showInstall.value = false;
+        canPrompt.value = false;
+      });
+    });
+
+    return {
+      showOpening, openingFade, today,
+      estimateQuick, costQuick, flowSteps,
+      news, changelog, logOpen,
+      showInstall, canPrompt, installHint,
+      lccGo, skipOpening, dismissInstall, doInstall,
+    };
+  }
+}).mount('#app');
+</script>
+
+
+
+
+<!-- ===== LCC Lサポ（常駐サポートキャラクター）ここから／追加ブロック ===== -->
+<!-- このブロックは既存アプリに一切手を加えず、末尾に追加するだけの自己完結モジュールです。 -->
+<!-- 役割提供アダプタ（このHTML専用：現在の画面ID・状態フラグを読み取り専用で返す） -->
+<script>
+/* ============================================================================
+   Lサポ アダプタ（index.html ＝ ポータル／トップ画面用）
+   - 既存Vueインスタンスには触れない。画面IDは常に 'top'。
+   - 状態フラグは持たない（ポータルには業務データがないため）。
+   - ショートカット target が 'lcc.html' 等のときは本体側がページ遷移する。
+   ============================================================================ */
+window.LSUPPORT_ADAPTER = {
+  getState: function () {
+    return { screenId: 'top', flags: {} };
+  }
+  // navigate は未実装 → 本体のデフォルト（href遷移）に任せる
+};
+</script>
+<!-- Lサポ本体（全アプリ共通：UI・文言データ・表示制御。AI接続なし／機密データ送信なし） -->
+<script>
+/* ============================================================================
+   Lサポ（L-Support）常駐サポートキャラクター 共通モジュール
+   ----------------------------------------------------------------------------
+   ■ 目的
+     営業・事務・工務・現場社員・管理者が、画面上で迷わず操作できるよう
+     「業務ナビゲーション／入力支援／エラー説明／次アクション案内」を行う
+     常駐サポート係。単なるマスコットではない。
+
+   ■ 設計方針（重要）
+     - 既存アプリ（Vueインスタンス／既存関数）を一切書き換えない「追加専用」モジュール。
+     - 既存DOMの上に「右下の丸アイコン＋吹き出し＋パネル」をかぶせるだけ。
+     - 画面ID・ロール・状態は、各HTML側が用意する軽量アダプタ
+       window.LSUPPORT_ADAPTER から読み取る（疎結合）。
+     - AI API接続なし。文言はすべて下記 MESSAGES データ構造に集約（コード直書きを避ける）。
+     - localStorage には「非表示設定／表示回数／ロール選択」程度のみ保存。
+       顧客情報・案件情報など機密データは一切保存・送信しない。
+     - 将来 AIチャット／FAQ検索へ拡張できるよう、文言取得を getMessages() に集約。
+
+   ■ グローバル名前空間
+     - window.LSupport … 本モジュール本体（メソッド群）
+     - window.LSUPPORT_ADAPTER … 各HTMLが実装する状態提供アダプタ（任意）
+     - グローバル関数は使わず、すべて LSupport 名前空間下に閉じる
+       （Manusスペースエディタの window.go 上書き問題と同種の競合を回避）
+   ============================================================================ */
+(function (global) {
+  'use strict';
+
+  /* ==========================================================================
+     0. デザインバリアント（A/B/C）
+     --------------------------------------------------------------------------
+     キャラクター感を弱めた「控えめな案内アイコン」3案。
+     業務ロジックには一切影響せず、CSS変数とSVG（アイコン形状）だけを切り替える。
+
+     ■ 正式採用：A案（LCCロゴ型・ネイビー）
+       通常ユーザーにはA案が固定表示される。
+       B案・C案のデータはコード内に保持するが、UIには出さない。
+
+     切替方法（優先順）：
+       1) <html data-lsup-variant="a|b|c">  … HTML側で固定指定（本番はこれ）
+       2) URL に ?lsup=a|b|c            … 検証用（一般ユーザーの導線には出さない）
+       3) localStorage（lcc_lsupport_pref_v1.variant） … 開発者モード時のみ有効
+       4) 既定 'a'（LCCロゴ型・正式採用）
+
+     ■ 開発者モード（切替UIを表示する条件）：
+       URL に ?lsup_dev=1 が含まれる場合のみ、パネルフッターの切替ボタンを表示する。
+       通常ユーザーの導線にはこのパラメータを出さない。
+     ========================================================================== */
+  var VARIANTS = {
+    // A案：LCCロゴ型（最も無難・本命）。丸ボタンに「？」、ヘッダーは「L」マーク。
+    a: {
+      name: 'A案：LCCロゴ型',
+      accent: '#0a2a5e',          // 基調：LCCネイビー
+      accent2: '#1d6fe0',         // 補助：ブルー
+      fabBg: '#0a2a5e',           // FAB背景（単色・落ち着いたネイビー）
+      fabFg: '#ffffff',
+      fabText: '？',              // 通常時の表示文字
+      // ヘッダーのアバター（顔なし・LCCの頭文字Lを記号化）
+      avatar: '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">'
+        + '<rect x="3" y="3" width="26" height="26" rx="7" fill="none" stroke="currentColor" stroke-width="2"/>'
+        + '<path d="M12 9v14h9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'
+        + '</svg>'
+    },
+    // B案：ヘルメット＋吹き出し型（現場感・ただし可愛くしない単色ライン）
+    b: {
+      name: 'B案：ヘルメット型',
+      accent: '#15507a',
+      accent2: '#2f7fb5',
+      fabBg: '#15507a',
+      fabFg: '#ffffff',
+      fabText: '？',
+      // ヘルメット（顔なし・線画のみ。表情やキャラ性を持たせない）
+      avatar: '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">'
+        + '<path d="M5 21a11 11 0 0 1 22 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'
+        + '<line x1="16" y1="6" x2="16" y2="10.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'
+        + '<rect x="3.5" y="21" width="25" height="3.4" rx="1.7" fill="none" stroke="currentColor" stroke-width="2.2"/>'
+        + '</svg>'
+    },
+    // C案：番頭・サポート係型（顔なし・帳簿＋チェックマークで表現。事務/経営にも合う）
+    c: {
+      name: 'C案：番頭・チェック型',
+      accent: '#1f6b4f',
+      accent2: '#2f9e72',
+      fabBg: '#1f6b4f',
+      fabFg: '#ffffff',
+      fabText: '？',
+      // クリップボード＋チェック（線画のみ）
+      avatar: '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">'
+        + '<rect x="7" y="6" width="18" height="21" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/>'
+        + '<rect x="12" y="3.5" width="8" height="4.5" rx="1.6" fill="none" stroke="currentColor" stroke-width="2.2"/>'
+        + '<path d="M11.5 16.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'
+        + '</svg>'
+    }
+  };
+
+  /* ==========================================================================
+     1. 文言データ（画面ID × ロール × 状態）
+     --------------------------------------------------------------------------
+     - roles: 5ロール共通の baseline と、ロール別の上書き(byRole)を持つ。
+     - screens[screenId]:
+         title    … パネル見出し
+         help     … 「この画面の使い方」（全ロール共通の基本説明）
+         next     … 「次に行う操作」案内（配列・最大3つ程度）
+         byRole   … ロール別の追加ひとこと（任意）
+         shortcuts… 関連画面へのショートカット（label / target）
+     - alerts[alertId]: 状態に応じた短い注意喚起（原価超過・未請求 等）
+     - tips: ランダムで出す軽いヒント（うるさくしない範囲で）
+     ※ 文言は「ITが苦手な社員でも分かる言葉」で、長文を避けて簡潔に。
+     ========================================================================== */
+  var DATA = {
+    /* ---- ロール定義（表示名・ひとこと方針） ---- */
+    roles: {
+      boss:   { id: 'boss',   name: '社長・管理者', hint: '全体の数字と注意案件を確認できます' },
+      sales:  { id: 'sales',  name: '営業',         hint: '見積から受注までを案内します' },
+      office: { id: 'office', name: '事務',         hint: '請求・入金・書類の確認を案内します' },
+      kanri:  { id: 'kanri',  name: '工務',         hint: '配置・原価・予実の確認を案内します' },
+      genba:  { id: 'genba',  name: '現場社員',     hint: '日報入力を案内します' }
+    },
+
+    /* ---- 画面別サポート文言 ---- */
+    screens: {
+
+      /* ===== トップ／ポータル ===== */
+      top: {
+        title: 'トップ画面',
+        help: 'この画面から、見積システム・原価管理・日報入力に移動できます。目的の業務を選んでください。',
+        next: [
+          'お客様の見積をつくる → 「見積システム」を開く',
+          '現場の原価・日報を入れる → 「原価管理」を開く'
+        ],
+        byRole: {
+          boss:   '全体の数字を確認する場合は、原価管理の「集計」で予実と注意案件を確認できます。',
+          sales:  'お客様対応は「見積システム」で行えます。',
+          office: '請求・入金の確認は「原価管理」の「請求」で行えます。',
+          kanri:  '配置と原価の確認は「原価管理」から行えます。',
+          genba:  '日報の入力は「原価管理」の「日報」で行えます。'
+        },
+        shortcuts: [
+          { label: '見積システムを開く', target: 'lcc.html' },
+          { label: '原価管理を開く',     target: 'lcc-cost.html' }
+        ]
+      },
+
+      /* ===== 見積：ダッシュボード ===== */
+      estimate_dashboard: {
+        title: '見積トップ（ダッシュボード）',
+        help: '案件の件数・売上・入金状況をひと目で確認できます。気になる案件は一覧から開けます。',
+        next: [
+          '新しい見積をつくる → 下の「案件」から案件を選ぶ',
+          '入金の遅れを見る → 「入金」タブを確認'
+        ],
+        byRole: {
+          boss:  '売上グラフと入金状況で全体の流れを確認できます。',
+          sales: '新規の見積は、案件を登録して明細を入力します。'
+        },
+        shortcuts: [
+          { label: '案件一覧へ', target: '#tab=projects' },
+          { label: '入金管理へ', target: '#tab=pay' }
+        ]
+      },
+
+      /* ===== 見積：明細入力 ===== */
+      estimate_edit: {
+        title: '見積画面',
+        help: '明細を入力すると、売上・原価・粗利が自動計算されます。粗利率は明細ごとに変更できます。',
+        next: [
+          '工事の項目を選んで数量・単価を入れる',
+          '粗利率は行ごとに調整できます（既定は35%）',
+          '入力が終わったら「見積書」タブでお客様向けに印刷できます'
+        ],
+        byRole: {
+          sales: 'お客様に提示する金額は「見積書」、社内の予算は「実行予算」で確認できます。',
+          kanri: 'ここで入力した原価が、原価管理の「実行予算」の基準になります。'
+        },
+        shortcuts: [
+          { label: '見積書プレビューへ', target: '#sub=quote' },
+          { label: '案件一覧へ戻る',     target: '#tab=projects' }
+        ]
+      },
+
+      /* ===== 見積：受注ロック時 ===== */
+      estimate_locked: {
+        title: '受注済みの見積',
+        help: 'この見積は受注済みです。単価と粗利率は受注時点で固定されています。',
+        next: [
+          '内容を変える必要があるときは「ロック解除」を押してから編集します',
+          '解除した変更は、お客様との合意内容と必ず照らし合わせてください'
+        ],
+        byRole: {
+          sales: '受注後の金額変更は、変更前に上長へご相談ください。',
+          office:'受注済みのため、次は請求の準備に進めます。'
+        },
+        shortcuts: [
+          { label: '請求の準備へ（原価管理）', target: 'lcc-cost.html#invoice' }
+        ]
+      },
+
+      /* ===== 原価：案件一覧 ===== */
+      cost_projects: {
+        title: '原価管理：案件一覧',
+        help: '案件ごとの実行予算と実績原価を一覧で確認できます。まず対象の現場を選んでください。',
+        next: [
+          '見積から予算を取り込む → 「設定」の「取り込む」',
+          '現場の実績を入れる → 「日報」タブへ'
+        ],
+        byRole: {
+          kanri:  '担当現場の予算消化は、この画面で確認できます。',
+          office: '請求・入金の状況は「請求」タブで確認できます。'
+        },
+        shortcuts: [
+          { label: '日報入力へ', target: '#daily' },
+          { label: '集計・予実へ', target: '#report' }
+        ]
+      },
+
+      /* ===== 原価：予実確認（集計） ===== */
+      cost_report: {
+        title: '原価管理画面（予実確認）',
+        help: '予算と実績を比較できます。赤信号の案件は、原価が予算を超えています。',
+        next: [
+          '赤信号（超過）の案件を最優先で確認',
+          '黄信号（消化80%超）の案件も早めに手を打つ'
+        ],
+        byRole: {
+          boss:  '全社の利益見込みと注意案件を、この画面で把握できます。',
+          kanri: '超過の原因（人工・車両・産廃）は、案件詳細で確認できます。'
+        },
+        shortcuts: [
+          { label: '案件一覧へ', target: '#projects' },
+          { label: '突合せ確認へ', target: '#match' }
+        ]
+      },
+
+      /* ===== 原価：日報入力 ===== */
+      cost_daily: {
+        title: '日報入力',
+        help: '今日の作業人数、時間、使用車両、写真を入れれば日報は完了です。',
+        next: [
+          '現場を選ぶ（配置表で決まった現場が出ます）',
+          '人数・時間・車両を入れる',
+          '写真があれば追加して「保存」'
+        ],
+        byRole: {
+          genba: '現場名は一覧から選択します。項目をタップして入力できます。',
+          kanri: '日報を入力すると、原価の実績に自動で反映されます。'
+        },
+        shortcuts: [
+          { label: '案件一覧へ戻る', target: '#projects' }
+        ]
+      },
+
+      /* ===== 原価：請求・入金 ===== */
+      cost_invoice: {
+        title: '請求・入金',
+        help: '未請求・未入金の案件を確認してください。完工済みでも入金まで終わらないとクローズではありません。',
+        next: [
+          '完工したのに未請求の案件 → 請求書を作成',
+          '請求済みで未入金の案件 → 入金予定を確認'
+        ],
+        byRole: {
+          office: '請求漏れ・入金遅れは、この画面で確認できます。',
+          boss:   '未入金は資金繰りに関わります。早めにご確認ください。'
+        },
+        shortcuts: [
+          { label: '集計・予実へ', target: '#report' },
+          { label: '突合せ確認へ', target: '#match' }
+        ]
+      },
+
+      /* ===== 原価：突合せ ===== */
+      cost_match: {
+        title: '突合せ確認',
+        help: '業者の請求と発注見込み、予算と実績を並べて確認します。問題なければ承認してください。',
+        next: [
+          '業者請求の金額が予算とずれていないか確認',
+          '内容が正しければ承認する'
+        ],
+        byRole: {
+          office: '承認前に、金額と現場名の取り違えがないかご確認ください。'
+        },
+        shortcuts: [
+          { label: '請求・入金へ', target: '#invoice' }
+        ]
+      },
+
+      /* ===== 原価：積算 ===== */
+      cost_quote: {
+        title: '積算',
+        help: '工種ごとの数量を入れると、概算の原価・売価を素早く出せます。',
+        next: [
+          '工種を選んで数量を入れる',
+          '出た金額は見積のたたき台として使えます'
+        ],
+        shortcuts: [
+          { label: '案件一覧へ', target: '#projects' }
+        ]
+      },
+
+      /* ===== 設定・マスタ ===== */
+      settings: {
+        title: '設定・マスタ',
+        help: '会社情報や単価マスタ、既定の粗利率（初期35%）などを設定できます。',
+        next: [
+          '会社名・住所・連絡先を確認',
+          '既定の粗利率や税率を必要に応じて調整',
+          '見積と原価で同じGAS URLを設定すると連携できます'
+        ],
+        byRole: {
+          boss:   '粗利率の既定値はこの画面で変更できます。現場運用に合わせて調整してください。',
+          office: '見積と原価で同じGAS URLを設定すると、データが連携されます。'
+        },
+        shortcuts: []
+      },
+
+      /* ===== バックアップ・復元 ===== */
+      backup: {
+        title: 'バックアップ・復元',
+        help: '復元前に現在データのバックアップを取ってください。外部データの読込は内容確認が必要です。',
+        next: [
+          'まず「バックアップ（書き出し）」で今のデータを保存',
+          '読み込むファイルの中身（会社・期間）を確認してから復元'
+        ],
+        byRole: {
+          office: '復元は上書きになります。先に必ずバックアップを取得してください。',
+          boss:   '外部から受け取ったデータは、内容を確認してから読み込んでください。'
+        },
+        shortcuts: []
+      },
+
+      /* ===== フォールバック（画面が特定できないとき） ===== */
+      _default: {
+        title: '操作ガイド',
+        help: '操作で迷ったときは、こちらを開いてください。今の画面の使い方と次の操作をご案内します。',
+        next: [
+          'やりたいことが決まっていれば、下のショートカットから移動できます'
+        ],
+        shortcuts: []
+      }
+    },
+
+    /* ---- 状態アラート（短い注意喚起。色だけに頼らず文章でも伝える） ---- */
+    alerts: {
+      over_budget:  { level: 'danger', text: '原価が予算を超えている案件があります。詳細を確認してください。' },
+      near_budget:  { level: 'warn',   text: '予算の80%を超えた案件があります。早めに確認してください。' },
+      unbilled:     { level: 'warn',   text: '完工したのに未請求の案件があります。請求書の作成をご確認ください。' },
+      unpaid:       { level: 'warn',   text: '請求済みで未入金の案件があります。入金予定をご確認ください。' },
+      unsaved:      { level: 'warn',   text: '保存していない変更があります。画面を移動する前に保存してください。' },
+      locked_edit:  { level: 'info',   text: 'この見積は受注済みです。単価・粗利率は固定されています。' }
+    },
+
+    /* ---- 軽いヒント（初回や手すきのときに、控えめに） ---- */
+    tips: [
+      '粗利率は明細ごとに変更できます（既定は35%）。',
+      '家電リサイクルの法定4品目は、粗利０%（売価＝原価）で固定です。',
+      '日報を入力すると、原価の実績に自動で反映されます。',
+      '完工後も、入金が完了して初めてクローズとなります。'
+    ]
+  };
+
+  /* ==========================================================================
+     2. 永続化（localStorage）— 機密データは保存しない
+     ========================================================================== */
+  var LS_KEY = 'lcc_lsupport_pref_v1';
+  function loadPref() {
+    try {
+      var raw = global.localStorage.getItem(LS_KEY);
+      if (!raw) return {};
+      return JSON.parse(raw) || {};
+    } catch (e) { return {}; }
+  }
+  function savePref(p) {
+    try { global.localStorage.setItem(LS_KEY, JSON.stringify(p)); } catch (e) { /* 保存できなくても動作継続 */ }
+  }
+
+  /* ==========================================================================
+     3. 本体オブジェクト
+     ========================================================================== */
+  var LSupport = {
+    data: DATA,
+    pref: {},          // { role, hidden, snoozeUntil, seenCount, panelOpen }
+    _root: null,       // 生成したルートDOM
+    _els: {},          // 主要DOM参照
+    _adapter: null,    // 状態提供アダプタ
+    _lastScreenId: null,
+    _pollTimer: null,
+    _bubbleTimer: null,
+    _variant: 'a',     // 現在のデザインバリアント（a/b/c）
+
+    /* ---- 現在バリアントを決定（URL > html属性 > localStorage > 既定a） ---- */
+    resolveVariant: function () {
+      // 1) URLパラメータ ?lsup=a|b|c（検証用・最優先）
+      try {
+        var q = (global.location.search || '').match(/[?&]lsup=([abc])/i);
+        if (q) return q[1].toLowerCase();
+      } catch (e) {}
+      // 2) <html data-lsup-variant="a|b|c">（本番の固定指定）
+      try {
+        var attr = (document.documentElement.getAttribute('data-lsup-variant') || '').toLowerCase();
+        if (VARIANTS[attr]) return attr;
+      } catch (e) {}
+      // 3) localStorage（画面内の切替ボタンで保存された値）
+      if (this.pref && VARIANTS[this.pref.variant]) return this.pref.variant;
+      // 4) 既定
+      return 'a';
+    },
+
+    /* ---- 開発者モード判定（URLに ?lsup_dev=1 または ?lsup=b/c が含まれる場合のみtrue） ---- */
+    isDevMode: function () {
+      try {
+        var search = global.location.search || '';
+        // ?lsup_dev=1 … 明示的な開発者モード
+        if (/[?&]lsup_dev=1/.test(search)) return true;
+        // ?lsup=b または ?lsup=c … B/C案を指定している場合も切替UIを表示
+        var q = search.match(/[?&]lsup=([bc])/i);
+        if (q) return true;
+      } catch (e) {}
+      return false;
+    },
+
+    /* ---- バリアントのCSS変数とアバターSVGを反映 ---- */
+    applyVariant: function (v) {
+      if (!VARIANTS[v]) v = 'a';
+      this._variant = v;
+      var conf = VARIANTS[v];
+      var root = document.getElementById('lsup-root');
+      if (!root) return;
+      // CSS変数で色を切替（CSSのみの差し替え）
+      root.style.setProperty('--lsup-accent', conf.accent);
+      root.style.setProperty('--lsup-accent2', conf.accent2);
+      root.style.setProperty('--lsup-fab-bg', conf.fabBg);
+      root.style.setProperty('--lsup-fab-fg', conf.fabFg);
+      root.setAttribute('data-variant', v);
+      // FAB・ヘッダーのアイコンを差し替え
+      if (this._els.fabIcon) this._els.fabIcon.innerHTML = conf.avatar;
+      if (this._els.fabText) this._els.fabText.textContent = conf.fabText;
+      if (this._els.headAva) this._els.headAva.innerHTML = conf.avatar;
+      this.syncVswitch();
+    },
+
+    /* ---- バリアントを切り替えて保存（画面内の切替ボタン用・公開API） ---- */
+    setVariant: function (v) {
+      if (!VARIANTS[v]) return;
+      this.pref.variant = v;
+      savePref(this.pref);
+      this.applyVariant(v);
+    },
+
+    /* ---- デザイン切替ボタンの押下状態を現在バリアントに同期 ---- */
+    syncVswitch: function () {
+      if (!this._els.vswitch) return;
+      var v = this._variant;
+      var btns = this._els.vswitch.querySelectorAll('button[data-v]');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].setAttribute('aria-pressed', btns[i].getAttribute('data-v') === v ? 'true' : 'false');
+      }
+    },
+
+    /* ---- ロール一覧（UI用） ---- */
+    roleList: function () {
+      return Object.keys(DATA.roles).map(function (k) { return DATA.roles[k]; });
+    },
+
+    /* ---- 現在ロール（未選択時は boss を仮の既定にせず、選択を促す） ---- */
+    currentRole: function () {
+      return this.pref.role || '';
+    },
+
+    /* ----------------------------------------------------------------------
+       文言取得：画面ID＋ロール＋状態から表示内容を組み立てる。
+       将来 AIチャット／FAQ検索に差し替えるなら、この関数の戻り値仕様を保てばよい。
+       ---------------------------------------------------------------------- */
+    getMessages: function (screenId, role, state) {
+      var s = DATA.screens[screenId] || DATA.screens._default;
+      var roleLine = (s.byRole && role && s.byRole[role]) ? s.byRole[role] : '';
+      var alerts = [];
+      if (state && state.flags) {
+        Object.keys(state.flags).forEach(function (f) {
+          if (state.flags[f] && DATA.alerts[f]) alerts.push(DATA.alerts[f]);
+        });
+      }
+      return {
+        title: s.title,
+        help: s.help,
+        roleLine: roleLine,
+        next: s.next || [],
+        shortcuts: s.shortcuts || [],
+        alerts: alerts
+      };
+    },
+
+    /* ---- 現在の画面状態をアダプタから取得（無ければ default） ---- */
+    readState: function () {
+      var a = global.LSUPPORT_ADAPTER;
+      if (a && typeof a.getState === 'function') {
+        try { return a.getState() || {}; } catch (e) { return {}; }
+      }
+      return {};
+    },
+
+    /* ======================================================================
+       初期化
+       ====================================================================== */
+    init: function () {
+      this.pref = loadPref();
+      this.injectStyle();
+      this.buildDom();
+      this.bindEvents();
+      // デザインバリアントを適用（CSS変数・SVGの差し替えのみ）
+      this.applyVariant(this.resolveVariant());
+      // 開発者モードでない場合は切替ボタン行を非表示にする
+      var vsRow = document.getElementById('lsup-vswitch-row');
+      if (vsRow) {
+        vsRow.style.display = this.isDevMode() ? '' : 'none';
+      }
+      // 起動直後にいったん描画
+      this.refresh(true);
+      // 画面状態の変化を監視（hashchange＋軽量ポーリング）
+      var self = this;
+      global.addEventListener('hashchange', function () { self.refresh(false); });
+      this._pollTimer = global.setInterval(function () { self.refresh(false); }, 1500);
+      return this;
+    },
+
+    /* ======================================================================
+       スタイル注入（既存CSSと衝突しないよう lsup- 接頭辞で限定）
+       ====================================================================== */
+    injectStyle: function () {
+      if (document.getElementById('lsup-style')) return;
+      var css = ''
+      /* デザイン変数（バリアントで上書きされる既定値） */
+      + '#lsup-root{--lsup-accent:#0a2a5e;--lsup-accent2:#1d6fe0;--lsup-fab-bg:#0a2a5e;--lsup-fab-fg:#fff;}'
+      /* FAB：控えめな単色丸ボタン。サイズを小さくし、「？」＋小さく「Lサポ」 */
+      + '.lsup-fab{position:fixed;z-index:2147483000;right:16px;bottom:calc(92px + env(safe-area-inset-bottom,0px));'
+      + '  width:48px;height:48px;border-radius:50%;border:none;cursor:pointer;padding:0;'
+      + '  background:var(--lsup-fab-bg);color:var(--lsup-fab-fg);box-shadow:0 3px 10px rgba(15,23,42,.22);'
+      + '  display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;'
+      + '  transition:transform .12s,box-shadow .12s;}'
+      + '.lsup-fab:hover{box-shadow:0 5px 14px rgba(15,23,42,.28);}'
+      + '.lsup-fab:active{transform:scale(.95);}'
+      + '.lsup-fab:focus-visible{outline:3px solid var(--lsup-accent2);outline-offset:2px;}'
+      /* FAB内はアイコンSVG（各案で差別化）＋小さく「Lサポ」ラベル。「？」文字は非表示 */
+      + '.lsup-fab .lsup-fabtxt{display:none;}'  /* 「？」文字は非表示（アイコンで差別化） */
+      + '.lsup-fab .lsup-fablabel{font-size:8.5px;font-weight:700;letter-spacing:.04em;margin-top:2px;opacity:.92;}'
+      + '.lsup-fab .lsup-fabicon{display:flex;align-items:center;justify-content:center;width:26px;height:26px;}'  /* FAB内アイコン枠：各案のSVGを展開 */
+      + '.lsup-fab .lsup-fabicon svg{width:26px;height:26px;color:var(--lsup-fab-fg);}'
+      /* 吹き出し（短く・控えめ・目立ちすぎない） */
+      + '.lsup-bubble{position:fixed;z-index:2147483000;right:72px;bottom:calc(98px + env(safe-area-inset-bottom,0px));'
+      + '  max-width:208px;background:#fff;color:#374151;border:1px solid #e5e7eb;border-radius:12px;'
+      + '  padding:9px 11px;font-size:12.5px;line-height:1.5;box-shadow:0 4px 14px rgba(15,23,42,.14);'
+      + '  opacity:0;transform:translateY(6px);pointer-events:none;transition:opacity .25s,transform .25s;}'
+      + '.lsup-bubble.show{opacity:1;transform:translateY(0);pointer-events:auto;}'
+      + '.lsup-bubble:after{content:"";position:absolute;right:-7px;bottom:16px;border:7px solid transparent;border-left-color:#fff;}'
+      + '.lsup-bubble .lsup-bclose{position:absolute;top:3px;right:5px;border:none;background:none;font-size:13px;color:#9aa1b2;cursor:pointer;min-height:auto;line-height:1;}'
+      /* バッジ（注意件数・控えめに）：赤すぎると目立ちすぎるため、小径・低彩度に抑える */
+      + '.lsup-badge{position:absolute;top:-2px;right:-2px;min-width:15px;height:15px;padding:0 3px;border-radius:8px;'
+      + '  background:#b91c1c;color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff;opacity:.9;}'
+      /* パネル */
+      + '.lsup-overlay{position:fixed;inset:0;z-index:2147483001;background:rgba(6,24,58,.35);'
+      + '  display:none;align-items:flex-end;justify-content:flex-end;}'
+      + '.lsup-overlay.show{display:flex;}'
+      + '.lsup-panel{width:min(380px,94vw);max-height:min(78vh,640px);margin:0 12px calc(16px + env(safe-area-inset-bottom,0px)) 12px;'
+      + '  background:#fff;border-radius:18px;box-shadow:0 16px 48px rgba(6,24,58,.4);display:flex;flex-direction:column;overflow:hidden;}'
+      + '.lsup-head{background:var(--lsup-accent);color:#fff;padding:13px 16px;display:flex;align-items:center;gap:10px;}'
+      + '.lsup-head .lsup-ava{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.16);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;}'
+      + '.lsup-head .lsup-ava svg{width:22px;height:22px;}'
+      + '.lsup-head .lsup-ttl{font-weight:700;font-size:15px;}'
+      + '.lsup-head .lsup-sub{font-size:11.5px;opacity:.85;margin-top:1px;}'
+      + '.lsup-head .lsup-x{margin-left:auto;background:rgba(255,255,255,.16);border:none;color:#fff;width:32px;height:32px;border-radius:8px;font-size:16px;cursor:pointer;}'
+      + '.lsup-body{padding:14px 16px;overflow-y:auto;-webkit-overflow-scrolling:touch;}'
+      + '.lsup-sec{margin-bottom:14px;}'
+      + '.lsup-sec h4{font-size:12px;color:#6b7088;margin:0 0 6px;font-weight:700;letter-spacing:.02em;}'
+      + '.lsup-help{font-size:14px;line-height:1.7;color:#1f2233;background:#f4f7fc;border-radius:12px;padding:12px;}'
+      + '.lsup-role-line{font-size:13px;color:var(--lsup-accent);background:#f3f6fb;border-left:3px solid var(--lsup-accent2);border-radius:8px;padding:9px 11px;margin-top:8px;}'
+      + '.lsup-next{list-style:none;margin:0;padding:0;}'
+      + '.lsup-next li{display:flex;gap:8px;font-size:13.5px;line-height:1.6;padding:7px 0;border-bottom:1px dashed #eceff5;}'
+      + '.lsup-next li:last-child{border-bottom:none;}'
+      + '.lsup-next .lsup-no{flex:none;width:20px;height:20px;border-radius:50%;background:var(--lsup-accent);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;}'
+      + '.lsup-alert{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.6;border-radius:10px;padding:10px 12px;margin-bottom:8px;}'
+      + '.lsup-alert .lsup-sig{flex:none;font-weight:700;}'
+      + '.lsup-alert.danger{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;}'
+      + '.lsup-alert.warn{background:#fffbeb;color:#92400e;border:1px solid #fde68a;}'
+      + '.lsup-alert.info{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;}'
+      + '.lsup-sc{display:flex;flex-wrap:wrap;gap:8px;}'
+      + '.lsup-sc button{font-size:13px;border:1px solid var(--lsup-accent2);color:var(--lsup-accent);background:#fff;border-radius:999px;padding:8px 14px;cursor:pointer;min-height:40px;}'
+      + '.lsup-sc button:active{background:#f3f6fb;}'
+      /* デザイン切替（フッターのミニセグメント。検証・比較用） */
+      + '.lsup-vswitch{display:flex;gap:4px;align-items:center;}'
+      + '.lsup-vswitch button{font-size:11px;border:1px solid #d6dbea;background:#fff;color:#6b7088;border-radius:6px;padding:3px 8px;cursor:pointer;min-height:auto;}'
+      + '.lsup-vswitch button[aria-pressed="true"]{background:var(--lsup-accent);color:#fff;border-color:var(--lsup-accent);}'
+      + '.lsup-foot{border-top:1px solid #eceff5;padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}'
+      + '.lsup-foot select{font-size:13px;border:1px solid #d6dbea;border-radius:8px;padding:7px 8px;color:#1f2233;background:#fff;}'
+      + '.lsup-foot .lsup-link{font-size:12px;color:#6b7088;background:none;border:none;cursor:pointer;text-decoration:underline;min-height:auto;}'
+      + '.lsup-foot .lsup-spacer{flex:1;}'
+      /* 最小化（アイコンだけ・吹き出し抑制）状態でも FAB は残す */
+      + '.lsup-hidden{display:none !important;}'
+      /* モバイルではパネル全幅寄り、主要ボタンと重ならないよう bottom を底上げ済み */
+      + '@media (max-width:480px){.lsup-fab{width:44px;height:44px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom,0px));}'
+      + '  .lsup-fab .lsup-fabtxt{display:none;}.lsup-fab .lsup-fabicon{width:22px;height:22px;}.lsup-fab .lsup-fabicon svg{width:22px;height:22px;}.lsup-fab .lsup-fablabel{font-size:7.5px;}'
+      + '  .lsup-bubble{right:62px;max-width:58vw;bottom:calc(88px + env(safe-area-inset-bottom,0px));}}'
+      /* 読み上げ・キーボード配慮：reduce motion */
+      + '@media (prefers-reduced-motion: reduce){.lsup-fab,.lsup-bubble{transition:none;}}';
+      var st = document.createElement('style');
+      st.id = 'lsup-style';
+      st.textContent = css;
+      document.head.appendChild(st);
+    },
+
+    /* ======================================================================
+       DOM構築
+       ====================================================================== */
+    buildDom: function () {
+      if (document.getElementById('lsup-root')) return;
+      var root = document.createElement('div');
+      root.id = 'lsup-root';
+
+      /* --- 吹き出し --- */
+      var bubble = document.createElement('div');
+      bubble.className = 'lsup-bubble';
+      bubble.setAttribute('role', 'status');
+      bubble.setAttribute('aria-live', 'polite');
+      bubble.innerHTML = '<button class="lsup-bclose" aria-label="ヒントを閉じる">×</button><span class="lsup-btxt"></span>';
+
+      /* --- FAB（控えめな丸ボタン：「？」＋小さく「Lサポ」） --- */
+      var fab = document.createElement('button');
+      fab.className = 'lsup-fab';
+      fab.type = 'button';
+      fab.setAttribute('aria-label', '操作ガイド（Lサポ）を開く。今の画面の使い方と次の操作を案内します');
+      fab.setAttribute('aria-haspopup', 'dialog');
+      // アイコン形状（バリアントで差替）は隐し枠として保持し、通常は「？」と「Lサポ」を表示
+      fab.innerHTML = '<span class="lsup-fabicon" aria-hidden="true"></span>'
+        + '<span class="lsup-fabtxt" aria-hidden="true">？</span>'
+        + '<span class="lsup-fablabel" aria-hidden="true">Lサポ</span>'
+        + '<span class="lsup-badge lsup-hidden" aria-hidden="true">0</span>';
+
+      /* --- パネル（モーダル） --- */
+      var overlay = document.createElement('div');
+      overlay.className = 'lsup-overlay';
+      overlay.innerHTML = ''
+        + '<div class="lsup-panel" role="dialog" aria-modal="true" aria-labelledby="lsup-ttl">'
+        + '  <div class="lsup-head">'
+        + '    <span class="lsup-ava"></span>'
+        + '    <div><div class="lsup-ttl" id="lsup-ttl">操作ガイド（Lサポ）</div><div class="lsup-sub"></div></div>'
+        + '    <button class="lsup-x" aria-label="パネルを閉じる">×</button>'
+        + '  </div>'
+        + '  <div class="lsup-body">'
+        + '    <div class="lsup-sec lsup-sec-alerts" hidden><h4>今の注意ポイント</h4><div class="lsup-alerts"></div></div>'
+        + '    <div class="lsup-sec"><h4>この画面でできること</h4><div class="lsup-help"></div><div class="lsup-role-line" hidden></div></div>'
+        + '    <div class="lsup-sec lsup-sec-next"><h4>次にやること</h4><ul class="lsup-next"></ul></div>'
+        + '    <div class="lsup-sec lsup-sec-sc" hidden><h4>かんたん移動</h4><div class="lsup-sc"></div></div>'
+        + '  </div>'
+        + '  <div class="lsup-foot">'
+        + '    <label style="font-size:12px;color:#6b7088;">あなたの役割：</label>'
+        + '    <select class="lsup-role" aria-label="役割を選ぶ"></select>'
+        + '    <span class="lsup-spacer"></span>'
+        + '    <button class="lsup-link lsup-snooze" type="button">しばらく非表示</button>'
+        + '  </div>'
+        + '  <div id="lsup-vswitch-row" class="lsup-foot" style="border-top:1px dashed #eceff5;">'
+        + '    <label style="font-size:11px;color:#9aa1b2;">表示デザイン：</label>'
+        + '    <span class="lsup-vswitch" role="group" aria-label="表示デザインを選ぶ（A・B・C）">'
+        + '      <button type="button" data-v="a">A</button>'
+        + '      <button type="button" data-v="b">B</button>'
+        + '      <button type="button" data-v="c">C</button>'
+        + '    </span>'
+        + '  </div>'
+        + '</div>';
+
+      root.appendChild(bubble);
+      root.appendChild(fab);
+      root.appendChild(overlay);
+      document.body.appendChild(root);
+
+      this._root = root;
+      this._els = {
+        fab: fab,
+        badge: fab.querySelector('.lsup-badge'),
+        bubble: bubble,
+        bubbleTxt: bubble.querySelector('.lsup-btxt'),
+        bubbleClose: bubble.querySelector('.lsup-bclose'),
+        overlay: overlay,
+        panel: overlay.querySelector('.lsup-panel'),
+        x: overlay.querySelector('.lsup-x'),
+        title: overlay.querySelector('.lsup-ttl'),
+        sub: overlay.querySelector('.lsup-sub'),
+        help: overlay.querySelector('.lsup-help'),
+        roleLine: overlay.querySelector('.lsup-role-line'),
+        next: overlay.querySelector('.lsup-next'),
+        secNext: overlay.querySelector('.lsup-sec-next'),
+        secSc: overlay.querySelector('.lsup-sec-sc'),
+        sc: overlay.querySelector('.lsup-sc'),
+        secAlerts: overlay.querySelector('.lsup-sec-alerts'),
+        alerts: overlay.querySelector('.lsup-alerts'),
+        roleSel: overlay.querySelector('.lsup-role'),
+        snooze: overlay.querySelector('.lsup-snooze'),
+        fabIcon: fab.querySelector('.lsup-fabicon'),
+        fabText: fab.querySelector('.lsup-fabtxt'),
+        headAva: overlay.querySelector('.lsup-ava'),
+        vswitch: overlay.querySelector('.lsup-vswitch')
+      };
+
+      // ロール選択肢を流し込む
+      var sel = this._els.roleSel;
+      var opt0 = document.createElement('option');
+      opt0.value = ''; opt0.textContent = '未選択';
+      sel.appendChild(opt0);
+      this.roleList().forEach(function (r) {
+        var o = document.createElement('option');
+        o.value = r.id; o.textContent = r.name;
+        sel.appendChild(o);
+      });
+      sel.value = this.pref.role || '';
+
+      // 非表示設定が有効なら FAB ごと隠す（完全非表示）
+      if (this.pref.hidden) { root.classList.add('lsup-hidden'); }
+    },
+
+    /* ======================================================================
+       イベント
+       ====================================================================== */
+    bindEvents: function () {
+      var self = this;
+      this._els.fab.addEventListener('click', function () { self.openPanel(); });
+      this._els.bubble.addEventListener('click', function (e) {
+        if (e.target === self._els.bubbleClose) { self.hideBubble(true); return; }
+        self.openPanel();
+      });
+      this._els.x.addEventListener('click', function () { self.closePanel(); });
+      this._els.overlay.addEventListener('click', function (e) {
+        if (e.target === self._els.overlay) self.closePanel();
+      });
+      this._els.roleSel.addEventListener('change', function () {
+        self.pref.role = self._els.roleSel.value;
+        savePref(self.pref);
+        self.render();   // ロール別文言を即反映
+      });
+      this._els.snooze.addEventListener('click', function () {
+        // 一定時間（このセッション中＝30分）吹き出しを出さない
+        self.pref.snoozeUntil = Date.now() + 30 * 60 * 1000;
+        savePref(self.pref);
+        self.hideBubble(true);
+        self.closePanel();
+      });
+      // デザイン切替（A/B/C）。CSS・SVGだけを差し替え、localStorageに保存
+      if (this._els.vswitch) {
+        this._els.vswitch.addEventListener('click', function (e) {
+          var btn = e.target.closest('button[data-v]');
+          if (!btn) return;
+          self.setVariant(btn.getAttribute('data-v'));
+          self.syncVswitch();
+        });
+      }
+      // キーボード：Escでパネルを閉じる
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && self._els.overlay.classList.contains('show')) self.closePanel();
+      });
+    },
+
+    /* ======================================================================
+       状態を読み、必要なら吹き出し／バッジを更新
+       force=true: 画面変化に関係なく描画（初期化時）
+       ====================================================================== */
+    refresh: function (force) {
+      if (this.pref.hidden) return;
+      var state = this.readState();
+      var screenId = state.screenId || '_default';
+      var changed = (screenId !== this._lastScreenId);
+      this._lastScreenId = screenId;
+
+      // 注意件数バッジ
+      var flags = (state.flags) || {};
+      var alertCount = Object.keys(flags).filter(function (k) { return flags[k] && DATA.alerts[k]; }).length;
+      this.updateBadge(alertCount);
+
+      // パネルが開いていれば中身も更新
+      if (this._els.overlay.classList.contains('show')) this.render();
+
+      // 吹き出しのポリシー（うるさくしない）：
+      //  ・初回のみ（かつスヌーズ中でない）に短い案内を出す
+      //  ・以後は、確認が必要な項目（超過・未請求等）があるときだけ通知
+      //  ・単なる画面遷移だけでは吹き出さない（大きな吹き出しを出し続けない）
+      var now = Date.now();
+      var snoozed = this.pref.snoozeUntil && now < this.pref.snoozeUntil;
+      if (snoozed) return;
+      var firstEver = !this.pref.welcomed;
+      if (alertCount > 0) {
+        // 注意があるときは、画面が変わったタイミングでのみ控えめに通知
+        if (force || changed) this.maybeShowBubble(screenId, alertCount);
+      } else if (firstEver) {
+        // 初回起動時のみ、使い方の短い案内を一度だけ
+        this.maybeShowBubble(screenId, 0);
+        this.pref.welcomed = true;
+        savePref(this.pref);
+      }
+    },
+
+    updateBadge: function (n) {
+      var b = this._els.badge;
+      if (n > 0) { b.textContent = String(n); b.classList.remove('lsup-hidden'); }
+      else { b.classList.add('lsup-hidden'); }
+    },
+
+    /* 吹き出しを出す（短文・自動で引っ込む。うるさくしない） */
+    maybeShowBubble: function (screenId, alertCount) {
+      // パネルが開いているときは吹き出さない
+      if (this._els.overlay.classList.contains('show')) return;
+      var msg;
+      if (alertCount > 0) {
+        // 注意があるときは件数を控えめに伝える
+        msg = '確認が必要な項目が' + alertCount + '件あります。';
+      } else {
+        var s = DATA.screens[screenId] || DATA.screens._default;
+        // 画面のhelpは長いことがあるので、先頭の一文だけ
+        msg = (s.help || '').split('。')[0];
+        if (msg) msg += '。';
+      }
+      if (!msg) return;
+      this._els.bubbleTxt.textContent = msg;
+      this._els.bubble.classList.add('show');
+      var self = this;
+      global.clearTimeout(this._bubbleTimer);
+      // 注意ありは長め、通常は短めで自動消灯
+      this._bubbleTimer = global.setTimeout(function () {
+        self._els.bubble.classList.remove('show');
+      }, alertCount > 0 ? 6000 : 4500);
+    },
+
+    hideBubble: function () {
+      global.clearTimeout(this._bubbleTimer);
+      this._els.bubble.classList.remove('show');
+    },
+
+    /* ======================================================================
+       パネル開閉
+       ====================================================================== */
+    openPanel: function () {
+      this.hideBubble();
+      this.render();
+      this.syncVswitch();
+      this._els.overlay.classList.add('show');
+      // 表示回数を記録（機密でない統計のみ）
+      this.pref.seenCount = (this.pref.seenCount || 0) + 1;
+      savePref(this.pref);
+      // フォーカスを閉じるボタンへ（キーボード操作配慮）
+      var x = this._els.x;
+      global.setTimeout(function () { try { x.focus(); } catch (e) {} }, 30);
+    },
+    closePanel: function () {
+      this._els.overlay.classList.remove('show');
+      try { this._els.fab.focus(); } catch (e) {}
+    },
+
+    /* ======================================================================
+       パネル本文を現在の画面・ロール・状態で描画
+       ====================================================================== */
+    render: function () {
+      var state = this.readState();
+      var screenId = state.screenId || '_default';
+      var role = this.currentRole();
+      var m = this.getMessages(screenId, role, state);
+      var E = this._els;
+
+      E.title.textContent = m.title || 'Lサポ';
+      var roleObj = role ? DATA.roles[role] : null;
+      E.sub.textContent = roleObj ? (roleObj.name + 'の方へ') : '役割を選ぶと案内が変わります';
+
+      // 注意
+      if (m.alerts.length) {
+        E.alerts.innerHTML = m.alerts.map(function (a) {
+          var sig = a.level === 'danger' ? '●' : (a.level === 'warn' ? '▲' : 'i');
+          return '<div class="lsup-alert ' + a.level + '"><span class="lsup-sig">' + sig + '</span><span>' + a.text + '</span></div>';
+        }).join('');
+        E.secAlerts.hidden = false;
+      } else {
+        E.secAlerts.hidden = true;
+      }
+
+      // この画面でできること
+      E.help.textContent = m.help;
+      if (m.roleLine) { E.roleLine.textContent = m.roleLine; E.roleLine.hidden = false; }
+      else { E.roleLine.hidden = true; }
+
+      // 次にやること
+      if (m.next.length) {
+        E.next.innerHTML = m.next.map(function (t, i) {
+          return '<li><span class="lsup-no">' + (i + 1) + '</span><span>' + t + '</span></li>';
+        }).join('');
+        E.secNext.hidden = false;
+      } else { E.secNext.hidden = true; }
+
+      // ショートカット
+      if (m.shortcuts.length) {
+        E.sc.innerHTML = '';
+        var self = this;
+        m.shortcuts.forEach(function (sc) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = sc.label;
+          b.addEventListener('click', function () { self.goShortcut(sc.target); });
+          E.sc.appendChild(b);
+        });
+        E.secSc.hidden = false;
+      } else { E.secSc.hidden = true; }
+
+      // ロールセレクトを現在値に
+      E.roleSel.value = role || '';
+    },
+
+    /* ----------------------------------------------------------------------
+       ショートカット遷移：
+       - 'xxx.html' や 'xxx.html#yyy' → ページ遷移
+       - '#tab=xxx' / '#sub=xxx' / '#xxx' → アダプタに委譲（無ければhash）
+       ---------------------------------------------------------------------- */
+    goShortcut: function (target) {
+      this.closePanel();
+      var a = global.LSUPPORT_ADAPTER;
+      if (a && typeof a.navigate === 'function') {
+        try { if (a.navigate(target) === true) return; } catch (e) {}
+      }
+      if (/\.html/.test(target)) { global.location.href = target; return; }
+      // ハッシュ系はそのまま（cost側 lccNav が hash を解釈）
+      if (target.charAt(0) === '#') { global.location.hash = target.replace(/^#/, ''); }
+    },
+
+    /* ======================================================================
+       外部API（最小化・非表示・再表示）
+       ====================================================================== */
+    minimize: function () { this.closePanel(); this.hideBubble(); },
+    hide: function () { this.pref.hidden = true; savePref(this.pref); if (this._root) this._root.classList.add('lsup-hidden'); },
+    show: function () { this.pref.hidden = false; savePref(this.pref); if (this._root) this._root.classList.remove('lsup-hidden'); }
+  };
+
+  global.LSupport = LSupport;
+
+  // DOM準備後に自動初期化（既存アプリのmount後でも問題ない：DOMにかぶせるだけ）
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { LSupport.init(); });
+  } else {
+    LSupport.init();
+  }
+})(window);
+</script>
+<!-- ===== LCC Lサポ ここまで ===== -->
+</body>
+</html>
