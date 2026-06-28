@@ -3,9 +3,22 @@ import type { AiMode, ChatMessage } from '../../types'
 import type { Screen } from '../../types'
 import { aiModes, initialChatMessages, mockAiResponses } from '../../data/mockData'
 import DemoBanner from '../DemoBanner'
-import { runOrchestrator } from '../../core/ai-engine/aiOrchestrator'
+import {
+  assembleOrchestratorResult,
+  getDemoInput,
+  loadInboxItems,
+  loadScheduleItems,
+  loadFileItems,
+  loadMetricItems,
+  loadNotificationItems,
+  type OrchestratorInput,
+} from '../../core/ai-engine/aiOrchestrator'
 import type { OrchestratorResult } from '../../core/ai-engine/aiEngineTypes'
-import { buildMorningBriefing, formatMorningBriefing } from '../../core/ai-engine/morningBriefingEngine'
+import {
+  buildMorningBriefing,
+  formatMorningBriefing,
+  type ProviderStatusMap,
+} from '../../core/ai-engine/morningBriefingEngine'
 import { mockCalendarEvents } from '../../services/calendar/mockCalendar'
 import { mapToCalendarDerivedEvent } from '../../services/calendar/calendarMapper'
 import { createCalendarSummary } from '../../services/calendar/calendarAnalyzer'
@@ -328,8 +341,8 @@ function getLineWorksShortcutResponse(input: string): string | null {
   return null
 }
 
-function getMockResponse(mode: AiMode, input: string, orchestratorData?: OrchestratorResult): string {
-  // Project SHOGUN 朝ブリーフィングを最優先（全Provider横断・3分類）
+function getMockResponse(mode: AiMode, input: string, orchestratorData?: OrchestratorResult, dataStatus?: ProviderStatusMap): string {
+  // Project SHOGUN 朝ブリーフィングを最優先（全Provider横断・3分類・実データ対応）
   if (orchestratorData) {
     if (
       input.includes('ブリーフィング') ||
@@ -341,7 +354,7 @@ function getMockResponse(mode: AiMode, input: string, orchestratorData?: Orchest
       input.includes('今日やること') ||
       input.includes('今日の予定をまとめて全部')
     ) {
-      return formatMorningBriefing(buildMorningBriefing(orchestratorData))
+      return formatMorningBriefing(buildMorningBriefing(orchestratorData), dataStatus)
     }
   }
 
@@ -383,27 +396,79 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
   const [isTyping, setIsTyping] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const tabBarRef = useRef<HTMLDivElement>(null)
-  const briefingShownRef = useRef(false)
-  const orchestratorResult = useMemo(() => runOrchestrator(), [])
-  const morningBriefing = useMemo(() => buildMorningBriefing(orchestratorResult), [orchestratorResult])
+  const loadedRef = useRef(false)
+  const briefingMsgIdRef = useRef('briefing-morning')
+
+  // Mission 1.1: 全Provider実データ対応・順次反映
+  // 初期はデモ入力で即表示 → 各Providerが取得完了するたびに再計算・差し替え
+  const dataRef = useRef<OrchestratorInput>(getDemoInput())
+  const statusRef = useRef<ProviderStatusMap>({
+    inbox: 'loading', schedule: 'loading', file: 'loading', business: 'loading', notification: 'loading',
+  })
+  const [orchResult, setOrchResult] = useState<OrchestratorResult>(() => assembleOrchestratorResult(dataRef.current))
+  const [dataStatus, setDataStatus] = useState<ProviderStatusMap>(statusRef.current)
+  const morningBriefing = useMemo(() => buildMorningBriefing(orchResult), [orchResult])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isTyping])
 
-  // Project SHOGUN 標準UI: 起動時に朝ブリーフィングを自動表示
-  // 社長はチャットを開くだけで「今日やること」が全部分かる
+  // ブリーフィングメッセージを再計算して差し替え（なければ追加）
+  function refreshBriefingMessage() {
+    const result = assembleOrchestratorResult(dataRef.current)
+    setOrchResult(result)
+    setDataStatus({ ...statusRef.current })
+    const text = formatMorningBriefing(buildMorningBriefing(result), statusRef.current)
+    const id = briefingMsgIdRef.current
+    setMessages((prev) => {
+      const idx = prev.findIndex((m) => m.id === id)
+      if (idx === -1) {
+        return [...prev, { id, role: 'assistant', content: text, timestamp: new Date() }]
+      }
+      const copy = prev.slice()
+      copy[idx] = { ...copy[idx], content: text }
+      return copy
+    })
+  }
+
+  // Project SHOGUN 標準UI: 起動時に朝ブリーフィングを自動表示し、
+  // 5Providerを並列・非同期取得して順次反映する（実データ対応）
   useEffect(() => {
-    if (briefingShownRef.current) return
-    briefingShownRef.current = true
-    const briefingMsg: ChatMessage = {
-      id: `briefing-${Date.now()}`,
-      role: 'assistant',
-      content: formatMorningBriefing(morningBriefing),
-      timestamp: new Date(),
-    }
-    setMessages((prev) => [...prev, briefingMsg])
-  }, [morningBriefing])
+    if (loadedRef.current) return
+    loadedRef.current = true
+    refreshBriefingMessage() // デモ即表示（取得中）
+
+    loadInboxItems().then((r) => {
+      dataRef.current = { ...dataRef.current, inbox: r.items }
+      statusRef.current = { ...statusRef.current, inbox: r.source }
+      refreshBriefingMessage()
+    }).catch(() => { statusRef.current = { ...statusRef.current, inbox: 'mock' }; refreshBriefingMessage() })
+
+    loadScheduleItems().then((r) => {
+      dataRef.current = { ...dataRef.current, schedule: r.items }
+      statusRef.current = { ...statusRef.current, schedule: r.source }
+      refreshBriefingMessage()
+    }).catch(() => { statusRef.current = { ...statusRef.current, schedule: 'mock' }; refreshBriefingMessage() })
+
+    loadFileItems().then((r) => {
+      dataRef.current = { ...dataRef.current, files: r.items }
+      statusRef.current = { ...statusRef.current, file: r.source }
+      refreshBriefingMessage()
+    }).catch(() => { statusRef.current = { ...statusRef.current, file: 'mock' }; refreshBriefingMessage() })
+
+    loadMetricItems().then((r) => {
+      dataRef.current = { ...dataRef.current, metrics: r.items }
+      statusRef.current = { ...statusRef.current, business: r.source }
+      refreshBriefingMessage()
+    }).catch(() => { statusRef.current = { ...statusRef.current, business: 'mock' }; refreshBriefingMessage() })
+
+    loadNotificationItems().then((r) => {
+      dataRef.current = { ...dataRef.current, notifications: r.items }
+      statusRef.current = { ...statusRef.current, notification: r.source }
+      refreshBriefingMessage()
+    }).catch(() => { statusRef.current = { ...statusRef.current, notification: 'mock' }; refreshBriefingMessage() })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function sendMessage(text: string) {
     if (!text.trim()) return
@@ -421,7 +486,7 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: getMockResponse(activeMode, text, orchestratorResult),
+        content: getMockResponse(activeMode, text, orchResult, dataStatus),
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, aiMsg])

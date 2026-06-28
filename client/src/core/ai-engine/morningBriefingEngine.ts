@@ -8,6 +8,17 @@
 
 import type { OrchestratorResult, DecisionItem } from './aiEngineTypes'
 
+// 各Providerのデータ取得状況（実データ / デモ / 取得中）
+export type ProviderSourceState = 'loading' | 'api' | 'cache' | 'mock'
+
+export interface ProviderStatusMap {
+  inbox: ProviderSourceState
+  schedule: ProviderSourceState
+  file: ProviderSourceState
+  business: ProviderSourceState
+  notification: ProviderSourceState
+}
+
 export type BriefingBucket = 'ceo' | 'delegate' | 'monitor'
 
 export interface BriefingItem {
@@ -110,9 +121,22 @@ export function buildMorningBriefing(result: OrchestratorResult): MorningBriefin
   }
 }
 
+// データ取得状況の1行表示（実=実データ / 取=取得中 / デ=デモ）
+function formatDataStatus(s: ProviderStatusMap): string {
+  const label = (st: ProviderSourceState): string =>
+    st === 'loading' ? '取得中' : st === 'mock' ? 'デモ' : '実データ'
+  return `📡 データ：受信箱=${label(s.inbox)} / 予定=${label(s.schedule)} / ファイル=${label(s.file)} / 数字=${label(s.business)} / 通知=${label(s.notification)}`
+}
+
+// すべて実データ（api/cache）かどうか
+export function isAllRealData(s: ProviderStatusMap): boolean {
+  return (Object.values(s) as ProviderSourceState[]).every((v) => v === 'api' || v === 'cache')
+}
+
 // Project SHOGUN 標準UI: 朝ブリーフィングの定型テキスト
 // 必ず「残りは私が監視します。」で締める。
-export function formatMorningBriefing(b: MorningBriefing): string {
+// dataStatus を渡すと、締めの直前にデータ取得状況を表示する。
+export function formatMorningBriefing(b: MorningBriefing, dataStatus?: ProviderStatusMap): string {
   const lines: string[] = []
 
   lines.push(`${b.greeting}、社長。`)
@@ -121,6 +145,7 @@ export function formatMorningBriefing(b: MorningBriefing): string {
   if (b.totalCount === 0) {
     lines.push('今日は対応が必要な案件はありません。')
     lines.push('')
+    if (dataStatus) lines.push(formatDataStatus(dataStatus))
     lines.push('残りは私が監視します。')
     return lines.join('\n')
   }
@@ -158,6 +183,7 @@ export function formatMorningBriefing(b: MorningBriefing): string {
   }
 
   lines.push('')
+  if (dataStatus) lines.push(formatDataStatus(dataStatus))
   lines.push('残りは私が監視します。')
 
   return lines.join('\n')
