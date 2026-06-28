@@ -866,12 +866,12 @@
           <h2 class="font-bold text-gray-800 mb-1 flex items-center gap-2"><span class="w-1.5 h-5 rounded" style="background:var(--lcc-orange)"></span>工事種別を選んでください</h2>
           <p class="text-xs text-gray-500 mb-3">タップすると、その工事のクイック積算に進みます。</p>
           <div class="grid grid-cols-2 gap-3">
-            <button class="trade-card" style="--c:#0a2a5e" @click="openTrade('demo')"><span class="text-4xl">🏗️</span><span class="label">解体工事</span><span class="sub">面積・階数・構造から</span></button>
-            <button class="trade-card" style="--c:#1f8f4e" @click="openTrade('clean')"><span class="text-4xl">📦</span><span class="label">片付け・残置</span><span class="sub">間取り or トラック台数</span></button>
-            <button class="trade-card" style="--c:#7a9e1b" @click="openTrade('kusa')"><span class="text-4xl">🌿</span><span class="label">草刈り・剪定</span><span class="sub">面積（㎡）から</span></button>
-            <button class="trade-card" style="--c:#c2622b" @click="openTrade('gaikou')"><span class="text-4xl">🧱</span><span class="label">外構工事</span><span class="sub">工事内容を選択</span></button>
+            <button class="trade-card" style="--c:#0a2a5e" @click="openTrade('demo')" :disabled="isEditLocked"><span class="text-4xl">🏗️</span><span class="label">解体工事</span><span class="sub">面積・階数・構造から</span></button>
+            <button class="trade-card" style="--c:#1f8f4e" @click="openTrade('clean')" :disabled="isEditLocked"><span class="text-4xl">📦</span><span class="label">片付け・残置</span><span class="sub">間取り or トラック台数</span></button>
+            <button class="trade-card" style="--c:#7a9e1b" @click="openTrade('kusa')" :disabled="isEditLocked"><span class="text-4xl">🌿</span><span class="label">草刈り・剪定</span><span class="sub">面積（㎡）から</span></button>
+            <button class="trade-card" style="--c:#c2622b" @click="openTrade('gaikou')" :disabled="isEditLocked"><span class="text-4xl">🧱</span><span class="label">外構工事</span><span class="sub">工事内容を選択</span></button>
           </div>
-          <button class="w-full mt-3 border border-gray-300 rounded-xl py-2.5 text-sm text-gray-500" @click="openTrade('manual')">クイック積算を使わず、手入力で見積を作る →</button>
+          <button class="w-full mt-3 border border-gray-300 rounded-xl py-2.5 text-sm text-gray-500" @click="openTrade('manual')" :disabled="isEditLocked">クイック積算を使わず、手入力で見積を作る →</button>
         </template>
 
         <template v-else>
@@ -896,7 +896,7 @@
             </div>
             <label class="flex items-center gap-2 text-sm py-1.5"><input type="checkbox" v-model="quick.asbestos" class="w-5 h-5"> 石綿スレート屋根（レベル3処分）</label>
             <label class="flex items-center gap-2 text-sm py-1.5"><input type="checkbox" v-model="quick.seibi" class="w-5 h-5"> 整地・転圧を行う</label>
-            <button class="w-full mt-2 text-white font-bold rounded-xl py-3 big-btn" style="background:var(--lcc-orange)" @click="confirmQuick('demo')">この内容で項目を自動生成</button>
+            <button class="w-full mt-2 text-white font-bold rounded-xl py-3 big-btn" style="background:var(--lcc-orange)" @click="confirmQuick('demo')" :disabled="isEditLocked">この内容で項目を自動生成</button>
             <p class="text-[11px] text-gray-400 mt-1">仮設・本体・廃棄物分別・整地・諸経費を自動で内訳ツリーに追加します。</p>
           </div>
 
@@ -930,7 +930,7 @@
               <button v-for="m in [{k:'few',l:'少なめ'},{k:'normal',l:'普通'},{k:'many',l:'多め'}]" :key="m.k" class="seg-btn rounded-lg py-2 text-sm border" :class="quick.volume===m.k?'text-white border-transparent':'bg-gray-50 text-gray-600 border-gray-300'" :style="quick.volume===m.k?'background:var(--lcc-navy)':''" @click="quick.volume=m.k">{{ m.l }}</button>
             </div>
             <label class="flex items-center gap-2 text-sm py-1.5"><input type="checkbox" v-model="quick.kaden" class="w-5 h-5"> 家電4品目（冷蔵庫・洗濯機・テレビ・エアコン）を含む</label>
-            <button class="w-full mt-2 text-white font-bold rounded-xl py-3 big-btn" style="background:var(--lcc-orange)" @click="confirmQuick('clean')">この内容で項目を自動生成</button>
+            <button class="w-full mt-2 text-white font-bold rounded-xl py-3 big-btn" style="background:var(--lcc-orange)" @click="confirmQuick('clean')" :disabled="isEditLocked">この内容で項目を自動生成</button>
             <p class="text-[11px] text-gray-400 mt-1">残置物撤去量（㎥）と家電リサイクル・処分費を自動算出します。</p>
           </div>
 
@@ -945,7 +945,7 @@
               <label class="flex items-center gap-2 text-sm py-1.5"><input type="checkbox" v-model="quick.kusaSlope" class="w-5 h-5"> 傾斜地・法面（作業効率低下で＋30％）</label>
               <label class="flex items-center gap-2 text-sm py-1.5"><input type="checkbox" v-model="quick.kusaObstacle" class="w-5 h-5"> 障害物あり（際刈りで＋20％）</label>
             </div>
-            <button class="w-full mt-2 text-white font-bold rounded-xl py-3 big-btn" style="background:var(--lcc-orange)" @click="confirmQuick('kusa')">この内容で項目を自動生成</button>
+            <button class="w-full mt-2 text-white font-bold rounded-xl py-3 big-btn" style="background:var(--lcc-orange)" @click="confirmQuick('kusa')" :disabled="isEditLocked">この内容で項目を自動生成</button>
             <p class="text-[11px] text-gray-400 mt-1">草刈り・剪定・防草シート・処分を自動で内訳ツリーに追加します。</p>
           </div>
 
@@ -964,7 +964,7 @@
               <label class="flex items-center gap-2 text-sm py-1.5"><input type="checkbox" v-model="quick.gaikouExisting" class="w-5 h-5"> 既存構造物の撤去がある（撤去・処分を＋計上）</label>
               <label class="flex items-center gap-2 text-sm py-1.5"><input type="checkbox" v-model="quick.gaikouNarrow" class="w-5 h-5"> 搬入経路の制約・狭小地（人力搬送で＋25％）</label>
             </div>
-            <button class="w-full mt-2 text-white font-bold rounded-xl py-3 big-btn" style="background:var(--lcc-orange)" @click="confirmQuick('gaikou')">この内容で項目を自動生成</button>
+            <button class="w-full mt-2 text-white font-bold rounded-xl py-3 big-btn" style="background:var(--lcc-orange)" @click="confirmQuick('gaikou')" :disabled="isEditLocked">この内容で項目を自動生成</button>
           </div>
 
           <!-- 階層ツリー -->
@@ -972,7 +972,7 @@
             <h2 class="font-bold text-gray-800 flex items-center gap-2"><span class="w-1.5 h-5 rounded" style="background:var(--lcc-orange)"></span>内訳明細</h2>
             <div class="flex gap-1.5">
               <button class="text-xs border border-gray-300 rounded-lg px-2 py-1.5 btn-sm" @click="startVoice" :class="voiceOn?'bg-orange-100':''">🎤 音声</button>
-              <button class="text-xs text-white rounded-lg px-2 py-1.5 btn-sm" style="background:var(--lcc-navy)" @click="addGroup()">＋大項目</button>
+              <button class="text-xs text-white rounded-lg px-2 py-1.5 btn-sm" style="background:var(--lcc-navy)" @click="addGroup()" :disabled="isEditLocked">＋大項目</button>
             </div>
           </div>
           <p v-if="voiceMsg" class="text-[11px] mb-2" :class="voiceErr?'text-red-500':'text-gray-500'">{{ voiceMsg }}</p>
@@ -991,29 +991,29 @@
           <!-- 大項目（group） -->
           <div v-for="(g,gi) in (activeEstimate?activeEstimate.tree:[])" :key="g.id" class="card mb-2 overflow-hidden">
             <div class="flex items-center gap-2 px-3 py-2.5" style="background:#eef2fa">
-              <input v-model="g.label" @input="save" class="flex-1 bg-transparent font-bold text-sm" style="color:var(--lcc-navy)">
+              <input v-model="g.label" @input="save" class="flex-1 bg-transparent font-bold text-sm" style="color:var(--lcc-navy)" :disabled="isEditLocked">
               <span class="text-sm font-bold" style="color:var(--lcc-navy)">{{ yen(groupSell(g)) }}</span>
-              <button class="text-gray-400 px-1" @click="removeGroup(gi)">✕</button>
+              <button class="text-gray-400 px-1" @click="removeGroup(gi)" :disabled="isEditLocked">✕</button>
             </div>
             <div class="p-2">
               <div v-for="(it,ii) in g.children" :key="it.id" class="border border-gray-100 rounded-xl p-2.5 mb-2">
                 <div class="flex items-center gap-2">
-                  <input v-model="it.label" @input="recalc" class="flex-1 text-sm font-semibold border-b border-dashed border-gray-200 pb-0.5">
-                  <button class="text-gray-400 flex items-center justify-center shrink-0" style="min-width:44px;min-height:44px;font-size:18px;line-height:1" aria-label="削除" @click.stop.prevent="removeItem(g,ii)">✕</button>
+                  <input v-model="it.label" @input="recalc" class="flex-1 text-sm font-semibold border-b border-dashed border-gray-200 pb-0.5" :disabled="isEditLocked">
+                  <button class="text-gray-400 flex items-center justify-center shrink-0" style="min-width:44px;min-height:44px;font-size:18px;line-height:1" aria-label="削除" @click.stop.prevent="removeItem(g,ii)" :disabled="isEditLocked">✕</button>
                 </div>
                 <div class="grid grid-cols-12 gap-1.5 mt-1 items-end">
-                  <div class="col-span-3"><label class="text-[10px] text-gray-400">数量</label><input type="number" v-model.number="it.qty" inputmode="decimal" @input="recalc" class="w-full border border-gray-300 rounded-lg px-1.5 py-2 text-sm text-right"></div>
-                  <div class="col-span-2"><label class="text-[10px] text-gray-400">単位</label><input v-model="it.unit" @input="save" class="w-full border border-gray-300 rounded-lg px-1 py-2 text-sm text-center"></div>
-                  <div class="col-span-4"><label class="text-[10px] text-gray-400">単価(売)</label><input type="number" v-model.number="it.price" inputmode="numeric" @input="onPriceEdit(it)" class="w-full border border-gray-300 rounded-lg px-1.5 py-2 text-sm text-right"></div>
+                  <div class="col-span-3"><label class="text-[10px] text-gray-400">数量</label><input type="number" v-model.number="it.qty" inputmode="decimal" @input="recalc" class="w-full border border-gray-300 rounded-lg px-1.5 py-2 text-sm text-right" :disabled="isEditLocked"></div>
+                  <div class="col-span-2"><label class="text-[10px] text-gray-400">単位</label><input v-model="it.unit" @input="save" class="w-full border border-gray-300 rounded-lg px-1 py-2 text-sm text-center" :disabled="isEditLocked"></div>
+                  <div class="col-span-4"><label class="text-[10px] text-gray-400">単価(売)</label><input type="number" v-model.number="it.price" inputmode="numeric" @input="onPriceEdit(it)" class="w-full border border-gray-300 rounded-lg px-1.5 py-2 text-sm text-right" :disabled="isEditLocked"></div>
                   <div class="col-span-3 text-right"><label class="text-[10px] text-gray-400">金額</label><div class="text-sm font-bold py-2" style="color:var(--lcc-navy)">{{ yen(it.qty*it.price) }}</div></div>
                 </div>
                 <!-- 原価・粗利 行（業者モードでは非表示） -->
                 <!-- 【P0追加検収】粗利率は行ごとに個別入力可。ただし家電リサイクル4品目（isRecycleItem）は法定実費のため0%固定・編集不可（readonly）とし、「法定0%」バッジを表示する。 -->
                 <div v-if="!vendorMode" class="grid grid-cols-12 gap-1.5 mt-1 items-end">
-                  <div class="col-span-5"><label class="text-[10px] text-gray-400">原価単価</label><input type="number" v-model.number="it.cost" inputmode="numeric" @input="onCostEdit(it)" class="w-full border border-gray-200 rounded-lg px-1.5 py-1.5 text-xs text-right bg-gray-50"></div>
+                  <div class="col-span-5"><label class="text-[10px] text-gray-400">原価単価</label><input type="number" v-model.number="it.cost" inputmode="numeric" @input="onCostEdit(it)" class="w-full border border-gray-200 rounded-lg px-1.5 py-1.5 text-xs text-right bg-gray-50" :disabled="isEditLocked"></div>
                   <div class="col-span-3">
                     <label class="text-[10px] text-gray-400">粗利率%</label>
-                    <input v-if="!isRecycleItem(it)" type="number" v-model.number="it.marginPct" inputmode="decimal" @input="onMarginEdit(it)" class="w-full border border-gray-200 rounded-lg px-1 py-1.5 text-xs text-right bg-gray-50">
+                    <input v-if="!isRecycleItem(it)" type="number" v-model.number="it.marginPct" inputmode="decimal" @input="onMarginEdit(it)" class="w-full border border-gray-200 rounded-lg px-1 py-1.5 text-xs text-right bg-gray-50" :disabled="isEditLocked">
                     <div v-else class="w-full border border-amber-200 rounded-lg px-1 py-1.5 text-xs text-right bg-amber-50 text-amber-700 font-bold" title="家電リサイクル法定実費のため0%固定">0% 法定</div>
                   </div>
                   <div class="col-span-4 text-right text-[11px]"><span class="text-gray-400">粗利</span> <b style="color:var(--lcc-orange)">{{ yen(it.qty*(it.price-it.cost)) }}</b></div>
@@ -1023,8 +1023,8 @@
                 </div>
               </div>
               <div class="flex gap-1.5">
-                <button class="flex-1 text-xs border border-dashed border-gray-300 rounded-lg py-2 text-gray-500" @click="openPicker(g)">＋ 単価マスタから追加</button>
-                <button class="text-xs border border-dashed border-gray-300 rounded-lg px-3 py-2 text-gray-500" @click="addBlankItem(g)">空項目</button>
+                <button class="flex-1 text-xs border border-dashed border-gray-300 rounded-lg py-2 text-gray-500" @click="openPicker(g)" :disabled="isEditLocked">＋ 単価マスタから追加</button>
+                <button class="text-xs border border-dashed border-gray-300 rounded-lg px-3 py-2 text-gray-500" @click="addBlankItem(g)" :disabled="isEditLocked">空項目</button>
               </div>
             </div>
           </div>
@@ -1628,11 +1628,11 @@
       <div class="card p-4 mb-3">
         <h3 class="font-bold text-gray-700 mb-2">見積雛形テンプレート</h3>
         <p class="text-[11px] text-gray-400 mb-2">現在の見積を雛形として保存、または保存済雛形を現在の案件に読み込めます。</p>
-        <button v-if="activeEstimate" class="w-full border border-gray-300 rounded-xl py-2.5 text-sm mb-2" @click="saveAsTemplate(activeEstimate)">現在の見積を雛形として保存</button>
+        <button v-if="activeEstimate" class="w-full border border-gray-300 rounded-xl py-2.5 text-sm mb-2" @click="saveAsTemplate(activeEstimate)" :disabled="isEditLocked">現在の見積を雛形として保存</button>
         <div v-if="templates.length===0" class="text-sm text-gray-400">保存済みの雛形はありません。</div>
         <div v-for="t in templates" :key="t.id" class="flex items-center gap-2 border-b border-gray-100 py-2">
           <span class="text-sm flex-1">{{ t.name }}</span>
-          <button class="text-xs text-white rounded-lg px-3 py-2 btn-sm" style="background:var(--lcc-orange)" @click="useTemplate(t)">この案件に引用</button>
+          <button class="text-xs text-white rounded-lg px-3 py-2 btn-sm" style="background:var(--lcc-orange)" @click="useTemplate(t)" :disabled="isEditLocked">この案件に引用</button>
           <button class="text-xs text-red-400" @click="delTemplate(t.id)">✕</button>
         </div>
       </div>
@@ -2290,6 +2290,8 @@ const appRootApp = createApp({
     activeProject(){ return this.projects.find(p=>p.id===this.activeProjectId)||null; },
     activeEstimate(){ const p=this.activeProject; if(!p) return null; return (p.estimates||[]).find(e=>e.id===this.activeEstimateId)||(p.estimates&&p.estimates[0])||null; },
     isContractLocked(){ return !!(this.activeProject && ['contract','inprogress','done'].includes(this.activeProject.status)); },
+    // 受注済みステータス OR estimate.locked フラグ のどちらかが true なら編集禁止
+    isEditLocked(){ return this.isContractLocked || !!(this.activeEstimate && this.activeEstimate.locked); },
     activeCustomer(){ return this.customers.find(c=>c.id===this.activeCustomerId)||null; },
     projectComments(){ const p=this.activeProject; if(!p) return []; return (p.comments||[]).slice().sort((a,b)=>(a.ts||0)-(b.ts||0)); },
 
@@ -3311,16 +3313,16 @@ const appRootApp = createApp({
     groupSell(g){ return (g.children||[]).reduce((a,it)=>a+(it.qty||0)*(it.price||0),0); },
 
     // ===== テンプレート =====
-    saveAsTemplate(e){ const name=prompt('雛形名を入力',e.label+' 雛形'); if(!name) return; this.templates.push({ id:uid(), name, tree:JSON.parse(JSON.stringify(e.tree)) }); this.save(); this.toastMsg('雛形を保存しました'); },
-    useTemplate(t){ const p=this.activeProject; if(!p) return; const e=this.activeEstimate; if(e){ const add=JSON.parse(JSON.stringify(t.tree)); add.forEach(ng=>{ ng.id=uid(); (ng.children||[]).forEach(it=>it.id=uid()); const eg=e.tree.find(x=>x.label===ng.label); if(eg){ eg.children.push(...ng.children); } else { e.tree.push(ng); } }); this.touch(p); this.lccSetSub('estimate'); this.toastMsg('雛形を引用しました'); } },
+    saveAsTemplate(e){ if(this.guardLocked()) return; const name=prompt('雛形名を入力',e.label+' 雛形'); if(!name) return; this.templates.push({ id:uid(), name, tree:JSON.parse(JSON.stringify(e.tree)) }); this.save(); this.toastMsg('雛形を保存しました'); },
+    useTemplate(t){ if(this.guardLocked()) return; const p=this.activeProject; if(!p) return; const e=this.activeEstimate; if(e){ const add=JSON.parse(JSON.stringify(t.tree)); add.forEach(ng=>{ ng.id=uid(); (ng.children||[]).forEach(it=>it.id=uid()); const eg=e.tree.find(x=>x.label===ng.label); if(eg){ eg.children.push(...ng.children); } else { e.tree.push(ng); } }); this.touch(p); this.lccSetSub('estimate'); this.toastMsg('雛形を引用しました'); } },
     delTemplate(id){ this.templates=this.templates.filter(t=>t.id!==id); this.save(); },
 
     // ===== ツリー編集 =====
-    addGroup(label){ const e=this.activeEstimate; if(!e) return; e.tree.push({ id:uid(), type:'group', label:label||'新しい大項目', children:[] }); this.save(); },
-    removeGroup(gi){ const e=this.activeEstimate; if(!e) return; e.tree.splice(gi,1); this.save(); },
+    addGroup(label){ if(this.guardLocked()) return; const e=this.activeEstimate; if(!e) return; e.tree.push({ id:uid(), type:'group', label:label||'新しい大項目', children:[] }); this.save(); },
+    removeGroup(gi){ if(this.guardLocked()) return; const e=this.activeEstimate; if(!e) return; e.tree.splice(gi,1); this.save(); },
     // 【P0追加検収】空項目の初期粗利率は設定の既定値（defaultMarginPct／初期35%）を使う。以降行ごとに個別変更可。
-    addBlankItem(g){ const dm=(this.settings.defaultMarginPct!=null?this.settings.defaultMarginPct:35); g.children.push({ id:uid(), type:'item', label:'新規項目', qty:1, unit:'式', price:0, cost:0, marginPct:dm, cat:g.label, formula:'', note:'' }); this.save(); },
-    removeItem(g,ii){ const it=(g.children||[])[ii]; const name=it&&it.label?it.label:'この項目'; if(!confirm('「'+name+'」を削除しますか？')) return; g.children.splice(ii,1); this.save(); },
+    addBlankItem(g){ if(this.guardLocked()) return; const dm=(this.settings.defaultMarginPct!=null?this.settings.defaultMarginPct:35); g.children.push({ id:uid(), type:'item', label:'新規項目', qty:1, unit:'式', price:0, cost:0, marginPct:dm, cat:g.label, formula:'', note:'' }); this.save(); },
+    removeItem(g,ii){ if(this.guardLocked()) return; const it=(g.children||[])[ii]; const name=it&&it.label?it.label:'この項目'; if(!confirm('「'+name+'」を削除しますか？')) return; g.children.splice(ii,1); this.save(); },
     // 【P0追加検収】以下3メソッドは明細行の売価・原価・粗利率を相互に同期させる。
     // 家電リサイクル4品目（isRecycleItem）は法定実費のため粗利率を常に0%に固定し、売価＝原価とする（粗利を乗せない）。
     // それ以外の項目は「売価＝原価÷（1－粗利率）」の関係を保ち、原価・売価を編集したら粗利率を、粗利率を編集したら売価を再計算する。
@@ -3328,15 +3330,24 @@ const appRootApp = createApp({
     // 【P1追加検収】設定画面から粗利0%固定キーワード（カンマ区切り）を保存。空白・重複を除去して配列化する。
     setZeroMarginKeywords(v){ const arr=(v||'').split(/[,、\n]/).map(s=>s.trim()).filter(s=>s.length>0); this.settings.zeroMarginKeywords=Array.from(new Set(arr)); this.save(); this.toastMsg('粗利0%固定キーワードを更新しました'); },
     isEstimateLocked(){ const e=this.activeEstimate; return !!(e && e.locked); },
-    guardLocked(){ if(this.isEstimateLocked()){ this.toastMsg('この見積は受注時に固定済みです。編集には設定からロック解除が必要です'); return true; } return false; },
+    guardLocked(){
+      if(this.isEditLocked){
+        const msg=this.isContractLocked
+          ?'受注済みステータスのため見積を編集できません'
+          :'この見積は受注時に固定済みです。編集にはロック解除が必要です';
+        this.toastMsg(msg); return true;
+      }
+      return false;
+    },
     onPriceEdit(it){ if(this.guardLocked()){ this.save(); return; } if(this.isRecycleItem(it)){ it.marginPct=0; it.price=it.cost; this.save(); return; } if(it.price>0){ it.marginPct=Math.round((1-it.cost/it.price)*1000)/10; } this.save(); },
     onCostEdit(it){ if(this.guardLocked()){ this.save(); return; } if(this.isRecycleItem(it)){ it.marginPct=0; it.price=it.cost; this.save(); return; } if(it.price>0){ it.marginPct=Math.round((1-it.cost/it.price)*1000)/10; } this.save(); },
     onMarginEdit(it){ if(this.guardLocked()){ this.save(); return; } if(this.isRecycleItem(it)){ it.marginPct=0; it.price=it.cost; this.save(); return; } const m=(it.marginPct||0)/100; if(m<1){ it.price=Math.round(it.cost/(1-m)); } this.save(); },
-    recalc(){ this.save(); },
+    recalc(){ if(this.guardLocked()) return; this.save(); },
 
     // ===== 単価マスタピッカー =====
-    openPicker(g){ this.pickerOpen=true; this.pickerSearch=''; this.pickerGroupId=g.id; },
+    openPicker(g){ if(this.guardLocked()) return; this.pickerOpen=true; this.pickerSearch=''; this.pickerGroupId=g.id; },
     pickRate(r){
+      if(this.guardLocked()) return;
       const e=this.activeEstimate; if(!e){ this.toastMsg('先に案件を選択してください'); return; }
       let g=e.tree.find(x=>x.id===this.pickerGroupId);
       if(!g){ g={id:uid(),type:'group',label:r.cat,children:[]}; e.tree.push(g); }
@@ -3353,9 +3364,10 @@ const appRootApp = createApp({
 
     // ===== クイック積算：工事種別ハブ =====
     // テンプレートの @click="openTrade('demo')" から呼ばれる（工事種別ハブ→クイック積算フォームへ遷移）
-    openTrade(t){ this.quickTrade=t; window.scrollTo({top:0,behavior:'smooth'}); },
+    openTrade(t){ if(this.guardLocked()) return; this.quickTrade=t; window.scrollTo({top:0,behavior:'smooth'}); },
     // テンプレートの @click="confirmQuick('demo')" から呼ばれる（クイック積算フォーム→積算実行）
     confirmQuick(t){
+      if(this.guardLocked()) return;
       if(t==='demo') this.applyDemo();
       else if(t==='clean') this.applyClean();
       else if(t==='kusa') this.applyKusa();
@@ -3369,6 +3381,7 @@ const appRootApp = createApp({
 
     // ===== クイック積算：解体 =====
     applyDemo(){
+      if(this.guardLocked()) return;
       const p=this.activeProject; if(!p) return;
       const e=this.activeEstimate; if(!e) return;
       const q=this.quick;
@@ -3432,6 +3445,7 @@ const appRootApp = createApp({
     //   以前は日本語キー（少ない/普通・1R/2DK等）とq.inputModeを参照していたため、
     //   物量・間取り・トラック台数が一切反映されず過小見積になっていた。
     applyClean(){
+      if(this.guardLocked()) return;
       const p=this.activeProject; if(!p) return;
       const e=this.activeEstimate; if(!e) return;
       const q=this.quick;
@@ -3492,6 +3506,7 @@ const appRootApp = createApp({
 
     // ===== クイック積算：草刈り =====
     applyKusa(){
+      if(this.guardLocked()) return;
       const p=this.activeProject; if(!p) return;
       const e=this.activeEstimate; if(!e) return;
       const q=this.quick;
@@ -3527,6 +3542,7 @@ const appRootApp = createApp({
 
     // ===== クイック積算：外構 =====
     applyGaikou(){
+      if(this.guardLocked()) return;
       const p=this.activeProject; if(!p) return;
       const e=this.activeEstimate; if(!e) return;
       const R=this.rates;
