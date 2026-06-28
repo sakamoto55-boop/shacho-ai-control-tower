@@ -9,3 +9,5 @@ data/*.db
 *.log
 .DS_Store
 upload-work/
+output/cdn/
+output/lcc-local.html
