@@ -18,6 +18,7 @@ import {
   buildMorningBriefing,
   formatMorningBriefing,
   type ProviderStatusMap,
+  type BriefingInput,
 } from '../../core/ai-engine/morningBriefingEngine'
 import { mockCalendarEvents } from '../../services/calendar/mockCalendar'
 import { mapToCalendarDerivedEvent } from '../../services/calendar/calendarMapper'
@@ -341,20 +342,23 @@ function getLineWorksShortcutResponse(input: string): string | null {
   return null
 }
 
-function getMockResponse(mode: AiMode, input: string, orchestratorData?: OrchestratorResult, dataStatus?: ProviderStatusMap): string {
-  // Project SHOGUN 朝ブリーフィングを最優先（全Provider横断・3分類・実データ対応）
+function getMockResponse(mode: AiMode, input: string, orchestratorData?: OrchestratorResult, dataStatus?: ProviderStatusMap, briefingInput?: BriefingInput): string {
+  // Project SHOGUN 夜間レビュー / 朝ブリーフィングを最優先（全Provider横断・実データ対応）
   if (orchestratorData) {
     if (
       input.includes('ブリーフィング') ||
       input.includes('今朝') ||
       input.includes('おはよう') ||
+      input.includes('夜間レビュー') ||
+      input.includes('昨日') ||
       input.includes('今日は何') ||
       input.includes('今日のまとめ') ||
       input.includes('今日はこれだけ') ||
       input.includes('今日やること') ||
+      input.includes('返信状況') ||
       input.includes('今日の予定をまとめて全部')
     ) {
-      return formatMorningBriefing(buildMorningBriefing(orchestratorData), dataStatus)
+      return formatMorningBriefing(buildMorningBriefing(orchestratorData, briefingInput), dataStatus)
     }
   }
 
@@ -413,12 +417,24 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isTyping])
 
+  // dataRef から BriefingInput（夜間レビュー入力）を構築
+  function currentBriefingInput(): BriefingInput {
+    const d = dataRef.current
+    return {
+      inbox: d.inbox,
+      scheduleCount: d.schedule.length,
+      fileCount: d.files.length,
+      metricCount: d.metrics.length,
+      notificationCount: d.notifications.length,
+    }
+  }
+
   // ブリーフィングメッセージを再計算して差し替え（なければ追加）
   function refreshBriefingMessage() {
     const result = assembleOrchestratorResult(dataRef.current)
     setOrchResult(result)
     setDataStatus({ ...statusRef.current })
-    const text = formatMorningBriefing(buildMorningBriefing(result), statusRef.current)
+    const text = formatMorningBriefing(buildMorningBriefing(result, currentBriefingInput()), statusRef.current)
     const id = briefingMsgIdRef.current
     setMessages((prev) => {
       const idx = prev.findIndex((m) => m.id === id)
@@ -486,7 +502,7 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: getMockResponse(activeMode, text, orchResult, dataStatus),
+        content: getMockResponse(activeMode, text, orchResult, dataStatus, currentBriefingInput()),
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, aiMsg])
