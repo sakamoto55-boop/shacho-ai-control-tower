@@ -3003,25 +3003,30 @@ const appRootApp = createApp({
       this.quickProjForm.customerName=c.name||'';
       this.quickProjForm.customerTel=c.tel||'';
     },
-    onQuickProjPhoto(ev){
+    async onQuickProjPhoto(ev){
       const file=ev.target.files&&ev.target.files[0]; if(!file) return;
-      const reader=new FileReader();
-      reader.onload=e=>{ this.quickProjPhotoData=e.target.result; };
-      reader.readAsDataURL(file);
+      try{ this.quickProjPhotoData=await this.compressImage(file,1280,0.7); }
+      catch(e){ const r=new FileReader(); r.onload=ev2=>{ this.quickProjPhotoData=ev2.target.result; }; r.readAsDataURL(file); }
     },
     lccSaveQuickProj(){
       const f=this.quickProjForm;
-      // 顧客の作成または取得
+      // タイムスタンプ（仮名生成用）
+      const now=new Date();
+      const pad=n=>String(n).padStart(2,'0');
+      const stamp=`${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+      // 顧客の作成または取得（顧客名・電話ともに未入力でも登録可）
       let custId=f.existingCustomerId;
       if(!custId){
-        if(!(f.customerName||f.customerTel)){ this.toastMsg('顧客名または電話番号を入力してください'); return; }
-        const c={ id:uid(), name:f.customerName, tel:f.customerTel, address:'', kana:'', kind:'person', referral:'', contactPerson:'', note:'' };
+        const cname=f.customerName.trim()||`仮顧客 ${stamp}`;
+        const c={ id:uid(), name:cname, tel:f.customerTel, address:'', kana:'', kind:'person', referral:'', contactPerson:'', note:'' };
         this.customers.unshift(c); custId=c.id;
       }
       const p=this.newProjectObj();
       p.customerId=custId;
       const c=this.customers.find(x=>x.id===custId);
-      p.name=(c&&c.name?c.name+'様 ':'')+f.kind;
+      // 案件名：あるものから自動生成、すべて空なら「新規案件 STAMP」
+      const nameParts=[(c&&c.name&&!c.name.startsWith('仮顧客')?c.name+'様':''),f.site,f.kind].filter(Boolean);
+      p.name=nameParts.length?nameParts.join(' '):`新規案件 ${stamp}`;
       p.site=f.site; p.kind=f.kind; p.receivedAt=f.receivedAt; p.nextAction=f.nextAction;
       if(f.note){ p.comments.push({ id:uid(), text:f.note, img:'', ts:Date.now() }); }
       if(this.quickProjPhotoData){ p.photos.push({ id:uid(), dataUrl:this.quickProjPhotoData, kind:'現地確認', note:'', ts:Date.now() }); }
