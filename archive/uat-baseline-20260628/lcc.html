@@ -244,25 +244,6 @@
         <span style="color:var(--lcc-orange-soft)">粗利 <b>{{ yen(grand.profit) }}</b></span>
         <span class="ml-auto px-1.5 rounded" :style="grand.marginRate>=0.25?'background:#1f8f4e':'background:#b4451f'">{{ (grand.marginRate*100).toFixed(1) }}%</span>
       </div>
-      <!-- コンテキストバー（全画面に常時表示：顧客名・案件ID・見積ID・ステータス） -->
-      <div class="mt-1 flex items-center gap-1.5 text-[10px] bg-white/10 rounded-lg px-2 py-1 flex-wrap">
-        <template v-if="activeProject">
-          <span class="text-blue-300 shrink-0">{{ customerName(activeProject.customerId)||'顧客未設定' }}</span>
-          <span class="text-white/50">›</span>
-          <span class="text-white font-semibold truncate max-w-[100px]">{{ activeProject.name||'無題案件' }}</span>
-          <span class="text-blue-300 shrink-0">案件#{{ activeProject.id.slice(-6) }}</span>
-          <template v-if="activeEstimate">
-            <span class="text-white/50">›</span>
-            <span class="text-blue-200 shrink-0">{{ activeEstimate.label||'見積' }} v{{ activeEstimate.version||1 }}</span>
-          </template>
-          <span v-if="isContractLocked" class="ml-auto shrink-0 px-1.5 py-0.5 rounded font-bold text-white" style="background:#dc2626;font-size:9px">🔒受注済</span>
-          <span v-else class="ml-auto shrink-0 px-1.5 py-0.5 rounded text-white" :style="'background:'+stageColor(activeProject.status)+';font-size:9px'">{{ stageLabel(activeProject.status) }}</span>
-        </template>
-        <template v-else>
-          <span class="font-bold" style="color:#fbbf24">案件未選択</span>
-          <span class="text-blue-200 text-[9px] ml-1">案件タブから選択または⚡新規登録</span>
-        </template>
-      </div>
     </header>
 
     <main class="max-w-2xl mx-auto px-3 pt-3">
@@ -446,16 +427,6 @@
         <button class="text-white text-sm font-bold rounded-xl px-4 py-2.5 big-btn" style="background:var(--lcc-navy)" @click="lccNewProject">＋ 新規案件</button>
       </div>
 
-      <!-- ⚡ クイック案件登録（帰り道・電話直後に30秒で登録） -->
-      <button @click="lccOpenQuickProj" class="w-full rounded-2xl p-4 mb-3 flex items-center gap-3 text-left shadow-md" style="background:linear-gradient(135deg,#ff7a18,#d95a00);border:none;min-height:72px">
-        <span class="text-3xl shrink-0">⚡</span>
-        <div class="flex-1 min-w-0">
-          <div class="font-black text-white text-base leading-tight">クイック案件登録</div>
-          <div class="text-orange-100 text-xs mt-0.5">帰り道・電話直後に30秒で登録。顧客名・住所は後でOK</div>
-        </div>
-        <span class="text-white text-2xl shrink-0">›</span>
-      </button>
-
       <!-- 要フォローサマリー -->
       <div v-if="followCount>0" class="rounded-xl px-3 py-2.5 mb-2 text-sm font-bold flex items-center gap-2" style="background:#fff7e0;border:1px solid #f3e0a8;color:#a36a00">
         <span style="font-size:18px">⚠️</span>見積提出から7日以上経過した要フォロー案件が {{ followCount }} 件あります
@@ -624,7 +595,7 @@
       </div>
 
       <!-- サブタブバー -->
-      <div class="subtab-bar scrollbar-hide mb-3 sticky top-[96px] z-20 bg-[#eef1f6] py-1">
+      <div class="subtab-bar scrollbar-hide mb-3 sticky top-[58px] z-20 bg-[#eef1f6] py-1">
         <button v-for="st in projectSubtabs" :key="st.key" @click="lccSetSub(st.key)" class="subtab-btn" :class="projectSub===st.key?'on':''">
           {{ st.icon }} {{ st.label }}
         </button>
@@ -841,31 +812,6 @@
 
       <!-- ========== 積算サブタブ ========== -->
       <div v-show="projectSub==='estimate'">
-        <!-- 見積バージョン管理バー -->
-        <div v-if="activeProject" class="card p-3 mb-2">
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-xs text-gray-500 shrink-0">見積バージョン</span>
-            <button v-for="e in (activeProject.estimates||[])" :key="e.id"
-              @click="activeEstimateId=e.id"
-              class="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border"
-              :class="activeEstimateId===e.id?'text-white border-transparent':'bg-white text-gray-600 border-gray-300'"
-              :style="activeEstimateId===e.id?'background:var(--lcc-navy)':''">
-              {{ e.label||('見積'+(e.version||1)) }}
-            </button>
-            <button v-if="!isContractLocked" @click="lccAddEstimate"
-              class="shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg border border-dashed border-gray-400 text-gray-600 bg-white">
-              ＋ 新バージョン
-            </button>
-          </div>
-        </div>
-        <!-- 受注済みロックバナー -->
-        <div v-if="isContractLocked" class="rounded-xl px-4 py-3 mb-2 flex items-center gap-2" style="background:#fff1f2;border:1px solid #fecdd3">
-          <span class="text-xl">🔒</span>
-          <div class="flex-1 min-w-0">
-            <div class="font-bold text-red-700 text-sm">受注済み・見積ロック中</div>
-            <div class="text-red-500 text-xs">受注済み・施工中・完了ステータスのため、見積の編集はできません</div>
-          </div>
-        </div>
         <!-- 工事種別ハブ（クイック積算未選択時） -->
         <template v-if="!quickTrade">
           <h2 class="font-bold text-gray-800 mb-1 flex items-center gap-2"><span class="w-1.5 h-5 rounded" style="background:var(--lcc-orange)"></span>工事種別を選んでください</h2>
@@ -1454,9 +1400,8 @@
         <div class="card p-4 mb-2">
           <div class="flex items-center justify-between mb-2">
             <h3 class="font-bold text-gray-700 flex items-center gap-2"><span class="w-1.5 h-5 rounded" style="background:var(--lcc-orange)"></span>この顧客の案件</h3>
-            <button class="text-xs text-white rounded-lg px-3 py-2 btn-sm font-bold" style="background:var(--lcc-orange)" @click="lccNewProjectForCustomer(activeCustomer.id)">＋ 新規案件を作成</button>
+            <button class="text-xs text-white rounded-lg px-3 py-2 btn-sm" style="background:var(--lcc-navy)" @click="lccNewProjectForCustomer(activeCustomer.id)">＋ 新規案件</button>
           </div>
-          <div class="text-[11px] text-gray-400 mb-2 px-1">「新規案件を作成」で新しい案件IDが発行されます。過去の見積・案件には影響しません。</div>
           <div v-if="customerProjects(activeCustomer.id).length===0" class="text-sm text-gray-400 text-center py-4">この顧客の案件はまだありません。</div>
           <div v-for="p in customerProjects(activeCustomer.id)" :key="p.id" class="flex items-center gap-2 border-b border-gray-100 py-2.5 last:border-0 cursor-pointer" @click="lccOpenProject(p.id)">
             <span class="pill text-white text-[10px] shrink-0" :style="'background:'+stageColor(p.status)">{{ stageLabel(p.status) }}</span>
@@ -1790,85 +1735,6 @@
     </transition>
 
     <!-- ====================================================== -->
-    <!-- ============ クイック案件登録モーダル ============ -->
-    <div v-if="quickProjOpen" class="fixed inset-0 z-50 flex flex-col" style="background:#f4f6fb">
-      <header class="px-3 py-3 flex items-center justify-between text-white shadow-md" style="background:linear-gradient(135deg,#d95a00,#ff7a18);padding-top:calc(env(safe-area-inset-top)+8px)">
-        <button @click="lccCloseQuickProj" class="text-white font-bold text-lg px-3 py-1 rounded-lg" style="background:rgba(255,255,255,.15)">✕ キャンセル</button>
-        <span class="font-black text-base">⚡ クイック案件登録</span>
-        <button @click="lccSaveQuickProj" class="font-bold text-base px-4 py-1.5 rounded-lg" style="background:#fff;color:#d95a00">保存</button>
-      </header>
-      <!-- 登録後アクション選択シート -->
-      <div v-if="quickProjAfterOpen" class="flex-1 flex flex-col items-center justify-center px-4">
-        <div class="text-4xl mb-3">✅</div>
-        <div class="font-black text-xl text-gray-800 mb-1">案件を登録しました！</div>
-        <div class="text-sm text-gray-500 mb-6">次にどうしますか？</div>
-        <div class="w-full max-w-sm space-y-3">
-          <button @click="lccQuickProjGoEstimate" class="w-full rounded-2xl py-4 font-bold text-white text-base" style="background:var(--lcc-navy)">🧮 続けて見積を作成</button>
-          <button @click="lccQuickProjGoVisit" class="w-full rounded-2xl py-4 font-bold text-white text-base" style="background:var(--lcc-blue)">📍 現調予定を登録</button>
-          <button @click="lccQuickProjEditLater" class="w-full rounded-2xl py-4 font-bold text-white text-base" style="background:#6b7280">✏️ 後で詳細を編集</button>
-          <button @click="lccQuickProjBackToList" class="w-full rounded-2xl py-4 font-bold text-gray-600 text-base border border-gray-300 bg-white">📋 案件一覧へ戻る</button>
-        </div>
-      </div>
-      <!-- 入力フォーム -->
-      <div v-else class="flex-1 overflow-y-auto px-3 py-4 space-y-3">
-        <!-- 既存顧客から選択 -->
-        <div class="card p-4">
-          <div class="font-bold text-gray-700 text-sm mb-2">顧客（任意）</div>
-          <select v-model="quickProjForm.existingCustomerId" @change="quickProjSelectExistingCustomer" class="w-full border border-gray-300 rounded-xl px-3 py-3 bg-white text-base mb-2">
-            <option value="">― 既存顧客から選択 ―</option>
-            <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.name||'(無名)' }}{{ c.kind==='corp'?'（法人）':'' }}</option>
-          </select>
-          <div class="text-xs text-gray-400 text-center mb-2">― または新規入力 ―</div>
-          <div class="grid grid-cols-2 gap-2">
-            <div><label class="text-xs text-gray-500">顧客名</label><input v-model="quickProjForm.customerName" placeholder="山田 太郎" class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base mt-0.5"></div>
-            <div><label class="text-xs text-gray-500">電話番号</label><input v-model="quickProjForm.customerTel" type="tel" placeholder="090-xxxx-xxxx" class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base mt-0.5"></div>
-          </div>
-        </div>
-        <!-- 現場・種別 -->
-        <div class="card p-4">
-          <label class="text-xs text-gray-500">現場住所（分かる範囲で）</label>
-          <input v-model="quickProjForm.site" placeholder="例：出雲市○○町（番地は後でOK）" class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base mt-0.5 mb-3">
-          <div class="font-bold text-gray-700 text-sm mb-2">案件種別</div>
-          <div class="flex flex-wrap gap-2">
-            <button v-for="k in ['解体','外構','草刈り','伐採','残置物','修繕','その他']" :key="k"
-              @click="quickProjForm.kind=quickProjForm.kind===k?'':k"
-              class="px-3 py-2 rounded-lg text-sm font-bold border"
-              :class="quickProjForm.kind===k?'text-white border-transparent':'bg-white text-gray-600 border-gray-300'"
-              :style="quickProjForm.kind===k?'background:var(--lcc-orange)':''">{{ k }}</button>
-          </div>
-        </div>
-        <!-- 受付日・担当者 -->
-        <div class="card p-4 grid grid-cols-2 gap-3">
-          <div><label class="text-xs text-gray-500">受付日</label><input type="date" v-model="quickProjForm.receivedAt" class="w-full border border-gray-300 rounded-xl px-2 py-2.5 text-sm bg-white mt-0.5"></div>
-          <div><label class="text-xs text-gray-500">担当者</label><input v-model="quickProjForm.responsible" placeholder="氏名" class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base mt-0.5"></div>
-        </div>
-        <!-- メモ・写真 -->
-        <div class="card p-4">
-          <label class="text-xs text-gray-500">メモ（電話内容・状況など）</label>
-          <textarea v-model="quickProjForm.note" rows="3" placeholder="例：玄関まで確認、2階建て木造、アスベストあり可能性、現調を依頼した" class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base mt-0.5 mb-2"></textarea>
-          <label class="text-xs text-gray-500 block mb-1">現場写真（任意）</label>
-          <div v-if="quickProjPhotoData" class="mb-2"><img :src="quickProjPhotoData" class="w-full max-h-40 object-cover rounded-xl"></div>
-          <label class="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 rounded-xl py-3 cursor-pointer text-gray-500 text-sm">
-            📷 写真を追加
-            <input type="file" accept="image/*" capture="environment" class="hidden" @change="onQuickProjPhoto">
-          </label>
-        </div>
-        <!-- 次アクション -->
-        <div class="card p-4">
-          <div class="font-bold text-gray-700 text-sm mb-2">次アクション</div>
-          <div class="grid grid-cols-2 gap-2">
-            <button v-for="a in ['現調する','見積を作る','後で確認','保留']" :key="a"
-              @click="quickProjForm.nextAction=quickProjForm.nextAction===a?'':a"
-              class="py-3 rounded-xl text-sm font-bold border"
-              :class="quickProjForm.nextAction===a?'text-white border-transparent':'bg-white text-gray-600 border-gray-300'"
-              :style="quickProjForm.nextAction===a?'background:var(--lcc-blue)':''">{{ a }}</button>
-          </div>
-        </div>
-        <button @click="lccSaveQuickProj" class="w-full rounded-2xl py-4 font-black text-white text-lg shadow-md" style="background:linear-gradient(135deg,#ff7a18,#d95a00)">⚡ 案件を登録する</button>
-        <div class="h-6"></div>
-      </div>
-    </div>
-
     <!-- ============ 下部タブバー（v2：5タブ） ============ -->
     <!-- ====================================================== -->
     <!-- 業務モード（営業 / 事務）に応じて表示するタブを出し分ける。
@@ -2234,16 +2100,6 @@ const appRootApp = createApp({
       lastSyncUp:'',     // 最終送信日時（表示用）
       syncing:false,     // GAS同期中フラグ（同期中はボタンを無効化）
 
-      // ===== クイック案件登録モーダル =====
-      quickProjOpen:false,         // モーダル開閉
-      quickProjAfterOpen:false,    // 登録後アクション選択シート
-      quickProjSavedId:'',         // 登録完了した案件ID
-      quickProjPhotoData:'',       // 写真プレビュー（base64）
-      quickProjForm:{
-        customerName:'', customerTel:'', existingCustomerId:'',
-        site:'', kind:'', receivedAt:'', responsible:'', note:'', nextAction:'',
-      },
-
       // ===== クイック積算入力 =====
       quickTrade:'',           // ''=工事種別ハブ / 'demo'/'clean'/'kusa'/'gaikou'/'manual'
       quick:{
@@ -2324,9 +2180,6 @@ const appRootApp = createApp({
         {key:'docs',     icon:'📑', label:'書類'},
       ];
     },
-
-    // 受注済み・施工中・完了ステータス時は見積をロック（編集不可）
-    isContractLocked(){ return !!(this.activeProject && ['contract','inprogress','done'].includes(this.activeProject.status)); },
 
     // ===== 要フォロー件数（見積提出のまま7日以上） =====
     followCount(){ return this.projects.filter(p=>this.needsFollow(p)).length; },
@@ -2705,8 +2558,7 @@ const appRootApp = createApp({
 
     // ===== 永続化（LocalStorage） =====
     save(){
-      // activeProjectId/activeEstimateId は永続化しない（セッション内のみ保持、次回起動は必ず案件一覧から）
-      const db={ settings:this.settings, rates:this.rates, customers:this.customers, projects:this.projects, templates:this.templates, members:this.members, vendorMode:this.vendorMode, actualExpenses:this.actualExpenses, lastSyncDown:this.lastSyncDown, lastSyncUp:this.lastSyncUp, appMode:this.appMode };
+      const db={ settings:this.settings, rates:this.rates, customers:this.customers, projects:this.projects, templates:this.templates, members:this.members, activeProjectId:this.activeProjectId, activeEstimateId:this.activeEstimateId, vendorMode:this.vendorMode, actualExpenses:this.actualExpenses, lastSyncDown:this.lastSyncDown, lastSyncUp:this.lastSyncUp, appMode:this.appMode };
       // ★localStorage 例外ハンドリング：容量超過時は明示的に警告する
       try{
         localStorage.setItem(STORE, JSON.stringify(db));
@@ -2744,8 +2596,7 @@ const appRootApp = createApp({
         this.rates=[...buildRates(), ...customRates];
         this.customers=db.customers||[]; this.projects=db.projects||[]; this.templates=db.templates||[];
         this.members=db.members||[]; // 営業担当者マスタ
-        // activeProjectId/activeEstimateId は常に空（新規セッションは必ず案件一覧から開始）
-        this.activeProjectId=''; this.activeEstimateId=''; this.vendorMode=!!db.vendorMode;
+        this.activeProjectId=db.activeProjectId||''; this.activeEstimateId=db.activeEstimateId||''; this.vendorMode=!!db.vendorMode;
         this.appMode=db.appMode||''; // 業務モード（営業/事務）を復元。未設定なら起動時に選択画面を表示
         // 原価実績キャッシュ・同期日時を復元（旧データ互換）
         this.actualExpenses=db.actualExpenses||{}; this.lastSyncDown=db.lastSyncDown||''; this.lastSyncUp=db.lastSyncUp||'';
@@ -2773,26 +2624,16 @@ const appRootApp = createApp({
           if(!Array.isArray(p.approvals)) p.approvals=[{step:'担当者作成',status:'未承認'},{step:'上長確認',status:'未承認'},{step:'社長承認',status:'未承認'}];
           if(!Array.isArray(p.shareLog)) p.shareLog=[];
           p.comments.forEach(cm=>{ if(!cm.id) cm.id=uid(); if(cm.img==null) cm.img=''; });
-          // 案件の新フィールドを補完（旧データ互換）
-          if(p.kind==null) p.kind='';
-          if(p.receivedAt==null) p.receivedAt='';
-          if(p.responsible==null) p.responsible='';
-          if(p.nextAction==null) p.nextAction='';
           // 見積項目の粗利率のみ補完（金額は保存済みの値を保護し、単価マスタで勝手に上書きしない）
           // ※単価マスタは「新規項目追加時の初期値」としてのみ使用。一式金額等の個別編集を壊さない。
-          (p.estimates||[]).forEach((e,idx)=>{
-            // 見積バージョン番号・コピー元ID を補完（旧データ互換）
-            if(e.version==null) e.version=idx+1;
-            if(e.copySourceId==null) e.copySourceId='';
-            (e.tree||[]).forEach(g=>{ (g.children||[]).forEach(it=>{
-              if(it.price>0 && (it.marginPct==null)){ it.marginPct=Math.round((1-(it.cost||0)/it.price)*1000)/10; }
-              // 【P0追加検収】家電リサイクル4品目は法定実費のため、既存データでも粗利率0%・売価＝原価に補正
-              if(this.isRecycleItem(it)){ it.marginPct=0; it.price=it.cost||it.price; }
-            }); });
-          });
+          (p.estimates||[]).forEach(e=>{ (e.tree||[]).forEach(g=>{ (g.children||[]).forEach(it=>{
+            if(it.price>0 && (it.marginPct==null)){ it.marginPct=Math.round((1-(it.cost||0)/it.price)*1000)/10; }
+            // 【P0追加検収】家電リサイクル4品目は法定実費のため、既存データでも粗利率0%・売価＝原価に補正
+            if(this.isRecycleItem(it)){ it.marginPct=0; it.price=it.cost||it.price; }
+          }); }); });
         });
-        // activeEstimateId は常に空（案件一覧起点のため、load時には自動選択しない）
-        this.activeProjectId=''; this.activeEstimateId='';
+        // activeEstimateIdが空の場合、最初の見積を選択
+        if(!this.activeEstimateId && this.activeProject){ const e=(this.activeProject.estimates||[])[0]; if(e) this.activeEstimateId=e.id; }
       }catch(e){ console.warn('読込失敗',e); this.rates=buildRates(); }
     },
     seedDemo(){
@@ -2852,7 +2693,7 @@ const appRootApp = createApp({
     lccOpenProject(id){
       const p=this.projects.find(x=>x.id===id); if(!p) return;
       this.activeProjectId=id;
-      if(!Array.isArray(p.estimates)||p.estimates.length===0){ p.estimates=[{ id:uid(), label:'見積1', version:1, copySourceId:'', tree:[], createdAt:Date.now() }]; }
+      if(!Array.isArray(p.estimates)||p.estimates.length===0){ p.estimates=[{ id:uid(), label:'見積', tree:[], createdAt:Date.now() }]; }
       if(!Array.isArray(p.comments)) p.comments=[];
       if(!Array.isArray(p.photos)) p.photos=[];
       this.activeEstimateId=(p.estimates[0]||{}).id||'';
@@ -2945,18 +2786,18 @@ const appRootApp = createApp({
       this.toastMsg('顧客「'+c.name+'」を登録しました');
       window.scrollTo({top:0,behavior:'smooth'});
     },
-    // 顧客詳細から、その顧客の新規案件を作成して案件ハブへ（過去案件・見積とは別の新規ID）
+    // 顧客詳細から、その顧客の新規案件を作成して案件ハブへ
     lccNewProjectForCustomer(customerId){
       const p=this.newProjectObj(); p.customerId=customerId;
       const c=this.customers.find(x=>x.id===customerId);
       if(c) p.name=(c.name||'新規顧客')+'様 ';
-      const e={ id:uid(), label:'見積1', version:1, copySourceId:'', tree:[], createdAt:Date.now() };
+      const e={ id:uid(), label:'見積', tree:[], createdAt:Date.now() };
       p.estimates.push(e);
       this.projects.unshift(p);
       this.activeProjectId=p.id; this.activeEstimateId=e.id;
       this.inProjectHub=true; this.projectSub='overview';
       this.tab='projects';
-      this.save(); this.toastMsg('新規案件ID #'+p.id.slice(-8)+' を作成しました（過去案件とは別の案件です）');
+      this.save(); this.toastMsg('案件を作成しました');
       window.scrollTo({top:0,behavior:'smooth'});
     },
     // 案件削除
@@ -2978,12 +2819,7 @@ const appRootApp = createApp({
 
     // ===== 案件 =====
     newProjectObj(){
-      const today=new Date(); const ymd=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
       return { id:uid(), customerId:'', name:'', site:'', lat:null, lng:null, status:'lead',
-        kind:'',               // 案件種別（解体/外構/草刈り/伐採/残置物/修繕/その他）
-        receivedAt:ymd,        // 受付日（デフォルト：当日）
-        responsible:(this.settings&&this.settings.company&&this.settings.company.person)||'', // 担当者名
-        nextAction:'',         // 次アクション（現調する/見積を作る/後で確認/保留）
         memberId:'',           // 営業担当者ID
         billingStatus:'none',  // 請求ステータス（none/deposit/partial/paid）
         payments:[],           // 入金履歴 [{id,kind,amount,date,note,ts}]
@@ -3011,7 +2847,7 @@ const appRootApp = createApp({
     // ＋新規案件ボタン（案件一覧から）
     lccNewProject(){
       const p=this.newProjectObj();
-      const e={ id:uid(), label:'見積1', version:1, copySourceId:'', tree:[], createdAt:Date.now() };
+      const e={ id:uid(), label:'見積', tree:[], createdAt:Date.now() };
       p.estimates.push(e);
       this.projects.unshift(p);
       this.activeProjectId=p.id; this.activeEstimateId=e.id;
@@ -3019,75 +2855,6 @@ const appRootApp = createApp({
       this.inProjectHub=true; this.projectSub='overview';
       this.save(); this.toastMsg('新規案件を作成しました。案件名と顧客を入力してください');
       window.scrollTo({top:0,behavior:'smooth'});
-    },
-    // ===== クイック案件登録 =====
-    lccOpenQuickProj(){
-      const today=new Date();
-      const ymd=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
-      this.quickProjForm={ customerName:'', customerTel:'', existingCustomerId:'', site:'', kind:'', receivedAt:ymd, responsible:(this.settings&&this.settings.company&&this.settings.company.person)||'', note:'', nextAction:'' };
-      this.quickProjPhotoData=''; this.quickProjAfterOpen=false; this.quickProjSavedId='';
-      this.quickProjOpen=true;
-    },
-    lccCloseQuickProj(){ this.quickProjOpen=false; this.quickProjAfterOpen=false; },
-    quickProjSelectExistingCustomer(){
-      const id=this.quickProjForm.existingCustomerId; if(!id) return;
-      const c=this.customers.find(x=>x.id===id); if(!c) return;
-      this.quickProjForm.customerName=c.name||'';
-      this.quickProjForm.customerTel=c.tel||'';
-    },
-    onQuickProjPhoto(e){
-      const f=e.target&&e.target.files&&e.target.files[0]; if(!f) return;
-      const reader=new FileReader();
-      reader.onload=ev=>{ this.quickProjPhotoData=ev.target.result; };
-      reader.readAsDataURL(f);
-    },
-    lccSaveQuickProj(){
-      const f=this.quickProjForm;
-      let customerId=f.existingCustomerId||'';
-      if(!customerId && (f.customerName||'').trim()){
-        const c={ id:uid(), name:f.customerName.trim(), kana:'', tel:(f.customerTel||'').trim(), address:'', note:'', kind:'person', referral:'', contactPerson:'' };
-        this.customers.unshift(c); customerId=c.id;
-      }
-      const p=this.newProjectObj();
-      p.customerId=customerId;
-      const custName=(this.customers.find(x=>x.id===customerId)||{}).name||f.customerName||'';
-      p.name=custName?(custName+'様 '+(f.kind||'工事')):((f.kind||'工事')+'（顧客未定）');
-      p.site=f.site||''; p.kind=f.kind||''; p.receivedAt=f.receivedAt||''; p.responsible=f.responsible||''; p.nextAction=f.nextAction||'';
-      if(f.note){ p.comments.push({ id:uid(), name:f.responsible||'登録者', text:f.note, img:'', ts:Date.now() }); }
-      if(this.quickProjPhotoData){ p.photos.push({ id:uid(), data:this.quickProjPhotoData, tag:'現場写真', note:'', ts:Date.now() }); }
-      const e={ id:uid(), label:'見積1', version:1, copySourceId:'', tree:[], createdAt:Date.now() };
-      p.estimates.push(e);
-      this.projects.unshift(p);
-      this.quickProjSavedId=p.id; this.activeProjectId=p.id; this.activeEstimateId=e.id;
-      this.save(); this.quickProjAfterOpen=true;
-    },
-    lccQuickProjGoEstimate(){
-      this.quickProjOpen=false; this.quickProjAfterOpen=false;
-      this.inProjectHub=true; this.projectSub='estimate'; this.tab='projects';
-      window.scrollTo({top:0,behavior:'smooth'});
-    },
-    lccQuickProjGoVisit(){
-      const p=this.projects.find(x=>x.id===this.quickProjSavedId); if(p){ p.status='visit'; this.save(); }
-      this.quickProjOpen=false; this.quickProjAfterOpen=false;
-      this.inProjectHub=true; this.projectSub='overview'; this.tab='projects';
-      window.scrollTo({top:0,behavior:'smooth'});
-    },
-    lccQuickProjBackToList(){ this.quickProjOpen=false; this.quickProjAfterOpen=false; this.inProjectHub=false; this.tab='projects'; },
-    lccQuickProjEditLater(){
-      this.quickProjOpen=false; this.quickProjAfterOpen=false;
-      this.inProjectHub=true; this.projectSub='overview'; this.tab='projects';
-      window.scrollTo({top:0,behavior:'smooth'});
-    },
-    // 見積バージョンを追加
-    lccAddEstimate(){
-      const p=this.activeProject; if(!p) return;
-      const vers=(p.estimates||[]).length+1;
-      const src=this.activeEstimate;
-      const tree=src?JSON.parse(JSON.stringify(src.tree||[])):[];
-      const e={ id:uid(), label:'見積'+vers, version:vers, copySourceId:src?src.id:'', tree, createdAt:Date.now() };
-      if(!Array.isArray(p.estimates)) p.estimates=[];
-      p.estimates.push(e); this.activeEstimateId=e.id;
-      this.save(); this.toastMsg('見積'+vers+' を追加しました（v'+vers+'）');
     },
     touch(p){ if(p) p.updatedAt=Date.now(); this.save(); },
     projectTotal(p){ let t=0; (p.estimates||[]).forEach(e=> t=Math.max(t,this.estimateGrand(e).total)); return t; },
@@ -3833,8 +3600,10 @@ const appRootApp = createApp({
     // A4プレビュー縮小（リサイズ対応）
     this.fitA4();
     window.addEventListener('resize',()=>this.fitA4());
-    // 起動時は必ず案件一覧から開始（前回の案件・見積を自動復元しない）
-    this.inProjectHub=false; this.activeProjectId=''; this.activeEstimateId='';
+    // activeProjectIdが設定済みなら案件ハブを開く
+    if(this.activeProjectId && this.projects.find(p=>p.id===this.activeProjectId)){
+      this.inProjectHub=true; this.projectSub='overview'; this.tab='projects';
+    }
     // 初期表示がダッシュボードならグラフを描画
     if(this.tab==='dashboard') this.renderDashCharts();
   },
@@ -3849,5 +3618,1055 @@ try{
   if(isDev){ window.__lccApp = appRoot; }
 }catch(e){ /* 公開できなくても動作に影響はない */ }
 </script>
+
+
+
+
+<!-- ===== LCC Lサポ（常駐サポートキャラクター）ここから／追加ブロック ===== -->
+<!-- このブロックは既存アプリに一切手を加えず、末尾に追加するだけの自己完結モジュールです。 -->
+<!-- 役割提供アダプタ（このHTML専用：現在の画面ID・状態フラグを読み取り専用で返す） -->
+<script>
+/* ============================================================================
+   Lサポ アダプタ（lcc.html ＝ 見積システム用）
+   ----------------------------------------------------------------------------
+   ■ 役割
+     既存Vueアプリの状態（tab / inProjectHub / projectSub / 受注ロック 等）を
+     「読み取り専用」で参照し、Lサポ本体が必要とする
+       { screenId, flags } を返す。
+   ■ 安全策
+     - window.__lccApp は localhost/127.0.0.1/file: のときだけ既存コードが公開する。
+       公開されていない場合（本番公開ドメイン等）は、DOM の見た目から推定する
+       フォールバックに切り替え、機密データには触れない。
+     - 例外は握りつぶして既存動作に影響を与えない。
+   ============================================================================ */
+window.LSUPPORT_ADAPTER = {
+
+  /* 既存Vueインスタンス（公開されていれば）を取得 */
+  _app: function () {
+    try { return window.__lccApp || null; } catch (e) { return null; }
+  },
+
+  getState: function () {
+    var st = { screenId: 'estimate_dashboard', flags: {} };
+    try {
+      var app = this._app();
+      if (app) {
+        /* ---- 内部状態が読める場合（推奨：localhost ステージング） ---- */
+        var tab = app.tab;
+        var inHub = app.inProjectHub;
+        var sub = app.projectSub;
+
+        if (inHub) {
+          // 案件ハブ内：サブタブで判定
+          if (sub === 'estimate' || sub === 'quote') {
+            // 受注ロック中かどうか
+            var est = null;
+            try { est = app.activeEstimate; } catch (e) {}
+            if (est && est.locked) {
+              st.screenId = 'estimate_locked';
+              st.flags.locked_edit = true;
+            } else {
+              st.screenId = 'estimate_edit';
+            }
+          } else if (sub === 'invoice') {
+            st.screenId = 'estimate_edit';   // 請求サブタブも編集系として案内
+          } else {
+            st.screenId = 'estimate_edit';
+          }
+        } else {
+          // ハブ外：下部タブで判定
+          if (tab === 'settings') st.screenId = 'settings';
+          else st.screenId = 'estimate_dashboard';
+        }
+
+        /* ---- 全社の注意フラグ（未請求・未入金）を軽く判定 ---- */
+        try {
+          var projects = app.projects || [];
+          var hasUnbilled = false, hasUnpaid = false;
+          projects.forEach(function (p) {
+            var b = p.billingStatus || (p.billing && p.billing.status) || '';
+            // 完工系ステータスで未請求 → unbilled の目安
+            if ((p.status === 'done' || p.status === 'completed' || p.status === '完工') && (b === '' || b === 'none')) hasUnbilled = true;
+            if (b && b !== 'none' && b !== 'paid') hasUnpaid = true;
+          });
+          if (hasUnbilled) st.flags.unbilled = true;
+          if (hasUnpaid) st.flags.unpaid = true;
+        } catch (e) { /* データ形が違っても無視 */ }
+
+        return st;
+      }
+    } catch (e) { /* 読めない場合は下のフォールバックへ */ }
+
+    /* ---- フォールバック：DOMの見た目から画面を推定（機密データに触れない） ---- */
+    try {
+      // 受注ロックの帯が見えているか
+      var lockBar = document.querySelector('.bg-amber-50');
+      var hash = (location.hash || '');
+      if (/sub=quote|sub=estimate/.test(hash)) {
+        st.screenId = (lockBar && /受注/.test(lockBar.textContent || '')) ? 'estimate_locked' : 'estimate_edit';
+      } else if (/tab=settings/.test(hash)) {
+        st.screenId = 'settings';
+      } else {
+        st.screenId = 'estimate_dashboard';
+      }
+    } catch (e) {}
+    return st;
+  },
+
+  /* ショートカット遷移：内部状態が読めるときは既存メソッドで安全に画面を切り替える */
+  navigate: function (target) {
+    try {
+      var app = this._app();
+      if (!app) return false; // 本体のデフォルト（hash/href）に任せる
+      if (target === '#tab=projects') { app.tab = 'projects'; app.inProjectHub = false; return true; }
+      if (target === '#tab=pay')      { app.tab = 'pay'; app.inProjectHub = false; return true; }
+      if (target === '#sub=quote')    { if (app.inProjectHub && typeof app.lccSetSub === 'function') { app.lccSetSub('quote'); return true; } }
+    } catch (e) {}
+    return false; // それ以外は本体デフォルトへ
+  }
+};
+</script>
+<!-- Lサポ本体（全アプリ共通：UI・文言データ・表示制御。AI接続なし／機密データ送信なし） -->
+<script>
+/* ============================================================================
+   Lサポ（L-Support）常駐サポートキャラクター 共通モジュール
+   ----------------------------------------------------------------------------
+   ■ 目的
+     営業・事務・工務・現場社員・管理者が、画面上で迷わず操作できるよう
+     「業務ナビゲーション／入力支援／エラー説明／次アクション案内」を行う
+     常駐サポート係。単なるマスコットではない。
+
+   ■ 設計方針（重要）
+     - 既存アプリ（Vueインスタンス／既存関数）を一切書き換えない「追加専用」モジュール。
+     - 既存DOMの上に「右下の丸アイコン＋吹き出し＋パネル」をかぶせるだけ。
+     - 画面ID・ロール・状態は、各HTML側が用意する軽量アダプタ
+       window.LSUPPORT_ADAPTER から読み取る（疎結合）。
+     - AI API接続なし。文言はすべて下記 MESSAGES データ構造に集約（コード直書きを避ける）。
+     - localStorage には「非表示設定／表示回数／ロール選択」程度のみ保存。
+       顧客情報・案件情報など機密データは一切保存・送信しない。
+     - 将来 AIチャット／FAQ検索へ拡張できるよう、文言取得を getMessages() に集約。
+
+   ■ グローバル名前空間
+     - window.LSupport … 本モジュール本体（メソッド群）
+     - window.LSUPPORT_ADAPTER … 各HTMLが実装する状態提供アダプタ（任意）
+     - グローバル関数は使わず、すべて LSupport 名前空間下に閉じる
+       （Manusスペースエディタの window.go 上書き問題と同種の競合を回避）
+   ============================================================================ */
+(function (global) {
+  'use strict';
+
+  /* ==========================================================================
+     0. デザインバリアント（A/B/C）
+     --------------------------------------------------------------------------
+     キャラクター感を弱めた「控えめな案内アイコン」3案。
+     業務ロジックには一切影響せず、CSS変数とSVG（アイコン形状）だけを切り替える。
+
+     ■ 正式採用：A案（LCCロゴ型・ネイビー）
+       通常ユーザーにはA案が固定表示される。
+       B案・C案のデータはコード内に保持するが、UIには出さない。
+
+     切替方法（優先順）：
+       1) <html data-lsup-variant="a|b|c">  … HTML側で固定指定（本番はこれ）
+       2) URL に ?lsup=a|b|c            … 検証用（一般ユーザーの導線には出さない）
+       3) localStorage（lcc_lsupport_pref_v1.variant） … 開発者モード時のみ有効
+       4) 既定 'a'（LCCロゴ型・正式採用）
+
+     ■ 開発者モード（切替UIを表示する条件）：
+       URL に ?lsup_dev=1 が含まれる場合のみ、パネルフッターの切替ボタンを表示する。
+       通常ユーザーの導線にはこのパラメータを出さない。
+     ========================================================================== */
+  var VARIANTS = {
+    // A案：LCCロゴ型（最も無難・本命）。丸ボタンに「？」、ヘッダーは「L」マーク。
+    a: {
+      name: 'A案：LCCロゴ型',
+      accent: '#0a2a5e',          // 基調：LCCネイビー
+      accent2: '#1d6fe0',         // 補助：ブルー
+      fabBg: '#0a2a5e',           // FAB背景（単色・落ち着いたネイビー）
+      fabFg: '#ffffff',
+      fabText: '？',              // 通常時の表示文字
+      // ヘッダーのアバター（顔なし・LCCの頭文字Lを記号化）
+      avatar: '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">'
+        + '<rect x="3" y="3" width="26" height="26" rx="7" fill="none" stroke="currentColor" stroke-width="2"/>'
+        + '<path d="M12 9v14h9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'
+        + '</svg>'
+    },
+    // B案：ヘルメット＋吹き出し型（現場感・ただし可愛くしない単色ライン）
+    b: {
+      name: 'B案：ヘルメット型',
+      accent: '#15507a',
+      accent2: '#2f7fb5',
+      fabBg: '#15507a',
+      fabFg: '#ffffff',
+      fabText: '？',
+      // ヘルメット（顔なし・線画のみ。表情やキャラ性を持たせない）
+      avatar: '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">'
+        + '<path d="M5 21a11 11 0 0 1 22 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'
+        + '<line x1="16" y1="6" x2="16" y2="10.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'
+        + '<rect x="3.5" y="21" width="25" height="3.4" rx="1.7" fill="none" stroke="currentColor" stroke-width="2.2"/>'
+        + '</svg>'
+    },
+    // C案：番頭・サポート係型（顔なし・帳簿＋チェックマークで表現。事務/経営にも合う）
+    c: {
+      name: 'C案：番頭・チェック型',
+      accent: '#1f6b4f',
+      accent2: '#2f9e72',
+      fabBg: '#1f6b4f',
+      fabFg: '#ffffff',
+      fabText: '？',
+      // クリップボード＋チェック（線画のみ）
+      avatar: '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">'
+        + '<rect x="7" y="6" width="18" height="21" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/>'
+        + '<rect x="12" y="3.5" width="8" height="4.5" rx="1.6" fill="none" stroke="currentColor" stroke-width="2.2"/>'
+        + '<path d="M11.5 16.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'
+        + '</svg>'
+    }
+  };
+
+  /* ==========================================================================
+     1. 文言データ（画面ID × ロール × 状態）
+     --------------------------------------------------------------------------
+     - roles: 5ロール共通の baseline と、ロール別の上書き(byRole)を持つ。
+     - screens[screenId]:
+         title    … パネル見出し
+         help     … 「この画面の使い方」（全ロール共通の基本説明）
+         next     … 「次に行う操作」案内（配列・最大3つ程度）
+         byRole   … ロール別の追加ひとこと（任意）
+         shortcuts… 関連画面へのショートカット（label / target）
+     - alerts[alertId]: 状態に応じた短い注意喚起（原価超過・未請求 等）
+     - tips: ランダムで出す軽いヒント（うるさくしない範囲で）
+     ※ 文言は「ITが苦手な社員でも分かる言葉」で、長文を避けて簡潔に。
+     ========================================================================== */
+  var DATA = {
+    /* ---- ロール定義（表示名・ひとこと方針） ---- */
+    roles: {
+      boss:   { id: 'boss',   name: '社長・管理者', hint: '全体の数字と注意案件を確認できます' },
+      sales:  { id: 'sales',  name: '営業',         hint: '見積から受注までを案内します' },
+      office: { id: 'office', name: '事務',         hint: '請求・入金・書類の確認を案内します' },
+      kanri:  { id: 'kanri',  name: '工務',         hint: '配置・原価・予実の確認を案内します' },
+      genba:  { id: 'genba',  name: '現場社員',     hint: '日報入力を案内します' }
+    },
+
+    /* ---- 画面別サポート文言 ---- */
+    screens: {
+
+      /* ===== トップ／ポータル ===== */
+      top: {
+        title: 'トップ画面',
+        help: 'この画面から、見積システム・原価管理・日報入力に移動できます。目的の業務を選んでください。',
+        next: [
+          'お客様の見積をつくる → 「見積システム」を開く',
+          '現場の原価・日報を入れる → 「原価管理」を開く'
+        ],
+        byRole: {
+          boss:   '全体の数字を確認する場合は、原価管理の「集計」で予実と注意案件を確認できます。',
+          sales:  'お客様対応は「見積システム」で行えます。',
+          office: '請求・入金の確認は「原価管理」の「請求」で行えます。',
+          kanri:  '配置と原価の確認は「原価管理」から行えます。',
+          genba:  '日報の入力は「原価管理」の「日報」で行えます。'
+        },
+        shortcuts: [
+          { label: '見積システムを開く', target: 'lcc.html' },
+          { label: '原価管理を開く',     target: 'lcc-cost.html' }
+        ]
+      },
+
+      /* ===== 見積：ダッシュボード ===== */
+      estimate_dashboard: {
+        title: '見積トップ（ダッシュボード）',
+        help: '案件の件数・売上・入金状況をひと目で確認できます。気になる案件は一覧から開けます。',
+        next: [
+          '新しい見積をつくる → 下の「案件」から案件を選ぶ',
+          '入金の遅れを見る → 「入金」タブを確認'
+        ],
+        byRole: {
+          boss:  '売上グラフと入金状況で全体の流れを確認できます。',
+          sales: '新規の見積は、案件を登録して明細を入力します。'
+        },
+        shortcuts: [
+          { label: '案件一覧へ', target: '#tab=projects' },
+          { label: '入金管理へ', target: '#tab=pay' }
+        ]
+      },
+
+      /* ===== 見積：明細入力 ===== */
+      estimate_edit: {
+        title: '見積画面',
+        help: '明細を入力すると、売上・原価・粗利が自動計算されます。粗利率は明細ごとに変更できます。',
+        next: [
+          '工事の項目を選んで数量・単価を入れる',
+          '粗利率は行ごとに調整できます（既定は35%）',
+          '入力が終わったら「見積書」タブでお客様向けに印刷できます'
+        ],
+        byRole: {
+          sales: 'お客様に提示する金額は「見積書」、社内の予算は「実行予算」で確認できます。',
+          kanri: 'ここで入力した原価が、原価管理の「実行予算」の基準になります。'
+        },
+        shortcuts: [
+          { label: '見積書プレビューへ', target: '#sub=quote' },
+          { label: '案件一覧へ戻る',     target: '#tab=projects' }
+        ]
+      },
+
+      /* ===== 見積：受注ロック時 ===== */
+      estimate_locked: {
+        title: '受注済みの見積',
+        help: 'この見積は受注済みです。単価と粗利率は受注時点で固定されています。',
+        next: [
+          '内容を変える必要があるときは「ロック解除」を押してから編集します',
+          '解除した変更は、お客様との合意内容と必ず照らし合わせてください'
+        ],
+        byRole: {
+          sales: '受注後の金額変更は、変更前に上長へご相談ください。',
+          office:'受注済みのため、次は請求の準備に進めます。'
+        },
+        shortcuts: [
+          { label: '請求の準備へ（原価管理）', target: 'lcc-cost.html#invoice' }
+        ]
+      },
+
+      /* ===== 原価：案件一覧 ===== */
+      cost_projects: {
+        title: '原価管理：案件一覧',
+        help: '案件ごとの実行予算と実績原価を一覧で確認できます。まず対象の現場を選んでください。',
+        next: [
+          '見積から予算を取り込む → 「設定」の「取り込む」',
+          '現場の実績を入れる → 「日報」タブへ'
+        ],
+        byRole: {
+          kanri:  '担当現場の予算消化は、この画面で確認できます。',
+          office: '請求・入金の状況は「請求」タブで確認できます。'
+        },
+        shortcuts: [
+          { label: '日報入力へ', target: '#daily' },
+          { label: '集計・予実へ', target: '#report' }
+        ]
+      },
+
+      /* ===== 原価：予実確認（集計） ===== */
+      cost_report: {
+        title: '原価管理画面（予実確認）',
+        help: '予算と実績を比較できます。赤信号の案件は、原価が予算を超えています。',
+        next: [
+          '赤信号（超過）の案件を最優先で確認',
+          '黄信号（消化80%超）の案件も早めに手を打つ'
+        ],
+        byRole: {
+          boss:  '全社の利益見込みと注意案件を、この画面で把握できます。',
+          kanri: '超過の原因（人工・車両・産廃）は、案件詳細で確認できます。'
+        },
+        shortcuts: [
+          { label: '案件一覧へ', target: '#projects' },
+          { label: '突合せ確認へ', target: '#match' }
+        ]
+      },
+
+      /* ===== 原価：日報入力 ===== */
+      cost_daily: {
+        title: '日報入力',
+        help: '今日の作業人数、時間、使用車両、写真を入れれば日報は完了です。',
+        next: [
+          '現場を選ぶ（配置表で決まった現場が出ます）',
+          '人数・時間・車両を入れる',
+          '写真があれば追加して「保存」'
+        ],
+        byRole: {
+          genba: '現場名は一覧から選択します。項目をタップして入力できます。',
+          kanri: '日報を入力すると、原価の実績に自動で反映されます。'
+        },
+        shortcuts: [
+          { label: '案件一覧へ戻る', target: '#projects' }
+        ]
+      },
+
+      /* ===== 原価：請求・入金 ===== */
+      cost_invoice: {
+        title: '請求・入金',
+        help: '未請求・未入金の案件を確認してください。完工済みでも入金まで終わらないとクローズではありません。',
+        next: [
+          '完工したのに未請求の案件 → 請求書を作成',
+          '請求済みで未入金の案件 → 入金予定を確認'
+        ],
+        byRole: {
+          office: '請求漏れ・入金遅れは、この画面で確認できます。',
+          boss:   '未入金は資金繰りに関わります。早めにご確認ください。'
+        },
+        shortcuts: [
+          { label: '集計・予実へ', target: '#report' },
+          { label: '突合せ確認へ', target: '#match' }
+        ]
+      },
+
+      /* ===== 原価：突合せ ===== */
+      cost_match: {
+        title: '突合せ確認',
+        help: '業者の請求と発注見込み、予算と実績を並べて確認します。問題なければ承認してください。',
+        next: [
+          '業者請求の金額が予算とずれていないか確認',
+          '内容が正しければ承認する'
+        ],
+        byRole: {
+          office: '承認前に、金額と現場名の取り違えがないかご確認ください。'
+        },
+        shortcuts: [
+          { label: '請求・入金へ', target: '#invoice' }
+        ]
+      },
+
+      /* ===== 原価：積算 ===== */
+      cost_quote: {
+        title: '積算',
+        help: '工種ごとの数量を入れると、概算の原価・売価を素早く出せます。',
+        next: [
+          '工種を選んで数量を入れる',
+          '出た金額は見積のたたき台として使えます'
+        ],
+        shortcuts: [
+          { label: '案件一覧へ', target: '#projects' }
+        ]
+      },
+
+      /* ===== 設定・マスタ ===== */
+      settings: {
+        title: '設定・マスタ',
+        help: '会社情報や単価マスタ、既定の粗利率（初期35%）などを設定できます。',
+        next: [
+          '会社名・住所・連絡先を確認',
+          '既定の粗利率や税率を必要に応じて調整',
+          '見積と原価で同じGAS URLを設定すると連携できます'
+        ],
+        byRole: {
+          boss:   '粗利率の既定値はこの画面で変更できます。現場運用に合わせて調整してください。',
+          office: '見積と原価で同じGAS URLを設定すると、データが連携されます。'
+        },
+        shortcuts: []
+      },
+
+      /* ===== バックアップ・復元 ===== */
+      backup: {
+        title: 'バックアップ・復元',
+        help: '復元前に現在データのバックアップを取ってください。外部データの読込は内容確認が必要です。',
+        next: [
+          'まず「バックアップ（書き出し）」で今のデータを保存',
+          '読み込むファイルの中身（会社・期間）を確認してから復元'
+        ],
+        byRole: {
+          office: '復元は上書きになります。先に必ずバックアップを取得してください。',
+          boss:   '外部から受け取ったデータは、内容を確認してから読み込んでください。'
+        },
+        shortcuts: []
+      },
+
+      /* ===== フォールバック（画面が特定できないとき） ===== */
+      _default: {
+        title: '操作ガイド',
+        help: '操作で迷ったときは、こちらを開いてください。今の画面の使い方と次の操作をご案内します。',
+        next: [
+          'やりたいことが決まっていれば、下のショートカットから移動できます'
+        ],
+        shortcuts: []
+      }
+    },
+
+    /* ---- 状態アラート（短い注意喚起。色だけに頼らず文章でも伝える） ---- */
+    alerts: {
+      over_budget:  { level: 'danger', text: '原価が予算を超えている案件があります。詳細を確認してください。' },
+      near_budget:  { level: 'warn',   text: '予算の80%を超えた案件があります。早めに確認してください。' },
+      unbilled:     { level: 'warn',   text: '完工したのに未請求の案件があります。請求書の作成をご確認ください。' },
+      unpaid:       { level: 'warn',   text: '請求済みで未入金の案件があります。入金予定をご確認ください。' },
+      unsaved:      { level: 'warn',   text: '保存していない変更があります。画面を移動する前に保存してください。' },
+      locked_edit:  { level: 'info',   text: 'この見積は受注済みです。単価・粗利率は固定されています。' }
+    },
+
+    /* ---- 軽いヒント（初回や手すきのときに、控えめに） ---- */
+    tips: [
+      '粗利率は明細ごとに変更できます（既定は35%）。',
+      '家電リサイクルの法定4品目は、粗利０%（売価＝原価）で固定です。',
+      '日報を入力すると、原価の実績に自動で反映されます。',
+      '完工後も、入金が完了して初めてクローズとなります。'
+    ]
+  };
+
+  /* ==========================================================================
+     2. 永続化（localStorage）— 機密データは保存しない
+     ========================================================================== */
+  var LS_KEY = 'lcc_lsupport_pref_v1';
+  function loadPref() {
+    try {
+      var raw = global.localStorage.getItem(LS_KEY);
+      if (!raw) return {};
+      return JSON.parse(raw) || {};
+    } catch (e) { return {}; }
+  }
+  function savePref(p) {
+    try { global.localStorage.setItem(LS_KEY, JSON.stringify(p)); } catch (e) { /* 保存できなくても動作継続 */ }
+  }
+
+  /* ==========================================================================
+     3. 本体オブジェクト
+     ========================================================================== */
+  var LSupport = {
+    data: DATA,
+    pref: {},          // { role, hidden, snoozeUntil, seenCount, panelOpen }
+    _root: null,       // 生成したルートDOM
+    _els: {},          // 主要DOM参照
+    _adapter: null,    // 状態提供アダプタ
+    _lastScreenId: null,
+    _pollTimer: null,
+    _bubbleTimer: null,
+    _variant: 'a',     // 現在のデザインバリアント（a/b/c）
+
+    /* ---- 現在バリアントを決定（URL > html属性 > localStorage > 既定a） ---- */
+    resolveVariant: function () {
+      // 1) URLパラメータ ?lsup=a|b|c（検証用・最優先）
+      try {
+        var q = (global.location.search || '').match(/[?&]lsup=([abc])/i);
+        if (q) return q[1].toLowerCase();
+      } catch (e) {}
+      // 2) <html data-lsup-variant="a|b|c">（本番の固定指定）
+      try {
+        var attr = (document.documentElement.getAttribute('data-lsup-variant') || '').toLowerCase();
+        if (VARIANTS[attr]) return attr;
+      } catch (e) {}
+      // 3) localStorage（画面内の切替ボタンで保存された値）
+      if (this.pref && VARIANTS[this.pref.variant]) return this.pref.variant;
+      // 4) 既定
+      return 'a';
+    },
+
+    /* ---- 開発者モード判定（URLに ?lsup_dev=1 または ?lsup=b/c が含まれる場合のみtrue） ---- */
+    isDevMode: function () {
+      try {
+        var search = global.location.search || '';
+        // ?lsup_dev=1 … 明示的な開発者モード
+        if (/[?&]lsup_dev=1/.test(search)) return true;
+        // ?lsup=b または ?lsup=c … B/C案を指定している場合も切替UIを表示
+        var q = search.match(/[?&]lsup=([bc])/i);
+        if (q) return true;
+      } catch (e) {}
+      return false;
+    },
+
+    /* ---- バリアントのCSS変数とアバターSVGを反映 ---- */
+    applyVariant: function (v) {
+      if (!VARIANTS[v]) v = 'a';
+      this._variant = v;
+      var conf = VARIANTS[v];
+      var root = document.getElementById('lsup-root');
+      if (!root) return;
+      // CSS変数で色を切替（CSSのみの差し替え）
+      root.style.setProperty('--lsup-accent', conf.accent);
+      root.style.setProperty('--lsup-accent2', conf.accent2);
+      root.style.setProperty('--lsup-fab-bg', conf.fabBg);
+      root.style.setProperty('--lsup-fab-fg', conf.fabFg);
+      root.setAttribute('data-variant', v);
+      // FAB・ヘッダーのアイコンを差し替え
+      if (this._els.fabIcon) this._els.fabIcon.innerHTML = conf.avatar;
+      if (this._els.fabText) this._els.fabText.textContent = conf.fabText;
+      if (this._els.headAva) this._els.headAva.innerHTML = conf.avatar;
+      this.syncVswitch();
+    },
+
+    /* ---- バリアントを切り替えて保存（画面内の切替ボタン用・公開API） ---- */
+    setVariant: function (v) {
+      if (!VARIANTS[v]) return;
+      this.pref.variant = v;
+      savePref(this.pref);
+      this.applyVariant(v);
+    },
+
+    /* ---- デザイン切替ボタンの押下状態を現在バリアントに同期 ---- */
+    syncVswitch: function () {
+      if (!this._els.vswitch) return;
+      var v = this._variant;
+      var btns = this._els.vswitch.querySelectorAll('button[data-v]');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].setAttribute('aria-pressed', btns[i].getAttribute('data-v') === v ? 'true' : 'false');
+      }
+    },
+
+    /* ---- ロール一覧（UI用） ---- */
+    roleList: function () {
+      return Object.keys(DATA.roles).map(function (k) { return DATA.roles[k]; });
+    },
+
+    /* ---- 現在ロール（未選択時は boss を仮の既定にせず、選択を促す） ---- */
+    currentRole: function () {
+      return this.pref.role || '';
+    },
+
+    /* ----------------------------------------------------------------------
+       文言取得：画面ID＋ロール＋状態から表示内容を組み立てる。
+       将来 AIチャット／FAQ検索に差し替えるなら、この関数の戻り値仕様を保てばよい。
+       ---------------------------------------------------------------------- */
+    getMessages: function (screenId, role, state) {
+      var s = DATA.screens[screenId] || DATA.screens._default;
+      var roleLine = (s.byRole && role && s.byRole[role]) ? s.byRole[role] : '';
+      var alerts = [];
+      if (state && state.flags) {
+        Object.keys(state.flags).forEach(function (f) {
+          if (state.flags[f] && DATA.alerts[f]) alerts.push(DATA.alerts[f]);
+        });
+      }
+      return {
+        title: s.title,
+        help: s.help,
+        roleLine: roleLine,
+        next: s.next || [],
+        shortcuts: s.shortcuts || [],
+        alerts: alerts
+      };
+    },
+
+    /* ---- 現在の画面状態をアダプタから取得（無ければ default） ---- */
+    readState: function () {
+      var a = global.LSUPPORT_ADAPTER;
+      if (a && typeof a.getState === 'function') {
+        try { return a.getState() || {}; } catch (e) { return {}; }
+      }
+      return {};
+    },
+
+    /* ======================================================================
+       初期化
+       ====================================================================== */
+    init: function () {
+      this.pref = loadPref();
+      this.injectStyle();
+      this.buildDom();
+      this.bindEvents();
+      // デザインバリアントを適用（CSS変数・SVGの差し替えのみ）
+      this.applyVariant(this.resolveVariant());
+      // 開発者モードでない場合は切替ボタン行を非表示にする
+      var vsRow = document.getElementById('lsup-vswitch-row');
+      if (vsRow) {
+        vsRow.style.display = this.isDevMode() ? '' : 'none';
+      }
+      // 起動直後にいったん描画
+      this.refresh(true);
+      // 画面状態の変化を監視（hashchange＋軽量ポーリング）
+      var self = this;
+      global.addEventListener('hashchange', function () { self.refresh(false); });
+      this._pollTimer = global.setInterval(function () { self.refresh(false); }, 1500);
+      return this;
+    },
+
+    /* ======================================================================
+       スタイル注入（既存CSSと衝突しないよう lsup- 接頭辞で限定）
+       ====================================================================== */
+    injectStyle: function () {
+      if (document.getElementById('lsup-style')) return;
+      var css = ''
+      /* デザイン変数（バリアントで上書きされる既定値） */
+      + '#lsup-root{--lsup-accent:#0a2a5e;--lsup-accent2:#1d6fe0;--lsup-fab-bg:#0a2a5e;--lsup-fab-fg:#fff;}'
+      /* FAB：控えめな単色丸ボタン。サイズを小さくし、「？」＋小さく「Lサポ」 */
+      + '.lsup-fab{position:fixed;z-index:2147483000;right:16px;bottom:calc(92px + env(safe-area-inset-bottom,0px));'
+      + '  width:48px;height:48px;border-radius:50%;border:none;cursor:pointer;padding:0;'
+      + '  background:var(--lsup-fab-bg);color:var(--lsup-fab-fg);box-shadow:0 3px 10px rgba(15,23,42,.22);'
+      + '  display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;'
+      + '  transition:transform .12s,box-shadow .12s;}'
+      + '.lsup-fab:hover{box-shadow:0 5px 14px rgba(15,23,42,.28);}'
+      + '.lsup-fab:active{transform:scale(.95);}'
+      + '.lsup-fab:focus-visible{outline:3px solid var(--lsup-accent2);outline-offset:2px;}'
+      /* FAB内はアイコンSVG（各案で差別化）＋小さく「Lサポ」ラベル。「？」文字は非表示 */
+      + '.lsup-fab .lsup-fabtxt{display:none;}'  /* 「？」文字は非表示（アイコンで差別化） */
+      + '.lsup-fab .lsup-fablabel{font-size:8.5px;font-weight:700;letter-spacing:.04em;margin-top:2px;opacity:.92;}'
+      + '.lsup-fab .lsup-fabicon{display:flex;align-items:center;justify-content:center;width:26px;height:26px;}'  /* FAB内アイコン枠：各案のSVGを展開 */
+      + '.lsup-fab .lsup-fabicon svg{width:26px;height:26px;color:var(--lsup-fab-fg);}'
+      /* 吹き出し（短く・控えめ・目立ちすぎない） */
+      + '.lsup-bubble{position:fixed;z-index:2147483000;right:72px;bottom:calc(98px + env(safe-area-inset-bottom,0px));'
+      + '  max-width:208px;background:#fff;color:#374151;border:1px solid #e5e7eb;border-radius:12px;'
+      + '  padding:9px 11px;font-size:12.5px;line-height:1.5;box-shadow:0 4px 14px rgba(15,23,42,.14);'
+      + '  opacity:0;transform:translateY(6px);pointer-events:none;transition:opacity .25s,transform .25s;}'
+      + '.lsup-bubble.show{opacity:1;transform:translateY(0);pointer-events:auto;}'
+      + '.lsup-bubble:after{content:"";position:absolute;right:-7px;bottom:16px;border:7px solid transparent;border-left-color:#fff;}'
+      + '.lsup-bubble .lsup-bclose{position:absolute;top:3px;right:5px;border:none;background:none;font-size:13px;color:#9aa1b2;cursor:pointer;min-height:auto;line-height:1;}'
+      /* バッジ（注意件数・控えめに）：赤すぎると目立ちすぎるため、小径・低彩度に抑える */
+      + '.lsup-badge{position:absolute;top:-2px;right:-2px;min-width:15px;height:15px;padding:0 3px;border-radius:8px;'
+      + '  background:#b91c1c;color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff;opacity:.9;}'
+      /* パネル */
+      + '.lsup-overlay{position:fixed;inset:0;z-index:2147483001;background:rgba(6,24,58,.35);'
+      + '  display:none;align-items:flex-end;justify-content:flex-end;}'
+      + '.lsup-overlay.show{display:flex;}'
+      + '.lsup-panel{width:min(380px,94vw);max-height:min(78vh,640px);margin:0 12px calc(16px + env(safe-area-inset-bottom,0px)) 12px;'
+      + '  background:#fff;border-radius:18px;box-shadow:0 16px 48px rgba(6,24,58,.4);display:flex;flex-direction:column;overflow:hidden;}'
+      + '.lsup-head{background:var(--lsup-accent);color:#fff;padding:13px 16px;display:flex;align-items:center;gap:10px;}'
+      + '.lsup-head .lsup-ava{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.16);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;}'
+      + '.lsup-head .lsup-ava svg{width:22px;height:22px;}'
+      + '.lsup-head .lsup-ttl{font-weight:700;font-size:15px;}'
+      + '.lsup-head .lsup-sub{font-size:11.5px;opacity:.85;margin-top:1px;}'
+      + '.lsup-head .lsup-x{margin-left:auto;background:rgba(255,255,255,.16);border:none;color:#fff;width:32px;height:32px;border-radius:8px;font-size:16px;cursor:pointer;}'
+      + '.lsup-body{padding:14px 16px;overflow-y:auto;-webkit-overflow-scrolling:touch;}'
+      + '.lsup-sec{margin-bottom:14px;}'
+      + '.lsup-sec h4{font-size:12px;color:#6b7088;margin:0 0 6px;font-weight:700;letter-spacing:.02em;}'
+      + '.lsup-help{font-size:14px;line-height:1.7;color:#1f2233;background:#f4f7fc;border-radius:12px;padding:12px;}'
+      + '.lsup-role-line{font-size:13px;color:var(--lsup-accent);background:#f3f6fb;border-left:3px solid var(--lsup-accent2);border-radius:8px;padding:9px 11px;margin-top:8px;}'
+      + '.lsup-next{list-style:none;margin:0;padding:0;}'
+      + '.lsup-next li{display:flex;gap:8px;font-size:13.5px;line-height:1.6;padding:7px 0;border-bottom:1px dashed #eceff5;}'
+      + '.lsup-next li:last-child{border-bottom:none;}'
+      + '.lsup-next .lsup-no{flex:none;width:20px;height:20px;border-radius:50%;background:var(--lsup-accent);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;}'
+      + '.lsup-alert{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.6;border-radius:10px;padding:10px 12px;margin-bottom:8px;}'
+      + '.lsup-alert .lsup-sig{flex:none;font-weight:700;}'
+      + '.lsup-alert.danger{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;}'
+      + '.lsup-alert.warn{background:#fffbeb;color:#92400e;border:1px solid #fde68a;}'
+      + '.lsup-alert.info{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;}'
+      + '.lsup-sc{display:flex;flex-wrap:wrap;gap:8px;}'
+      + '.lsup-sc button{font-size:13px;border:1px solid var(--lsup-accent2);color:var(--lsup-accent);background:#fff;border-radius:999px;padding:8px 14px;cursor:pointer;min-height:40px;}'
+      + '.lsup-sc button:active{background:#f3f6fb;}'
+      /* デザイン切替（フッターのミニセグメント。検証・比較用） */
+      + '.lsup-vswitch{display:flex;gap:4px;align-items:center;}'
+      + '.lsup-vswitch button{font-size:11px;border:1px solid #d6dbea;background:#fff;color:#6b7088;border-radius:6px;padding:3px 8px;cursor:pointer;min-height:auto;}'
+      + '.lsup-vswitch button[aria-pressed="true"]{background:var(--lsup-accent);color:#fff;border-color:var(--lsup-accent);}'
+      + '.lsup-foot{border-top:1px solid #eceff5;padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}'
+      + '.lsup-foot select{font-size:13px;border:1px solid #d6dbea;border-radius:8px;padding:7px 8px;color:#1f2233;background:#fff;}'
+      + '.lsup-foot .lsup-link{font-size:12px;color:#6b7088;background:none;border:none;cursor:pointer;text-decoration:underline;min-height:auto;}'
+      + '.lsup-foot .lsup-spacer{flex:1;}'
+      /* 最小化（アイコンだけ・吹き出し抑制）状態でも FAB は残す */
+      + '.lsup-hidden{display:none !important;}'
+      /* モバイルではパネル全幅寄り、主要ボタンと重ならないよう bottom を底上げ済み */
+      + '@media (max-width:480px){.lsup-fab{width:44px;height:44px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom,0px));}'
+      + '  .lsup-fab .lsup-fabtxt{display:none;}.lsup-fab .lsup-fabicon{width:22px;height:22px;}.lsup-fab .lsup-fabicon svg{width:22px;height:22px;}.lsup-fab .lsup-fablabel{font-size:7.5px;}'
+      + '  .lsup-bubble{right:62px;max-width:58vw;bottom:calc(88px + env(safe-area-inset-bottom,0px));}}'
+      /* 読み上げ・キーボード配慮：reduce motion */
+      + '@media (prefers-reduced-motion: reduce){.lsup-fab,.lsup-bubble{transition:none;}}';
+      var st = document.createElement('style');
+      st.id = 'lsup-style';
+      st.textContent = css;
+      document.head.appendChild(st);
+    },
+
+    /* ======================================================================
+       DOM構築
+       ====================================================================== */
+    buildDom: function () {
+      if (document.getElementById('lsup-root')) return;
+      var root = document.createElement('div');
+      root.id = 'lsup-root';
+
+      /* --- 吹き出し --- */
+      var bubble = document.createElement('div');
+      bubble.className = 'lsup-bubble';
+      bubble.setAttribute('role', 'status');
+      bubble.setAttribute('aria-live', 'polite');
+      bubble.innerHTML = '<button class="lsup-bclose" aria-label="ヒントを閉じる">×</button><span class="lsup-btxt"></span>';
+
+      /* --- FAB（控えめな丸ボタン：「？」＋小さく「Lサポ」） --- */
+      var fab = document.createElement('button');
+      fab.className = 'lsup-fab';
+      fab.type = 'button';
+      fab.setAttribute('aria-label', '操作ガイド（Lサポ）を開く。今の画面の使い方と次の操作を案内します');
+      fab.setAttribute('aria-haspopup', 'dialog');
+      // アイコン形状（バリアントで差替）は隐し枠として保持し、通常は「？」と「Lサポ」を表示
+      fab.innerHTML = '<span class="lsup-fabicon" aria-hidden="true"></span>'
+        + '<span class="lsup-fabtxt" aria-hidden="true">？</span>'
+        + '<span class="lsup-fablabel" aria-hidden="true">Lサポ</span>'
+        + '<span class="lsup-badge lsup-hidden" aria-hidden="true">0</span>';
+
+      /* --- パネル（モーダル） --- */
+      var overlay = document.createElement('div');
+      overlay.className = 'lsup-overlay';
+      overlay.innerHTML = ''
+        + '<div class="lsup-panel" role="dialog" aria-modal="true" aria-labelledby="lsup-ttl">'
+        + '  <div class="lsup-head">'
+        + '    <span class="lsup-ava"></span>'
+        + '    <div><div class="lsup-ttl" id="lsup-ttl">操作ガイド（Lサポ）</div><div class="lsup-sub"></div></div>'
+        + '    <button class="lsup-x" aria-label="パネルを閉じる">×</button>'
+        + '  </div>'
+        + '  <div class="lsup-body">'
+        + '    <div class="lsup-sec lsup-sec-alerts" hidden><h4>今の注意ポイント</h4><div class="lsup-alerts"></div></div>'
+        + '    <div class="lsup-sec"><h4>この画面でできること</h4><div class="lsup-help"></div><div class="lsup-role-line" hidden></div></div>'
+        + '    <div class="lsup-sec lsup-sec-next"><h4>次にやること</h4><ul class="lsup-next"></ul></div>'
+        + '    <div class="lsup-sec lsup-sec-sc" hidden><h4>かんたん移動</h4><div class="lsup-sc"></div></div>'
+        + '  </div>'
+        + '  <div class="lsup-foot">'
+        + '    <label style="font-size:12px;color:#6b7088;">あなたの役割：</label>'
+        + '    <select class="lsup-role" aria-label="役割を選ぶ"></select>'
+        + '    <span class="lsup-spacer"></span>'
+        + '    <button class="lsup-link lsup-snooze" type="button">しばらく非表示</button>'
+        + '  </div>'
+        + '  <div id="lsup-vswitch-row" class="lsup-foot" style="border-top:1px dashed #eceff5;">'
+        + '    <label style="font-size:11px;color:#9aa1b2;">表示デザイン：</label>'
+        + '    <span class="lsup-vswitch" role="group" aria-label="表示デザインを選ぶ（A・B・C）">'
+        + '      <button type="button" data-v="a">A</button>'
+        + '      <button type="button" data-v="b">B</button>'
+        + '      <button type="button" data-v="c">C</button>'
+        + '    </span>'
+        + '  </div>'
+        + '</div>';
+
+      root.appendChild(bubble);
+      root.appendChild(fab);
+      root.appendChild(overlay);
+      document.body.appendChild(root);
+
+      this._root = root;
+      this._els = {
+        fab: fab,
+        badge: fab.querySelector('.lsup-badge'),
+        bubble: bubble,
+        bubbleTxt: bubble.querySelector('.lsup-btxt'),
+        bubbleClose: bubble.querySelector('.lsup-bclose'),
+        overlay: overlay,
+        panel: overlay.querySelector('.lsup-panel'),
+        x: overlay.querySelector('.lsup-x'),
+        title: overlay.querySelector('.lsup-ttl'),
+        sub: overlay.querySelector('.lsup-sub'),
+        help: overlay.querySelector('.lsup-help'),
+        roleLine: overlay.querySelector('.lsup-role-line'),
+        next: overlay.querySelector('.lsup-next'),
+        secNext: overlay.querySelector('.lsup-sec-next'),
+        secSc: overlay.querySelector('.lsup-sec-sc'),
+        sc: overlay.querySelector('.lsup-sc'),
+        secAlerts: overlay.querySelector('.lsup-sec-alerts'),
+        alerts: overlay.querySelector('.lsup-alerts'),
+        roleSel: overlay.querySelector('.lsup-role'),
+        snooze: overlay.querySelector('.lsup-snooze'),
+        fabIcon: fab.querySelector('.lsup-fabicon'),
+        fabText: fab.querySelector('.lsup-fabtxt'),
+        headAva: overlay.querySelector('.lsup-ava'),
+        vswitch: overlay.querySelector('.lsup-vswitch')
+      };
+
+      // ロール選択肢を流し込む
+      var sel = this._els.roleSel;
+      var opt0 = document.createElement('option');
+      opt0.value = ''; opt0.textContent = '未選択';
+      sel.appendChild(opt0);
+      this.roleList().forEach(function (r) {
+        var o = document.createElement('option');
+        o.value = r.id; o.textContent = r.name;
+        sel.appendChild(o);
+      });
+      sel.value = this.pref.role || '';
+
+      // 非表示設定が有効なら FAB ごと隠す（完全非表示）
+      if (this.pref.hidden) { root.classList.add('lsup-hidden'); }
+    },
+
+    /* ======================================================================
+       イベント
+       ====================================================================== */
+    bindEvents: function () {
+      var self = this;
+      this._els.fab.addEventListener('click', function () { self.openPanel(); });
+      this._els.bubble.addEventListener('click', function (e) {
+        if (e.target === self._els.bubbleClose) { self.hideBubble(true); return; }
+        self.openPanel();
+      });
+      this._els.x.addEventListener('click', function () { self.closePanel(); });
+      this._els.overlay.addEventListener('click', function (e) {
+        if (e.target === self._els.overlay) self.closePanel();
+      });
+      this._els.roleSel.addEventListener('change', function () {
+        self.pref.role = self._els.roleSel.value;
+        savePref(self.pref);
+        self.render();   // ロール別文言を即反映
+      });
+      this._els.snooze.addEventListener('click', function () {
+        // 一定時間（このセッション中＝30分）吹き出しを出さない
+        self.pref.snoozeUntil = Date.now() + 30 * 60 * 1000;
+        savePref(self.pref);
+        self.hideBubble(true);
+        self.closePanel();
+      });
+      // デザイン切替（A/B/C）。CSS・SVGだけを差し替え、localStorageに保存
+      if (this._els.vswitch) {
+        this._els.vswitch.addEventListener('click', function (e) {
+          var btn = e.target.closest('button[data-v]');
+          if (!btn) return;
+          self.setVariant(btn.getAttribute('data-v'));
+          self.syncVswitch();
+        });
+      }
+      // キーボード：Escでパネルを閉じる
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && self._els.overlay.classList.contains('show')) self.closePanel();
+      });
+    },
+
+    /* ======================================================================
+       状態を読み、必要なら吹き出し／バッジを更新
+       force=true: 画面変化に関係なく描画（初期化時）
+       ====================================================================== */
+    refresh: function (force) {
+      if (this.pref.hidden) return;
+      var state = this.readState();
+      var screenId = state.screenId || '_default';
+      var changed = (screenId !== this._lastScreenId);
+      this._lastScreenId = screenId;
+
+      // 注意件数バッジ
+      var flags = (state.flags) || {};
+      var alertCount = Object.keys(flags).filter(function (k) { return flags[k] && DATA.alerts[k]; }).length;
+      this.updateBadge(alertCount);
+
+      // パネルが開いていれば中身も更新
+      if (this._els.overlay.classList.contains('show')) this.render();
+
+      // 吹き出しのポリシー（うるさくしない）：
+      //  ・初回のみ（かつスヌーズ中でない）に短い案内を出す
+      //  ・以後は、確認が必要な項目（超過・未請求等）があるときだけ通知
+      //  ・単なる画面遷移だけでは吹き出さない（大きな吹き出しを出し続けない）
+      var now = Date.now();
+      var snoozed = this.pref.snoozeUntil && now < this.pref.snoozeUntil;
+      if (snoozed) return;
+      var firstEver = !this.pref.welcomed;
+      if (alertCount > 0) {
+        // 注意があるときは、画面が変わったタイミングでのみ控えめに通知
+        if (force || changed) this.maybeShowBubble(screenId, alertCount);
+      } else if (firstEver) {
+        // 初回起動時のみ、使い方の短い案内を一度だけ
+        this.maybeShowBubble(screenId, 0);
+        this.pref.welcomed = true;
+        savePref(this.pref);
+      }
+    },
+
+    updateBadge: function (n) {
+      var b = this._els.badge;
+      if (n > 0) { b.textContent = String(n); b.classList.remove('lsup-hidden'); }
+      else { b.classList.add('lsup-hidden'); }
+    },
+
+    /* 吹き出しを出す（短文・自動で引っ込む。うるさくしない） */
+    maybeShowBubble: function (screenId, alertCount) {
+      // パネルが開いているときは吹き出さない
+      if (this._els.overlay.classList.contains('show')) return;
+      var msg;
+      if (alertCount > 0) {
+        // 注意があるときは件数を控えめに伝える
+        msg = '確認が必要な項目が' + alertCount + '件あります。';
+      } else {
+        var s = DATA.screens[screenId] || DATA.screens._default;
+        // 画面のhelpは長いことがあるので、先頭の一文だけ
+        msg = (s.help || '').split('。')[0];
+        if (msg) msg += '。';
+      }
+      if (!msg) return;
+      this._els.bubbleTxt.textContent = msg;
+      this._els.bubble.classList.add('show');
+      var self = this;
+      global.clearTimeout(this._bubbleTimer);
+      // 注意ありは長め、通常は短めで自動消灯
+      this._bubbleTimer = global.setTimeout(function () {
+        self._els.bubble.classList.remove('show');
+      }, alertCount > 0 ? 6000 : 4500);
+    },
+
+    hideBubble: function () {
+      global.clearTimeout(this._bubbleTimer);
+      this._els.bubble.classList.remove('show');
+    },
+
+    /* ======================================================================
+       パネル開閉
+       ====================================================================== */
+    openPanel: function () {
+      this.hideBubble();
+      this.render();
+      this.syncVswitch();
+      this._els.overlay.classList.add('show');
+      // 表示回数を記録（機密でない統計のみ）
+      this.pref.seenCount = (this.pref.seenCount || 0) + 1;
+      savePref(this.pref);
+      // フォーカスを閉じるボタンへ（キーボード操作配慮）
+      var x = this._els.x;
+      global.setTimeout(function () { try { x.focus(); } catch (e) {} }, 30);
+    },
+    closePanel: function () {
+      this._els.overlay.classList.remove('show');
+      try { this._els.fab.focus(); } catch (e) {}
+    },
+
+    /* ======================================================================
+       パネル本文を現在の画面・ロール・状態で描画
+       ====================================================================== */
+    render: function () {
+      var state = this.readState();
+      var screenId = state.screenId || '_default';
+      var role = this.currentRole();
+      var m = this.getMessages(screenId, role, state);
+      var E = this._els;
+
+      E.title.textContent = m.title || 'Lサポ';
+      var roleObj = role ? DATA.roles[role] : null;
+      E.sub.textContent = roleObj ? (roleObj.name + 'の方へ') : '役割を選ぶと案内が変わります';
+
+      // 注意
+      if (m.alerts.length) {
+        E.alerts.innerHTML = m.alerts.map(function (a) {
+          var sig = a.level === 'danger' ? '●' : (a.level === 'warn' ? '▲' : 'i');
+          return '<div class="lsup-alert ' + a.level + '"><span class="lsup-sig">' + sig + '</span><span>' + a.text + '</span></div>';
+        }).join('');
+        E.secAlerts.hidden = false;
+      } else {
+        E.secAlerts.hidden = true;
+      }
+
+      // この画面でできること
+      E.help.textContent = m.help;
+      if (m.roleLine) { E.roleLine.textContent = m.roleLine; E.roleLine.hidden = false; }
+      else { E.roleLine.hidden = true; }
+
+      // 次にやること
+      if (m.next.length) {
+        E.next.innerHTML = m.next.map(function (t, i) {
+          return '<li><span class="lsup-no">' + (i + 1) + '</span><span>' + t + '</span></li>';
+        }).join('');
+        E.secNext.hidden = false;
+      } else { E.secNext.hidden = true; }
+
+      // ショートカット
+      if (m.shortcuts.length) {
+        E.sc.innerHTML = '';
+        var self = this;
+        m.shortcuts.forEach(function (sc) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = sc.label;
+          b.addEventListener('click', function () { self.goShortcut(sc.target); });
+          E.sc.appendChild(b);
+        });
+        E.secSc.hidden = false;
+      } else { E.secSc.hidden = true; }
+
+      // ロールセレクトを現在値に
+      E.roleSel.value = role || '';
+    },
+
+    /* ----------------------------------------------------------------------
+       ショートカット遷移：
+       - 'xxx.html' や 'xxx.html#yyy' → ページ遷移
+       - '#tab=xxx' / '#sub=xxx' / '#xxx' → アダプタに委譲（無ければhash）
+       ---------------------------------------------------------------------- */
+    goShortcut: function (target) {
+      this.closePanel();
+      var a = global.LSUPPORT_ADAPTER;
+      if (a && typeof a.navigate === 'function') {
+        try { if (a.navigate(target) === true) return; } catch (e) {}
+      }
+      if (/\.html/.test(target)) { global.location.href = target; return; }
+      // ハッシュ系はそのまま（cost側 lccNav が hash を解釈）
+      if (target.charAt(0) === '#') { global.location.hash = target.replace(/^#/, ''); }
+    },
+
+    /* ======================================================================
+       外部API（最小化・非表示・再表示）
+       ====================================================================== */
+    minimize: function () { this.closePanel(); this.hideBubble(); },
+    hide: function () { this.pref.hidden = true; savePref(this.pref); if (this._root) this._root.classList.add('lsup-hidden'); },
+    show: function () { this.pref.hidden = false; savePref(this.pref); if (this._root) this._root.classList.remove('lsup-hidden'); }
+  };
+
+  global.LSupport = LSupport;
+
+  // DOM準備後に自動初期化（既存アプリのmount後でも問題ない：DOMにかぶせるだけ）
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { LSupport.init(); });
+  } else {
+    LSupport.init();
+  }
+})(window);
+</script>
+<!-- ===== LCC Lサポ ここまで ===== -->
 </body>
 </html>
