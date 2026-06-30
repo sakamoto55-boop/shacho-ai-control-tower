@@ -1,0 +1,1856 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>LCC 原価管理</title>
+<style>
+:root{
+  --navy:#1a237e;
+  --navy-dark:#0d1442;
+  --navy-light:#3949ab;
+  --orange:#f57c00;
+  --orange-light:#ff9d3f;
+  --bg:#f4f5fa;
+  --card:#ffffff;
+  --text:#1f2233;
+  --sub:#6b7088;
+  --line:#e2e5f0;
+  --green:#2e7d32;
+  --green-bg:#e6f4ea;
+  --red:#c62828;
+  --red-bg:#fdecec;
+  --yellow:#f9a825;
+  --yellow-bg:#fff7e0;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  font-size:16px;
+  line-height:1.6;
+  padding-bottom:90px;
+  -webkit-text-size-adjust:100%;
+}
+input,select,textarea,button{font-family:inherit;font-size:17px;}
+/* ===== ヘッダー ===== */
+.app-header{
+  background:linear-gradient(135deg,var(--navy) 0%,var(--navy-light) 100%);
+  color:#fff;
+  padding:14px 16px;
+  position:sticky;top:0;z-index:50;
+  box-shadow:0 2px 8px rgba(0,0,0,.15);
+}
+.app-header .title{font-size:21px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.app-header .title .badge{
+  background:var(--orange);color:#fff;font-size:12px;font-weight:700;
+  padding:2px 8px;border-radius:6px;letter-spacing:.5px;
+}
+.app-header .sub{font-size:13px;opacity:.85;margin-top:2px;}
+/* ===== ページ ===== */
+.page{display:none;padding:16px;max-width:760px;margin:0 auto;}
+.page.active{display:block;}
+.page-title{font-size:20px;font-weight:800;margin:0 0 4px;color:var(--navy);}
+.page-desc{font-size:15px;color:var(--sub);margin:0 0 16px;}
+/* ===== カード ===== */
+.card{
+  background:var(--card);border-radius:14px;padding:16px;margin-bottom:14px;
+  box-shadow:0 1px 4px rgba(26,35,126,.06);border:1px solid var(--line);
+}
+.card.flat{box-shadow:none;}
+/* ===== ボタン ===== */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-height:52px;padding:0 18px;border:none;border-radius:12px;
+  font-size:16px;font-weight:700;cursor:pointer;text-decoration:none;
+  transition:filter .15s,transform .1s;line-height:1.2;
+}
+.btn:active{filter:brightness(.92);transform:scale(.96);}
+.btn-primary{background:var(--navy);color:#fff;}
+.btn-orange{background:var(--orange);color:#fff;}
+.btn-green{background:var(--green);color:#fff;}
+.btn-red{background:var(--red);color:#fff;}
+.btn-ghost{background:#eef0f7;color:var(--navy);}
+.btn-block{display:flex;width:100%;}
+.btn-sm{min-height:44px;font-size:14px;padding:0 14px;border-radius:10px;}
+.btn-lg{min-height:60px;font-size:19px;}
+.btn[disabled]{opacity:.5;cursor:not-allowed;}
+/* ===== フォーム ===== */
+label.fld{display:block;margin-bottom:16px;}
+label.fld .lbl{display:block;font-size:16px;font-weight:700;color:var(--navy);margin-bottom:6px;}
+input[type=text],input[type=number],input[type=date],select,textarea{
+  width:100%;min-height:52px;padding:12px 14px;border:2px solid var(--line);
+  border-radius:10px;background:#fff;font-size:17px;color:var(--text);
+}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--orange);}
+select{appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%231a237e' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;padding-right:38px;}
+.row2{display:flex;gap:10px;}
+.row2>*{flex:1;}
+.mb0{margin-bottom:0;}
+/* ===== ステッパー（人工数などのタップ入力） ===== */
+.stepper{display:flex;align-items:center;gap:0;border:2px solid var(--line);border-radius:12px;overflow:hidden;}
+.stepper button{
+  width:60px;min-height:60px;border:none;background:#eef0f7;color:var(--navy);
+  font-size:28px;font-weight:800;cursor:pointer;flex-shrink:0;transition:transform .12s;
+}
+.stepper button:active{background:#dfe3f3;transform:scale(.96);}
+.stepper .val{flex:1;text-align:center;font-size:24px;font-weight:800;color:var(--navy);min-width:0;}
+/* ===== タップ選択チップ（職種・産廃種別など） ===== */
+.pick{display:flex;flex-wrap:wrap;gap:8px;}
+.pick button{
+  min-height:48px;padding:0 16px;border:2px solid var(--line);background:#fff;
+  border-radius:12px;font-size:15px;font-weight:700;color:var(--text);cursor:pointer;transition:transform .12s;
+}
+.pick button:active{transform:scale(.96);}
+.pick button.on{background:var(--navy);color:#fff;border-color:var(--navy);}
+/* ===== チップ/バッジ ===== */
+.chip{display:inline-block;font-size:14px;font-weight:700;padding:5px 12px;border-radius:999px;white-space:nowrap;}
+.chip-green{background:var(--green-bg);color:var(--green);}
+.chip-red{background:var(--red-bg);color:var(--red);}
+.chip-yellow{background:var(--yellow-bg);color:#a36a00;}
+.chip-navy{background:#e8eaf6;color:var(--navy);}
+.chip-gray{background:#eef0f7;color:var(--sub);}
+/* ===== 信号機 ===== */
+.signal{font-size:20px;line-height:1;}
+/* ===== 案件カード ===== */
+.proj{
+  background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;
+  box-shadow:0 1px 4px rgba(26,35,126,.06);border:1px solid var(--line);cursor:pointer;
+  border-left:6px solid var(--line);
+}
+.proj.sig-green{border-left-color:var(--green);}
+.proj.sig-yellow{border-left-color:var(--yellow);}
+.proj.sig-red{border-left-color:var(--red);}
+.proj:active{background:#fafbff;}
+.proj .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;}
+.proj .name{font-size:18px;font-weight:800;color:var(--text);}
+.proj-figs{display:flex;gap:8px;text-align:center;}
+.proj-figs .f{flex:1;background:#f7f8fc;border-radius:10px;padding:8px 4px;}
+.proj-figs .f .k{font-size:12px;color:var(--sub);}
+.proj-figs .f .v{font-size:16px;font-weight:800;margin-top:2px;}
+.proj-bar{height:10px;border-radius:5px;background:#eef0f7;overflow:hidden;margin-top:10px;}
+.proj-bar i{display:block;height:100%;background:var(--navy);transition:width .3s;}
+.proj-bar i.over{background:var(--red);}
+.proj-bar i.warn{background:var(--yellow);}
+/* ===== 集計値 ===== */
+.kpi{display:flex;gap:10px;margin-bottom:14px;}
+.kpi .box{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center;}
+.kpi .box .k{font-size:12px;color:var(--sub);}
+.kpi .box .v{font-size:20px;font-weight:800;margin-top:4px;}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";}
+.pos{color:var(--green);} .neg{color:var(--red);}
+/* ===== セクション見出し ===== */
+.sec-title{font-size:17px;font-weight:800;color:var(--navy);margin:18px 0 8px;display:flex;align-items:center;gap:6px;}
+.sec-title::before{content:"";width:4px;height:16px;background:var(--orange);border-radius:2px;}
+/* ===== 実績明細リスト ===== */
+.actline{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);}
+.actline:last-child{border-bottom:none;}
+.actline .al-l{font-size:15px;}
+.actline .al-l .sub{font-size:13px;color:var(--sub);}
+.actline .al-r{font-weight:800;white-space:nowrap;}
+.del-x{background:none;border:none;color:var(--red);font-size:22px;font-weight:800;padding:4px 10px;cursor:pointer;}
+/* ===== 突合せ：予実バー ===== */
+.cmp-row{margin-bottom:16px;}
+.cmp-row .cmp-head{display:flex;justify-content:space-between;font-size:14px;font-weight:700;margin-bottom:6px;}
+.cmp-bars{position:relative;}
+.cmp-bar{height:26px;border-radius:6px;background:#eef0f7;overflow:hidden;margin-bottom:6px;position:relative;}
+.cmp-bar .fillb{display:block;height:100%;border-radius:6px;}
+.cmp-bar .lab{position:absolute;left:8px;top:0;height:100%;display:flex;align-items:center;font-size:12px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.3);}
+.fill-budget{background:var(--navy-light);}
+.fill-actual{background:var(--orange);}
+.fill-actual.over{background:var(--red);}
+.fill-actual.ok{background:var(--green);}
+/* ===== 突合せ：業者請求 vs 発注見込 ===== */
+.vrow{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;background:#fff;}
+.vrow.diff{border-color:#f3c5c5;background:var(--red-bg);}
+.vrow .vtop{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.vrow .vname{font-weight:800;font-size:16px;}
+.vrow .vgrid{display:flex;gap:8px;text-align:center;}
+.vrow .vgrid .c{flex:1;background:#f7f8fc;border-radius:8px;padding:8px 4px;}
+.vrow.diff .vgrid .c{background:#fff;}
+.vrow .vgrid .k{font-size:11px;color:var(--sub);}
+.vrow .vgrid .v{font-size:15px;font-weight:800;margin-top:2px;}
+/* ===== 警告バナー ===== */
+.alert{display:flex;gap:10px;align-items:center;padding:14px;border-radius:12px;font-weight:700;font-size:15px;margin-bottom:14px;}
+.alert-red{background:var(--red-bg);color:var(--red);border:1px solid #f3c5c5;}
+.alert-yellow{background:var(--yellow-bg);color:#a36a00;border:1px solid #f3e0a8;}
+.alert-green{background:var(--green-bg);color:var(--green);border:1px solid #bfe0c6;}
+.alert-navy{background:#e8eaf6;color:var(--navy);border:1px solid #c5cae9;}
+/* ===== 空状態 ===== */
+.empty{text-align:center;color:var(--sub);padding:40px 16px;}
+.empty .ico{font-size:44px;}
+/* ===== ヒント ===== */
+.hint{font-size:13px;color:var(--sub);margin-top:-4px;margin-bottom:12px;}
+.divline{height:1px;background:var(--line);margin:14px 0;}
+.right{text-align:right;}
+.center{text-align:center;}
+/* ===== 下部ナビ ===== */
+/* タップ領域62px以上、アクティブタブに背景色＋上部インジケーターバーを追加 */
+.nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:10000;
+  display:flex;background:#fff;border-top:1px solid var(--line);
+  box-shadow:0 -2px 10px rgba(0,0,0,.06);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.nav button{
+  flex:1;background:none;border:none;padding:8px 2px 10px;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  color:var(--sub);cursor:pointer;min-height:68px;font-size:12px;font-weight:700;
+  position:relative;transition:color .15s,background-color .15s;
+}
+.nav button .ico{font-size:24px;line-height:1;}
+/* アクティブタブ：背景色＋上部インジケーターバーを追加 */
+.nav button.active{
+  color:var(--navy);
+  background:linear-gradient(to bottom, rgba(26,35,126,.04) 0%, rgba(26,35,126,.02) 100%);
+}
+.nav button.active::before{
+  content:'';
+  position:absolute;top:0;left:0;right:0;
+  height:3px;background:var(--navy);border-radius:0 0 2px 2px;
+}
+.nav button.active .ico{transform:translateY(0);}
+/* ナビボタン7項目対応：小画面でも指が届くサイズに調整 */
+@media (max-width: 420px){
+  .nav button{ font-size:11px; padding:6px 1px 8px; min-height:62px; }
+  .nav button .ico{ font-size:20px; }
+}
+/* ===== モーダル ===== */
+.modal-bg{
+  position:fixed;inset:0;background:rgba(13,20,66,.5);z-index:20000;
+  display:none;align-items:flex-end;justify-content:center;
+}
+.modal-bg.open{display:flex;}
+.modal-bg.open ~ nav.nav, body.modal-open nav.nav{ display:none !important; }
+body.modal-open{ overflow:hidden; }
+.modal{
+  background:#fff;width:100%;max-width:760px;max-height:92vh;overflow-y:auto;
+  border-radius:20px 20px 0 0;
+  padding:18px 16px;
+  padding-bottom:max(90px, calc(90px + env(safe-area-inset-bottom)));
+  animation:slideup .22s ease;
+}
+@keyframes slideup{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;position:sticky;top:-18px;background:#fff;padding-top:4px;z-index:2;}
+.modal-head .mh-title{font-size:19px;font-weight:800;color:var(--navy);}
+.modal-head .close{background:#eef0f7;border:none;width:48px;height:48px;border-radius:50%;font-size:24px;color:var(--navy);cursor:pointer;flex-shrink:0;transition:transform .12s;}
+.modal-head .close:active{transform:scale(.92);}
+/* ===== トースト ===== */
+.toast{
+  position:fixed;left:50%;bottom:100px;transform:translateX(-50%) translateY(20px);
+  background:var(--navy-dark);color:#fff;padding:13px 24px;border-radius:999px;
+  font-weight:700;font-size:15px;z-index:30000;opacity:0;pointer-events:none;
+  transition:all .25s;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:90%;text-align:center;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+/* ===== 集計グラフ（依存ゼロ・内製Canvas/SVG） ===== */
+.chart-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 1px 4px rgba(26,35,126,.06);}
+.chart-title{font-size:16px;font-weight:800;color:var(--navy);margin:0 0 12px;display:flex;align-items:center;gap:6px;}
+.chart-title::before{content:"";width:4px;height:16px;background:var(--orange);border-radius:2px;}
+/* 横棒グラフ（案件別消化率など） */
+.hbar{margin-bottom:12px;}
+.hbar:last-child{margin-bottom:0;}
+.hbar .hb-head{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:4px;gap:8px;}
+.hbar .hb-name{font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
+.hbar .hb-val{font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.hbar .hb-track{height:18px;border-radius:6px;background:#eef0f7;overflow:hidden;position:relative;}
+.hbar .hb-fill{display:block;height:100%;border-radius:6px;background:var(--navy);transition:width .35s;}
+.hbar .hb-fill.warn{background:var(--yellow);}
+.hbar .hb-fill.over{background:var(--red);}
+.hbar .hb-fill.ok{background:var(--green);}
+/* 積み上げ横棒（費目別構成を1本の帯で表現） */
+.stackbar{display:flex;height:28px;border-radius:8px;overflow:hidden;background:#eef0f7;margin-bottom:10px;}
+.stackbar .seg{height:100%;}
+.stack-legend{display:flex;flex-wrap:wrap;gap:6px 14px;}
+.stack-legend .lg{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;}
+.stack-legend .lg .dot{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
+.stack-legend .lg .amt{color:var(--sub);font-weight:700;}
+/* 費目色（費目別集計で共通使用） */
+.c-labor{background:#3949ab;} .c-vehicle{background:#f57c00;} .c-disposal{background:#2e7d32;} .c-subcon{background:#8e24aa;} .c-material{background:#00897b;}
+/* 検索ボックス */
+.search-wrap{position:relative;margin-bottom:10px;}
+.search-wrap input{padding-left:40px;}
+.search-wrap .si{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;pointer-events:none;}
+.search-wrap .clr{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:#eef0f7;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;color:var(--sub);cursor:pointer;}
+/* 期間フィルタのチップ */
+.seg-tabs{display:flex;gap:6px;background:#eef0f7;border-radius:10px;padding:4px;margin-bottom:12px;}
+.seg-tabs button{flex:1;border:none;background:none;border-radius:8px;padding:10px 6px;font-size:15px;font-weight:700;color:var(--sub);cursor:pointer;min-height:44px;transition:transform .12s;}
+.seg-tabs button:active{transform:scale(.96);}
+.seg-tabs button.on{background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(0,0,0,.1);}
+/* トーストの種別色（エラー・成功） */
+.toast.err{background:var(--red);}
+.toast.ok{background:var(--green);}
+</style>
+<meta property="og:type" content="website">
+		<meta property="og:url" content="https://lccsystem-gd2b7bov.manus.space/lcc-cost.html">
+		<meta property="og:title" content="LCC 原価管理">
+		<meta property="og:image" content="https://files.manuscdn.com/webdev_screenshots/2026/06/25/jg7cngkqbs9BGBhnjzVRWd.png?x-oss-process=image/resize,w_1200/crop,h_630,x_0,y_0">
+		<meta property="og:image:width" content="1200">
+		<meta property="og:image:height" content="630">
+		<meta name="twitter:card" content="summary_large_image">
+		<meta name="twitter:title" content="LCC 原価管理">
+		<meta name="twitter:image" content="https://files.manuscdn.com/webdev_screenshots/2026/06/25/jg7cngkqbs9BGBhnjzVRWd.png?x-oss-process=image/resize,w_1200/crop,h_630,x_0,y_0">
+		<meta name="twitter:image:width" content="1200">
+		<meta name="twitter:image:height" content="630"><link rel="canonical" href="https://lccsystem-gd2b7bov.manus.space/lcc-cost.html" /></head>
+<body>
+
+<header class="app-header">
+  <!-- 【修正2：ホーム戻るボタン】ヘッダーは sticky なので全画面で常時表示される。
+       同ディレクトリの index.html（ホーム画面）へ遷移。高齢者でも押しやすい大きめのボタン。 -->
+  <div style="display:flex;align-items:center;gap:12px">
+    <a href="index.html" style="flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;background:var(--orange);color:#fff;font-weight:800;font-size:15px;min-height:44px;padding:0 14px;border-radius:12px;text-decoration:none;box-shadow:0 2px 6px rgba(0,0,0,.25)" aria-label="ホーム画面へ戻る" title="ホーム画面へ戻る"><span style="font-size:18px;line-height:1">🏠</span><span>ホーム</span></a>
+    <div style="flex:1 1 auto;min-width:0">
+      <div class="title">LCC 原価管理 <span class="badge">予実</span></div>
+      <div class="sub">島根県出雲市・解体／片付け／外構／草刈り</div>
+    </div>
+  </div>
+</header>
+
+<!-- ========== ① 案件一覧 ========== -->
+<section id="page-projects" class="page active">
+  <h2 class="page-title">案件一覧</h2>
+  <p class="page-desc">見積（実行予算）に対して、いま原価がどれだけ使われているかを信号で確認します</p>
+  <div id="projAlerts"></div>
+  <div id="projList"></div>
+</section>
+
+
+<!-- ========== ★クイック積算（単価マスタ連動） ========== -->
+<section id="page-quote" class="page">
+  <h2 class="page-title">クイック積算</h2>
+  <p class="page-desc">取引先を選ぶと単価が自動表示。数量を入れるだけで金額が自動計算されます（出典：単価表）</p>
+  <div class="card">
+    <label class="fld"><span class="lbl">① カテゴリを選ぶ</span>
+      <div class="pick" id="qe_cat_pick"></div>
+    </label>
+    <label class="fld mb0"><span class="lbl">② 取引先（業者）を選ぶ</span>
+      <div class="search-wrap" style="margin-bottom:6px">
+        <span class="si">🔍</span>
+        <input type="text" id="qe_vendor_search" placeholder="業者名で絞り込む…" oninput="fillQeVendorSelect()" autocomplete="off">
+        <button class="clr" onclick="document.getElementById('qe_vendor_search').value='';fillQeVendorSelect()" title="クリア">×</button>
+      </div>
+      <select id="qe_vendor" onchange="qeSelectVendor(this.value)"></select>
+    </label>
+  </div>
+  <div id="qe_items"></div>
+  <div class="card flat" id="qe_total_card" style="display:none;border:2px solid var(--navy);background:#f7f8fc">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:800;color:var(--navy)">積算合計</span>
+      <span class="num" id="qe_total" style="font-size:24px;font-weight:800;color:var(--navy)">¥0</span>
+    </div>
+    <div class="hint" style="margin-top:6px">※ この金額は原価（仕入）ベースです。見積売価は別途粗利率を加味してください。</div>
+  </div>
+</section>
+
+<!-- ========== ★ 集計（ダッシュボード） ========== -->
+<section id="page-report" class="page">
+  <h2 class="page-title">集計</h2>
+  <p class="page-desc">全社の予実・費目別構成・案件別消化率・月別推移をグラフで確認します</p>
+  <div id="reportBody"></div>
+</section>
+
+<!-- ========== ② 日報入力 ========== -->
+<section id="page-daily" class="page">
+  <h2 class="page-title">日報入力</h2>
+  <p class="page-desc">現場・日付を選んで、人工・車両・産廃をタップで入力します（金額は自動計算）</p>
+  <div class="card">
+    <label class="fld"><span class="lbl">現場（案件）を選ぶ</span>
+      <select id="dr_proj"></select></label>
+    <label class="fld mb0"><span class="lbl">日付</span>
+      <input type="date" id="dr_date"></label>
+  </div>
+  <button class="btn btn-orange btn-block btn-lg" style="margin-bottom:10px" onclick="openDailyModal()">📝 日報を入力する</button>
+  <div class="hint">人工＝日額単価、車両＝日額単価、産廃＝種類ごとの単価で自動的に原価に計上します。</div>
+  <div id="dailyList"></div>
+</section>
+
+<!-- ========== ③ 請求書仕分け ========== -->
+<section id="page-invoice" class="page">
+  <h2 class="page-title">請求書仕分け</h2>
+  <p class="page-desc">業者の請求書（1枚に複数現場分）を、現場ごとに金額を振り分けます</p>
+  <button class="btn btn-orange btn-block btn-lg" style="margin-bottom:14px;" onclick="openInvoiceModal()">＋ 請求書を登録する</button>
+  <div id="invoiceList"></div>
+</section>
+
+<!-- ========== ④ 突合せ ========== -->
+<section id="page-match" class="page">
+  <h2 class="page-title">突合せ</h2>
+  <p class="page-desc">予算と実績、業者請求と発注見込を並べて確認し、問題なければ承認します</p>
+  <div class="card">
+    <label class="fld mb0"><span class="lbl">現場（案件）を選ぶ</span>
+      <select id="mt_proj" onchange="renderMatch()"></select></label>
+  </div>
+  <div id="matchBody"></div>
+</section>
+
+<!-- ========== ⑤ 設定 ========== -->
+<section id="page-settings" class="page">
+  <h2 class="page-title">設定</h2>
+  <p class="page-desc">単価とクラウド連携を設定します</p>
+
+  <div class="sec-title">人工・車両の日額単価</div>
+  <div class="card">
+    <label class="fld"><span class="lbl">人工（1人工あたり）の日額単価（円）</span>
+      <input type="number" id="set_labor" inputmode="numeric" placeholder="15000" onchange="saveRate('laborDailyRate',this.value)"></label>
+    <label class="fld mb0"><span class="lbl">車両（1台あたり）の日額単価（円）</span>
+      <input type="number" id="set_vehicle" inputmode="numeric" placeholder="12000" onchange="saveRate('vehicleDailyRate',this.value)"></label>
+  </div>
+
+  <div class="sec-title">産廃（処分費）の単価</div>
+  <div class="card" id="wasteRateCard"></div>
+
+  <div class="sec-title">クラウド連携（Googleスプレッドシート / GAS）</div>
+  <div class="card">
+    <label class="fld"><span class="lbl">GAS WebアプリURL</span>
+      <input type="text" id="set_gas" placeholder="https://script.google.com/macros/s/.../exec" onchange="saveGasUrl(this.value)"></label>
+    <button class="btn btn-primary btn-block btn-lg" style="margin-bottom:10px" onclick="pullFromCloud()">↓ 見積から案件・売価・予算を取り込む</button>
+    <button class="btn btn-orange btn-block" onclick="pushToCloud()">↑ 原価実績と消化率をクラウドに送信</button>
+    <div class="hint" style="margin-top:10px">見積システムと同じGAS URLを設定してください。「取り込む」で見積済み案件・税込売価・見積原価（実行予算）・費目別予算が一覧に追加され、予実対比・粗利見込が自動計算されます。「送信」で実績原価と消化率フラグ（80%超判定）をGASに送信し、見積システムのダッシュボードで予実対比グラフが更新されます。</div>
+  </div>
+
+  <div class="sec-title">データ管理</div>
+  <div class="card">
+    <button class="btn btn-ghost btn-block" style="margin-bottom:10px;" onclick="exportData()">バックアップを書き出す</button>
+    <button class="btn btn-ghost btn-block" style="margin-bottom:10px;" onclick="document.getElementById('importFile').click()">バックアップを読み込む</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+    <button class="btn btn-red btn-block" onclick="resetAll()">全データを消去</button>
+  </div>
+</section>
+
+<!-- ========== 下部ナビ（lccNav：Manusバナー非干渉の独自名） ========== -->
+<nav class="nav">
+  <button data-tab="projects" class="active" onclick="lccNav('projects')"><span class="ico">📋</span>案件</button>
+  <button data-tab="daily" onclick="lccNav('daily')"><span class="ico">📝</span>日報</button>
+  <button data-tab="report" onclick="lccNav('report')"><span class="ico">📊</span>集計</button>
+  <button data-tab="match" onclick="lccNav('match')"><span class="ico">⚖️</span>突合せ</button>
+  <button data-tab="quote" onclick="lccNav('quote')"><span class="ico">🧮</span>積算</button>
+  <button data-tab="invoice" onclick="lccNav('invoice')"><span class="ico">🧾</span>請求</button>
+  <button data-tab="settings" onclick="lccNav('settings')"><span class="ico">⚙️</span>設定</button>
+</nav>
+
+<!-- モーダル類 -->
+<div class="modal-bg" id="modalBg"><div class="modal" id="modalBox"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   ★P0共通ユーティリティ（DOM安全参照・サニタイズ・日付/数値ガード）
+   - safeGetEl: 存在しない要素への参照・イベント登録を防ぐ
+   - safeOn:    要素が存在するときだけイベントを登録する
+   - csvCell:   CSV/TSVインジェクション（=,+,-,@始まり）を無害化
+   - safeDateStr: 不正日付を空文字にして Invalid Date 表示を防ぐ
+   ============================================================ */
+function safeGetEl(id){
+  // document が無い・id 不正・要素未存在でも null を返すだけで例外を投げない
+  try{ return (typeof document!=='undefined' && id) ? document.getElementById(id) : null; }
+  catch(e){ return null; }
+}
+function safeOn(id, type, handler){
+  var el = safeGetEl(id);
+  if(el && typeof el.addEventListener==='function'){ el.addEventListener(type, handler); return true; }
+  return false;
+}
+function csvCell(v){
+  // 数式インジェクション対策：先頭が = + - @ の場合は先頭に ' を付けて無害化し、ダブルクォートで囲む
+  var s = (v==null ? '' : String(v));
+  if(/^[=+\-@\t\r]/.test(s)){ s = "'" + s; }
+  return '"' + s.replace(/"/g,'""') + '"';
+}
+function safeDateStr(s){
+  // 'YYYY-MM-DD' 等の妥当な日付だけ通し、不正値は '' を返す
+  if(!s) return '';
+  var d = new Date(s);
+  return isNaN(d.getTime()) ? '' : s;
+}
+
+/* ============================================================
+   単価マスタ（「単価表（処分場別）最新.xlsx」より自動生成）
+   shobunhi=処分費(29社) / zairyo=材料費(18社) / lease=リース単価(4ソース)
+   ============================================================ */
+var PRICE_MASTER = {"shobunhi":{"アースサポート":[{"item":"産業廃棄物処理","price":7500,"unit":"㎥","note":"A"},{"item":"産業廃棄物処理","price":14500,"unit":"㎥","note":"B"},{"item":"産業廃棄物処理","price":28000,"unit":"㎥","note":"C"},{"item":"小型家電処分","price":31000,"unit":"㎥","note":""},{"item":"廃石膏ボード（新築系","price":16500,"unit":"㎥","note":""},{"item":"廃石膏ボード・がれき混合物処理","price":20000,"unit":"㎥","note":""},{"item":"廃石膏ボード（解体系","price":20000,"unit":"㎥","note":""},{"item":"木くず処分","price":4500,"unit":"㎥","note":""},{"item":"蛍光灯処分","price":550,"unit":"ｋｇ","note":""},{"item":"乾電池処分","price":450,"unit":"ｋｇ","note":""},{"item":"パソコン本体処分","price":1500,"unit":"台","note":""},{"item":"パソコンディスプレー処分","price":1500,"unit":"台","note":""},{"item":"パソコンキーボード処分","price":500,"unit":"台","note":""},{"item":"ノートパソコン処分代","price":1700,"unit":"台","note":""},{"item":"家電ﾘｻｲｸﾙ品運搬手数料","price":8000,"unit":"1式","note":"（3台まで）"},{"item":"家電ﾘｻｲｸﾙ品運搬手数料","price":2000,"unit":"台","note":"（4台以上）"},{"item":"根株処分","price":13500,"unit":"㎥","note":""},{"item":"焼却物処分（固体系","price":31500,"unit":"㎥","note":""},{"item":"安定型産廃 埋立処分","price":15000,"unit":"㎥","note":""},{"item":"分別費","price":3500,"unit":"時間","note":""},{"item":"返却費","price":10000,"unit":"1式","note":"受入不可物・条件外・契約外"},{"item":"消火器手数料","price":3000,"unit":"1式","note":"5本まで"},{"item":"消火器手数料","price":600,"unit":"本","note":"6本以上"}],"出雲土建 （ﾘｻｲｸﾙ）":[{"item":"コンクリート（大）100","price":900,"unit":"t","note":""},{"item":"コンクリート（大）50","price":600,"unit":"t","note":""}],"出雲土建":[{"item":"木くず","price":2000,"unit":"t","note":""},{"item":"コンクリートがら","price":300,"unit":"t","note":""}],"伊東運送・興業":[{"item":"残土","price":3500,"unit":"2ｔ","note":""},{"item":"残土","price":4000,"unit":"3t","note":""},{"item":"残土","price":5000,"unit":"4ｔ","note":""},{"item":"残土（草・石）","price":4500,"unit":"2ｔ","note":""},{"item":"残土（草・石）","price":5000,"unit":"3ｔ","note":""},{"item":"残土（草・石）","price":6000,"unit":"4ｔ","note":""},{"item":"残土（石）","price":5000,"unit":"2ｔ","note":""},{"item":"残土（石）","price":6000,"unit":"3t","note":""},{"item":"残土（石）","price":7000,"unit":"4ｔ","note":""},{"item":"残土（石入り）","price":4500,"unit":"2ｔ","note":""},{"item":"残土（石入り）","price":6000,"unit":"4ｔ","note":""}],"エコテック":[{"item":"木くず","price":3500,"unit":"㎥","note":""},{"item":"残土","price":12000,"unit":"ｔ","note":"4ｔ"},{"item":"根株","price":5500,"unit":"㎥","note":""}],"景山総業":[{"item":"残土","price":2500,"unit":"2ｔ","note":""}],"掛合運送":[{"item":"残土","price":3500,"unit":"2ｔ","note":"2500.0"},{"item":"残土","price":2750,"unit":"3ｔ","note":""},{"item":"残土","price":3000,"unit":"4ｔ","note":""},{"item":"真砂","price":3500,"unit":"2ｔ","note":""},{"item":"真砂","price":5600,"unit":"3ｔ","note":""},{"item":"真砂","price":6700,"unit":"4ｔ","note":""}],"鎌田組":[{"item":"瓦（浜山）","price":10800,"unit":"台","note":"2ｔ"},{"item":"瓦（浜山）","price":21600,"unit":"台","note":"4ｔ"},{"item":"瓦（稗原）","price":9000,"unit":"台","note":"2ｔ"},{"item":"瓦（稗原）","price":18000,"unit":"台","note":"4ｔ"},{"item":"残土・石(稗原）","price":6000,"unit":"台","note":"2ｔ"},{"item":"残土・石(稗原）","price":8000,"unit":"台","note":"4ｔ"},{"item":"残土・石（浜山）","price":6000,"unit":"台","note":"2ｔ"},{"item":"残土・石（浜山）","price":12000,"unit":"台","note":"4ｔ"},{"item":"壁泥（浜山）","price":12000,"unit":"台","note":"2ｔ"},{"item":"壁泥（浜山）","price":24000,"unit":"台","note":"4t"},{"item":"壁泥（稗原）","price":8000,"unit":"台","note":"2ｔ"},{"item":"壁泥（稗原）","price":16000,"unit":"台","note":"4ｔ"},{"item":"コンクリート無筋 （浜山）","price":800,"unit":"台","note":"2ｔ"},{"item":"コンクリート鉄筋 （浜山）","price":1000,"unit":"台","note":"2ｔ"},{"item":"コンクリート鉄筋 （浜山）","price":2000,"unit":"台","note":"4ｔ"},{"item":"コンクリート無筋 （稗原）","price":1600,"unit":"台","note":"4ｔ"},{"item":"コンクリート鉄筋 （稗原）","price":2000,"unit":"台","note":"4ｔ"}],"クリーンパーク （別途産廃減量税あり ・1割くらい）":[{"item":"瓦礫","price":10000,"unit":"ｔ","note":""},{"item":"繊維くず・廃プラ（畳）","price":10000,"unit":"ｔ","note":""},{"item":"ガラス・陶器くず","price":10000,"unit":"ｔ","note":""},{"item":"廃プラスチック","price":25000,"unit":"ｔ","note":""},{"item":"木くず（要破砕）","price":15000,"unit":"ｔ","note":""},{"item":"石膏ボード","price":20000,"unit":"ｔ","note":""},{"item":"断熱材","price":25000,"unit":"ｔ","note":""},{"item":"石綿含有（がれき）","price":25000,"unit":"ｔ","note":""}],"クリエイト山陰":[{"item":"混合","price":10000,"unit":"㎥","note":""},{"item":"混合（廃石膏ボード）","price":12000,"unit":"㎥","note":""}],"江津開発センター":[{"item":"瓦","price":2500,"unit":"t","note":""},{"item":"石","price":2500,"unit":"t","note":""},{"item":"コンクリート","price":1000,"unit":"t","note":""},{"item":"残土","price":2000,"unit":"3ｔ","note":""},{"item":"残土","price":2500,"unit":"4ｔ","note":""}],"コーケン":[{"item":"コンクリート（無筋）","price":1000,"unit":"ｔ","note":""},{"item":"コンクリート（有筋）","price":1200,"unit":"t","note":""},{"item":"瓦礫・陶磁器くず・瓦","price":3000,"unit":"t","note":""}],"越野組":[{"item":"コンクリート 無筋","price":1000,"unit":"ｔ","note":""},{"item":"コンクリート 有筋","price":1500,"unit":"ｔ","note":""},{"item":"真砂","price":5200,"unit":"㎥","note":"2㎥ 10400"}],"島根産廃環境事業協同組合":[{"item":"廃プラスチック","price":5500,"unit":"㎥","note":""},{"item":"金属","price":5500,"unit":"㎥","note":""}],"山陰丸和林業":[{"item":"木くず","price":10000,"unit":"t","note":""},{"item":"植栽","price":4000,"unit":"㎥","note":"伝票無"},{"item":"根っこ","price":19000,"unit":"t","note":""}],"山建プラント":[{"item":"ｾﾒﾝﾄ瓦","price":800,"unit":"ｔ","note":""},{"item":"瓦・瓦礫","price":4500,"unit":"t","note":""},{"item":"コンクリート（無筋）","price":500,"unit":"t","note":""},{"item":"コンクリート（有筋）","price":500,"unit":"t","note":""},{"item":"アスガラ","price":1300,"unit":"t","note":""},{"item":"45.0","price":1300,"unit":"t","note":""},{"item":"マニフェスト","price":150,"unit":"1枚","note":""}],"ケイナン":[{"item":"コンクリート 無筋","price":1800,"unit":"ｔ","note":""},{"item":"コンクリート 有筋","price":1900,"unit":"ｔ","note":""}],"田口資材":[{"item":"残土","price":2500,"unit":"2t","note":""}],"大成商事":[{"item":"伐採木・枝・竹","price":10,"unit":"㎏","note":""},{"item":"家屋解体材・コンパネ","price":12,"unit":"㎏","note":""},{"item":"根","price":15,"unit":"㎏","note":""}],"大福工業":[{"item":"コンクリート","price":1300,"unit":"t","note":"2t/2000 4t/5200"},{"item":"鉄筋コンクリート","price":1700,"unit":"t","note":"2ｔ/3,000 4ｔ/6,000"},{"item":"鉄筋コンクリート","price":15000,"unit":"10ｔ","note":""},{"item":"アスファルト","price":2000,"unit":"t","note":""}],"森山商事":[{"item":"真砂","price":3500,"unit":"2ｔ","note":""},{"item":"真砂","price":4500,"unit":"3ｔ","note":""},{"item":"真砂","price":5500,"unit":"4ｔ","note":""}],"播磨屋林業":[{"item":"木","price":15000,"unit":"t","note":""},{"item":"根","price":5000,"unit":"㎥","note":""}],"プレート商会":[{"item":"テレビ（小）","price":5000,"unit":"台","note":""},{"item":"テレビ（大）","price":6000,"unit":"台","note":""},{"item":"パソコンモニター","price":3000,"unit":"台","note":""},{"item":"乾燥機","price":6000,"unit":"台","note":""},{"item":"洗濯機","price":6000,"unit":"台","note":""},{"item":"冷蔵庫（小）","price":7000,"unit":"台","note":""},{"item":"冷蔵庫（大）","price":8000,"unit":"台","note":""},{"item":"たたみ","price":800,"unit":"枚","note":"1,000円"},{"item":"一般廃棄物","price":5000,"unit":"㎥","note":""},{"item":"一般廃棄物（事業系）","price":6000,"unit":"㎥","note":""},{"item":"一般廃棄物（廃プラ）","price":12000,"unit":"㎥","note":""},{"item":"金庫","price":7500,"unit":"台","note":""},{"item":"仏壇","price":30000,"unit":"基","note":""},{"item":"消火器","price":3000,"unit":"本","note":""},{"item":"タイヤ","price":800,"unit":"本","note":"500円 700円"}],"前田道路":[{"item":"アスガラ","price":400,"unit":"t","note":""},{"item":"コンクリート","price":400,"unit":"t","note":""}],"山崎組（里方）":[{"item":"コンクリート（無筋）","price":1000,"unit":"t","note":"軽トラ1台"},{"item":"コンクリート（有筋）","price":1200,"unit":"t","note":"軽1台"},{"item":"コンクリート（ALC）","price":5000,"unit":"t","note":""},{"item":"コンクリート（石まじり）","price":4000,"unit":"t","note":""},{"item":"コンクリート（タイル交）","price":3000,"unit":"t","note":"又は軽トラ1台 1,500"},{"item":"コンクリート（ラス入り）","price":10000,"unit":"t","note":""},{"item":"残土処理","price":1000,"unit":"台","note":"軽 1台"},{"item":"残土処理","price":1500,"unit":"t","note":"2t/3000 4ｔ/6000"},{"item":"残土処理（草まじり）","price":3000,"unit":"ｔ","note":"2ｔ/6,000 4ｔ/12000"},{"item":"残土処理B 軽1台","price":3000,"unit":"台","note":""},{"item":"残土処理B","price":7000,"unit":"㎥","note":""},{"item":"残土（ガラまじり）","price":1500,"unit":"台","note":"軽トラ1台"},{"item":"残土（石交じり）","price":2000,"unit":"台","note":"軽トラ1台"},{"item":"瓦","price":8000,"unit":"2ｔ","note":""},{"item":"ぬり瓦","price":6000,"unit":"t","note":"又は軽トラ1台 2,000"},{"item":"壁泥","price":7000,"unit":"㎥","note":""},{"item":"石処理","price":8000,"unit":"1t","note":"又は軽トラ1台 1,500"},{"item":"石処理","price":16000,"unit":"t","note":"2ｔ"},{"item":"石処理","price":32000,"unit":"t","note":"4ｔ"}],"山﨑組（大田）":[{"item":"木くず","price":12900,"unit":"t","note":"（生木）"},{"item":"木くず","price":7,"unit":"㎏","note":""},{"item":"コンクリートガラ","price":1500,"unit":"ｔ","note":"30㎝角程度（CDブロック含む）"},{"item":"コンクリートガラ","price":2500,"unit":"ｔ","note":"50㎝角以上の物（同上）"},{"item":"コンクリートガラ（有筋）","price":1500,"unit":"ｔ","note":"30㎝角程度（同上）"},{"item":"残コン（袋入り）","price":4500,"unit":"ｔ","note":"30㎝角程度（同上）"},{"item":"アスファルトガラ","price":1500,"unit":"ｔ","note":"30㎝角程度（砕石、草等の付着不可）同上"},{"item":"Aがれき","price":10000,"unit":"㎥","note":"瓦、モルタル（ラス付可）、レンガ、タイル、ALC等"},{"item":"瓦礫（混載）","price":20000,"unit":"㎥","note":"ルーフィング付き、木付着ガレキ等"},{"item":"サイディング","price":13000,"unit":"㎥","note":""}],"八雲産業":[{"item":"木","price":6000,"unit":"㎥","note":"樹木・竹など7,000円"}],"YKK産業":[{"item":"混合","price":38,"unit":"㎏","note":""},{"item":"たたみ","price":35,"unit":"㎏","note":""},{"item":"廃プラスチック","price":28,"unit":"㎏","note":""}],"(有)まるとも産業":[{"item":"廃棄物収集運搬","price":6500,"unit":"㎥","note":""},{"item":"テレビ","price":6000,"unit":"台","note":""}]},"zairyo":{"朝日生コンクリート工業":[{"item":"生コン","price":18120,"unit":"㎥","note":"18-8-20-Ｎ"},{"item":"生コン","price":16240,"unit":"㎥","note":"18-15-20-Ｎ"}],"出雲土建":[{"item":"ＲＣ40","price":1500,"unit":"㎥","note":""}],"掛合運送 ★真砂土・現場渡しは都度確認":[{"item":"真砂土","price":3500,"unit":"2ｔ","note":"土場渡し・江田"},{"item":"真砂土","price":5600,"unit":"3ｔ","note":"土場渡し・江田"},{"item":"真砂土","price":6700,"unit":"4ｔ","note":"土場渡し・江田"},{"item":"幸和真砂土","price":5000,"unit":"3ｔ","note":""}],"共栄採石":[{"item":"下水道用砂","price":1800,"unit":"㎥","note":""},{"item":"クラッシャーラン30下","price":3100,"unit":"㎥","note":"1.3㎥"},{"item":"クラッシャーラン","price":2100,"unit":"㎥","note":"C-40"},{"item":"ダスト","price":1700,"unit":"㎥","note":""},{"item":"1505.0","price":2700,"unit":"㎥","note":""}],"協同商事 割増分要確認!!":[{"item":"生コン","price":21640,"unit":"4ｔ指定","note":"18-15-20-N"},{"item":"生コン","price":18280,"unit":"2ｔ指定","note":"16-15-20-N"},{"item":"生コン","price":19110,"unit":"4ｔ指定","note":"24-15-20-N"},{"item":"生コン","price":19610,"unit":"2ｔ指定","note":"24-15-20-N"},{"item":"生コン","price":19000,"unit":"","note":"21-15-20-N"},{"item":"生コン","price":17610,"unit":"","note":"24-15-20-N"}],"ケイナン":[{"item":"砕石4020","price":5500,"unit":"1㎥","note":""},{"item":"砕石2005A（石灰岩）","price":43500,"unit":"台","note":"7㎥"},{"item":"砕石2005A（石灰岩）","price":4000,"unit":"1㎥","note":""},{"item":"クラッシャーランC-30","price":2300,"unit":"1㎥","note":""},{"item":"庭園砂利","price":3500,"unit":"t","note":""},{"item":"砂運搬","price":20000,"unit":"台","note":"3台/60000"}],"越野組":[{"item":"真砂土","price":2600,"unit":"㎥","note":"2㎥ 5,200"},{"item":"真砂土","price":1533,"unit":"t","note":""},{"item":"真砂T","price":1733,"unit":"t","note":""},{"item":"ＲＣ40","price":1133,"unit":"t","note":""}],"山陰酸素工業":[{"item":"アセチレン","price":3410,"unit":"㎏","note":""}],"山建プラント":[{"item":"ＲＣ白30","price":1300,"unit":"㎥","note":""},{"item":"ＲＣ白40","price":1500,"unit":"1㎥","note":""},{"item":"ＲＣ40","price":1000,"unit":"㎥","note":"4ｔ 1車（2.5㎥）"}],"新宮採石":[{"item":"ＲＣ30","price":1000,"unit":"","note":"軽トラ1台"},{"item":"Ｃ40","price":2200,"unit":"1㎥","note":"2ｔ1台"}],"大福工業":[{"item":"ＲＣ40","price":1500,"unit":"1㎥","note":""}],"田口資材":[{"item":"真砂土","price":2800,"unit":"2t","note":""}],"森山商事":[{"item":"真砂土","price":2000,"unit":"台","note":"軽トラ"},{"item":"真砂土","price":2500,"unit":"台","note":"1ｔ車"},{"item":"真砂土","price":6000,"unit":"台","note":"2ｔ車"},{"item":"真砂土","price":7000,"unit":"台","note":"3ｔ車"},{"item":"真砂土","price":8000,"unit":"台","note":"4ｔ車"},{"item":"佐官砂（ストック渡し）","price":2500,"unit":"軽トラ","note":""},{"item":"佐官砂（ストック渡し）","price":5000,"unit":"1ｔ車","note":""}],"前田道路":[{"item":"ＲＣ40","price":1200,"unit":"t","note":""}],"マルサワ":[{"item":"ブロック","price":140,"unit":"","note":"並 角 10ｃｍ"},{"item":"ブロック","price":167,"unit":"","note":"並 角 12ｃｍ"},{"item":"ブロック","price":210,"unit":"","note":"並 角 15ｃｍ"}],"山崎組（里方）":[{"item":"真砂持ち帰り","price":4200,"unit":"㎥","note":""},{"item":"真砂","price":6000,"unit":"4t","note":""},{"item":"RC40","price":2100,"unit":"2ｔ","note":""},{"item":"ＲＣ-40持ち帰り","price":1600,"unit":"㎥","note":""}],"和光産業":[{"item":"L形側溝 1種300","price":1400,"unit":"本","note":""},{"item":"ネダ木 L=1.0ｍ","price":200,"unit":"本","note":""}],"出雲採石":[{"item":"砕石（C-30）","price":8400,"unit":"㎥","note":"4ｔ 1台"}]},"lease":{"原商リース":[{"category":"重機","name":"3ｔ用フォーク","item":"単価","price":6000,"unit":"台","note":""},{"category":"重機","name":"3ｔ用フォーク","item":"基本料","price":1000,"unit":"台","note":""},{"category":"重機","name":"3ｔ用フォーク","item":"補償料","price":200,"unit":"台","note":""},{"category":"重機","name":"0.4-0.45ｍ3バックホー後方小旋クレーン付","item":"レンタル料","price":16000,"unit":"台","note":""},{"category":"重機","name":"0.4-0.45ｍ3バックホー後方小旋クレーン付","item":"基本料","price":2500,"unit":"","note":""},{"category":"重機","name":"0.4-0.45ｍ3バックホー後方小旋クレーン付","item":"補償料","price":500,"unit":"台","note":""},{"category":"重機","name":"エンジンチェンソー42㏄","item":"レンタル料","price":4500,"unit":"台","note":""},{"category":"重機","name":"エンジンチェンソー42㏄","item":"基本料","price":300,"unit":"","note":""},{"category":"重機","name":"エンジンチェンソー42㏄","item":"補償料","price":60,"unit":"台","note":""},{"category":"重機","name":"エンジンハンドカッター12インチ","item":"レンタル料","price":5000,"unit":"台","note":""},{"category":"重機","name":"エンジンハンドカッター12インチ","item":"基本料","price":200,"unit":"","note":""},{"category":"重機","name":"エンジンハンドカッター12インチ","item":"補償料","price":120,"unit":"台","note":""},{"category":"その他","name":"敷鉄板（5×10）","item":"レンタル料","price":80,"unit":"枚","note":""},{"category":"その他","name":"ストロングマット(1ｍ×2ｍ×10㎜)","item":"レンタル料","price":50,"unit":"枚","note":""},{"category":"その他","name":"エアホース","item":"レンタル料","price":100,"unit":"ｍ","note":""},{"category":"その他","name":"ノミ付","item":"レンタル料","price":1800,"unit":"台","note":""},{"category":"その他","name":"ノミ付","item":"補償料","price":300,"unit":"台","note":""},{"category":"その他","name":"8馬力ｴﾝｼﾞﾝﾊｲﾌﾟﾚｯｼｬｰ（防音型）","item":"レンタル料","price":4500,"unit":"台","note":""},{"category":"その他","name":"8馬力ｴﾝｼﾞﾝﾊｲﾌﾟﾚｯｼｬｰ（防音型）","item":"基本料","price":500,"unit":"台","note":""},{"category":"その他","name":"8馬力ｴﾝｼﾞﾝﾊｲﾌﾟﾚｯｼｬｰ（防音型）","item":"保証料","price":100,"unit":"台","note":""},{"category":"その他","name":"ソーラー式LEDチューブ","item":"レンタル料","price":16,"unit":"台","note":""},{"category":"その他","name":"ソーラー式LEDチューブ","item":"基本料","price":500,"unit":"台","note":""},{"category":"その他","name":"ソーラー式LEDチューブ","item":"保証料","price":0,"unit":"台","note":""},{"category":"その他","name":"LEDチューブ用ソーラーユニット","item":"レンタル料","price":20,"unit":"台","note":""},{"category":"その他","name":"LEDチューブ用ソーラーユニット","item":"基本料","price":600,"unit":"台","note":""},{"category":"その他","name":"LEDチューブ用ソーラーユニット","item":"保証料","price":0,"unit":"台","note":""}],"OKリース(最新)":[{"category":"ダンプ トラック","name":"フックロール","item":"レンタル料","price":160000,"unit":"台(月)","note":""},{"category":"ダンプ トラック","name":"フックロール","item":"サポート料","price":800,"unit":"台(日)","note":""},{"category":"ダンプ トラック","name":"フックロール","item":"冬季料","price":500,"unit":"台(日)","note":""},{"category":"重機","name":"フォーク SP3-60","item":"レンタル料","price":5000,"unit":"台","note":""},{"category":"重機","name":"フォーク SP3-60","item":"サポート料","price":30,"unit":"台","note":""},{"category":"重機","name":"バックホー(0.25)MLクレーン","item":"レンタル料","price":13000,"unit":"台","note":""},{"category":"重機","name":"バックホー(0.25)MLクレーン","item":"サポート料","price":600,"unit":"台","note":""},{"category":"重機","name":"ツース盤","item":"レンタル料","price":100,"unit":"台","note":""},{"category":"その他","name":"油圧ブレーカー","item":"レンタル料","price":6000,"unit":"台(日)","note":""},{"category":"その他","name":"油圧ブレーカー","item":"管理料","price":50,"unit":"台(日)","note":""},{"category":"その他","name":"E/Gカッター","item":"レンタル料","price":7000,"unit":"台(日)","note":""},{"category":"その他","name":"E/Gカッター","item":"補償料","price":50,"unit":"台(日)","note":""}],"OKリース":[{"category":"重 機","name":"VIO20バックフォー","item":"レンタル料","price":7000,"unit":"台","note":"軽油代かかる"},{"category":"重 機","name":"VIO20バックフォー","item":"サポート料","price":300,"unit":"台","note":""},{"category":"重 機","name":"VIO20バックフォー","item":"軽油代","price":150,"unit":"L","note":"軽油税含む"},{"category":"重 機","name":"ZX30Uバックホー","item":"レンタル料","price":8000,"unit":"台","note":""},{"category":"重 機","name":"ZX30Uバックホー","item":"サポート料","price":400,"unit":"台","note":""},{"category":"重 機","name":"ZX30Uバックホー","item":"軽油代","price":150,"unit":"L","note":"軽油税含む"},{"category":"重 機","name":"VIO30バックホー（月極）","item":"レンタル料","price":80000,"unit":"台","note":""},{"category":"重 機","name":"VIO30バックホー（月極）","item":"サポート料","price":300,"unit":"台","note":""},{"category":"重 機","name":"ZX35Uバックホー","item":"レンタル料","price":9000,"unit":"台","note":"軽油代かかる"},{"category":"重 機","name":"ZX35Uバックホー","item":"サポート料","price":400,"unit":"台","note":""},{"category":"重 機","name":"ZX35Uバックホー","item":"軽油代","price":150,"unit":"L","note":"軽油税含む"},{"category":"重 機","name":"ZX35Uバックホー（月極）","item":"レンタル料","price":90000,"unit":"台","note":""},{"category":"重 機","name":"ZX35Uバックホー（月極）","item":"サポート料","price":400,"unit":"台","note":""},{"category":"重 機","name":"VIO45バックフォー","item":"レンタル料","price":15000,"unit":"台","note":"軽油代かかる"},{"category":"重 機","name":"VIO45バックフォー","item":"サポート料","price":600,"unit":"台","note":""},{"category":"重 機","name":"VIO45バックフォー","item":"軽油代","price":150,"unit":"L","note":"軽油税含む"},{"category":"重 機","name":"フォーク","item":"レンタル料","price":3000,"unit":"台","note":""},{"category":"重 機","name":"フォーク","item":"サポート料","price":20,"unit":"台","note":""},{"category":"重 機","name":"U-20フォーク（月極）","item":"レンタル料","price":30000,"unit":"台","note":""},{"category":"重 機","name":"U-20フォーク（月極）","item":"サポート料","price":20,"unit":"台","note":""},{"category":"重 機","name":"U-30用フォーク（月極）","item":"レンタル料","price":40000,"unit":"台","note":""},{"category":"重 機","name":"U-30用フォーク（月極）","item":"サポート料","price":20,"unit":"台","note":""},{"category":"重 機","name":"ツース盤（平爪）","item":"レンタル料","price":50,"unit":"台","note":""},{"category":"重 機","name":"＃20・＃25ブレーカー","item":"レンタル料","price":6000,"unit":"台","note":""},{"category":"重 機","name":"＃20・＃25ブレーカー","item":"サポート料","price":50,"unit":"台","note":""},{"category":"重 機","name":"＃20・＃25ブレーカー（月極）","item":"レンタル料","price":60000,"unit":"台","note":""},{"category":"重 機","name":"＃20・＃25ブレーカー（月極）","item":"サポート料","price":50,"unit":"台","note":"一日"},{"category":"重 機","name":"＃30・＃45ブレーカー","item":"レンタル料","price":7000,"unit":"台","note":""},{"category":"重 機","name":"＃30・＃45ブレーカー","item":"サポート料","price":50,"unit":"台","note":""},{"category":"ダンプ トラック","name":"２ｔダンプカー","item":"レンタル料","price":8000,"unit":"台","note":""},{"category":"ダンプ トラック","name":"２ｔダンプカー","item":"サポート料","price":400,"unit":"台","note":""},{"category":"ダンプ トラック","name":"２ｔダンプカー","item":"軽油代","price":150,"unit":"L","note":"軽油税含む"},{"category":"ダンプ トラック","name":"２ｔダンプカー","item":"冬季料","price":300,"unit":"日","note":""},{"category":"ダンプ トラック","name":"４ｔダンプカー","item":"レンタル料","price":13000,"unit":"台","note":""},{"category":"ダンプ トラック","name":"４ｔダンプカー","item":"サポート料","price":700,"unit":"台","note":""},{"category":"ダンプ トラック","name":"４ｔダンプカー","item":"軽油代","price":150,"unit":"L","note":"軽油税含む"},{"category":"ダンプ トラック","name":"４ｔダンプカー","item":"冬季料","price":500,"unit":"日","note":""},{"category":"ダンプ トラック","name":"パワーゲート","item":"レンタル料","price":9000,"unit":"台","note":""},{"category":"ダンプ トラック","name":"パワーゲート","item":"サポート料","price":400,"unit":"台","note":""},{"category":"ダンプ トラック","name":"パワーゲート","item":"軽油代","price":150,"unit":"L","note":"軽油税含む"},{"category":"ダンプ トラック","name":"パワーゲート","item":"冬季料","price":300,"unit":"日","note":""},{"category":"ダンプ トラック","name":"パレットトラック","item":"レンタル料","price":1500,"unit":"台","note":""},{"category":"ダンプ トラック","name":"パレットトラック","item":"サポート料","price":50,"unit":"台","note":""}],"リース単価(汎用)":[{"category":"ダンプ トラック","name":"４ｔ（クレーン付き）","item":"レンタル料","price":20000,"unit":"台","note":""},{"category":"ダンプ トラック","name":"４ｔ（クレーン付き）","item":"補償料","price":700,"unit":"台","note":""},{"category":"ダンプ トラック","name":"４ｔ（クレーン付き）","item":"冬季料","price":500,"unit":"台","note":""},{"category":"ダンプ トラック","name":"3ｔ（セーフティーローダー）","item":"レンタル料","price":13000,"unit":"台","note":""},{"category":"ダンプ トラック","name":"3ｔ（セーフティーローダー）","item":"補償料","price":3000,"unit":"台","note":""},{"category":"ダンプ トラック","name":"２ｔ（深箱）","item":"レンタル料","price":10000,"unit":"台","note":""},{"category":"ダンプ トラック","name":"２ｔ（深箱）","item":"補償料","price":400,"unit":"台","note":""},{"category":"ダンプ トラック","name":"２ｔ","item":"レンタル料","price":8000,"unit":"台","note":""},{"category":"ダンプ トラック","name":"２ｔ","item":"補償料","price":400,"unit":"台","note":""},{"category":"ダンプ トラック","name":"２ｔ","item":"冬季料","price":300,"unit":"台","note":""},{"category":"重機","name":"2.0ｔ用フォーク","item":"レンタル料","price":4000,"unit":"台","note":""},{"category":"重機","name":"2.0ｔ用フォーク","item":"補償料","price":20,"unit":"台","note":""},{"category":"重機","name":"1.5ｔ用フォーク","item":"レンタル料","price":3000,"unit":"台","note":""},{"category":"重機","name":"1.5ｔ用フォーク","item":"補償料","price":20,"unit":"台","note":""},{"category":"重機","name":"ミニバックホー","item":"レンタル料","price":7000,"unit":"台","note":""},{"category":"重機","name":"ミニバックホー","item":"補償料","price":300,"unit":"台","note":""},{"category":"重機","name":"1.7ｔミニバックホー","item":"レンタル料","price":6000,"unit":"台","note":""},{"category":"重機","name":"1.7ｔミニバックホー","item":"補償料","price":300,"unit":"台","note":""},{"category":"重機","name":"キャリヤ Ｃ12Ｒ-Ｂ","item":"レンタル料","price":6000,"unit":"台","note":""},{"category":"重機","name":"キャリヤ Ｃ12Ｒ-Ｂ","item":"サポート料","price":100,"unit":"台","note":""},{"category":"その他","name":"立馬 勇馬18号","item":"レンタル料","price":250,"unit":"台","note":""},{"category":"その他","name":"立馬 勇馬18号","item":"管理料","price":5000,"unit":"台","note":""},{"category":"その他","name":"E/Gカッター","item":"レンタル料","price":7000,"unit":"台","note":""},{"category":"その他","name":"E/Gカッター","item":"補償料","price":50,"unit":"台","note":""},{"category":"その他","name":"電気ディスクグラインダー","item":"レンタル料","price":1000,"unit":"台","note":""},{"category":"その他","name":"エアホース","item":"レンタル料","price":500,"unit":"ｍ","note":""},{"category":"その他","name":"エアホース","item":"レンタル料","price":500,"unit":"ｍ","note":""},{"category":"その他","name":"エアホース","item":"レンタル料","price":500,"unit":"ｍ","note":""},{"category":"その他","name":"エアホース","item":"レンタル料","price":500,"unit":"ｍ","note":""},{"category":"その他","name":"エアホース","item":"レンタル料","price":500,"unit":"ｍ","note":""},{"category":"その他","name":"エアーブレーカー","item":"レンタル料","price":1500,"unit":"台","note":""},{"category":"その他","name":"エアーブレーカー","item":"補償料","price":20,"unit":"台","note":""},{"category":"その他","name":"エアチッパー","item":"レンタル料","price":1000,"unit":"台","note":""},{"category":"その他","name":"エアチッパー","item":"補償料","price":20,"unit":"台","note":""},{"category":"その他","name":"コンプレッサー（50PS）","item":"レンタル料","price":5000,"unit":"台","note":""},{"category":"その他","name":"コンプレッサー（50PS）","item":"補償料","price":300,"unit":"台","note":""},{"category":"その他","name":"コンプレッサー（25PS）","item":"レンタル料","price":4000,"unit":"台","note":""},{"category":"その他","name":"コンプレッサー（25PS）","item":"補償料","price":200,"unit":"台","note":""},{"category":"その他","name":"コンプレッサー（20PS）","item":"レンタル料","price":3500,"unit":"台","note":""},{"category":"その他","name":"コンプレッサー（20PS）","item":"補償料","price":200,"unit":"台","note":""},{"category":"その他","name":"コンプレッサー（14PS）","item":"レンタル料","price":3000,"unit":"台","note":""},{"category":"その他","name":"コンプレッサー（14PS）","item":"補償料","price":100,"unit":"台","note":""},{"category":"その他","name":"フレキヘッダー","item":"レンタル料","price":1500,"unit":"本","note":""},{"category":"その他","name":"フレキヘッダー","item":"補償料","price":20,"unit":"本","note":""},{"category":"その他","name":"高周波インバーター","item":"レンタル料","price":5000,"unit":"台","note":""},{"category":"その他","name":"高周波インバーター","item":"補償料","price":20,"unit":"台","note":""},{"category":"その他","name":"送風機","item":"レンタル料","price":2000,"unit":"台","note":""},{"category":"その他","name":"送風機","item":"補償料","price":20,"unit":"台","note":""},{"category":"その他","name":"電動ピック","item":"レンタル料","price":2000,"unit":"台","note":""},{"category":"その他","name":"電動ピック","item":"補償料","price":20,"unit":"台","note":""},{"category":"その他","name":"電動ハンマ","item":"レンタル料","price":2000,"unit":"台","note":""},{"category":"その他","name":"電動ハンマ","item":"補償料","price":20,"unit":"台","note":""},{"category":"その他","name":"高圧洗浄機（エンジン式）","item":"レンタル料","price":2500,"unit":"台","note":""},{"category":"その他","name":"高圧洗浄機（エンジン式）","item":"補償料","price":20,"unit":"台","note":""},{"category":"その他","name":"水タンク 200L","item":"レンタル料","price":400,"unit":"台","note":""},{"category":"その他","name":"ストロングマット","item":"レンタル料","price":40,"unit":"枚","note":""},{"category":"その他","name":"ストロングマット","item":"基本管理料","price":400,"unit":"枚","note":""},{"category":"その他","name":"ハンマードリル ＤＨ40ＳＥ","item":"レンタル料","price":2000,"unit":"台","note":""},{"category":"その他","name":"ハンマードリル ＤＨ40ＳＥ","item":"サポート","price":20,"unit":"台","note":""},{"category":"その他","name":"ハンマードリル用キリ","item":"レンタル料","price":3000,"unit":"台","note":""}]}};
+/* カテゴリ定義（クイック積算で使用） */
+var QE_CATEGORIES = [
+  {key:'shobunhi', name:'処分費', icon:'🗑️'},
+  {key:'zairyo',   name:'材料費', icon:'🧱'},
+  {key:'lease',    name:'リース', icon:'🚜'}
+];
+/* クイック積算の一時状態 */
+var QE = { cat:'shobunhi', vendor:'', qty:{} };
+
+/* ============================================================
+   LCC 原価管理アプリ
+   設計方針:
+   1) 見積=実行予算の母体（projects.estimate = 目標原価）
+   2) 原価は「日報(dailyReports)」と「請求書(invoices)」の2系統から集約
+   3) 現場は金額を入力せず、行動（人工・車両稼働・産廃台数）だけをタップ入力
+   データは LocalStorage に保存（キー: lcc_cost_v2）
+   ============================================================ */
+
+/* ---------- 費目（原価カテゴリ）の定義 ---------- */
+/* labor=労務費, vehicle=車両費, disposal=処分費, subcon=外注費, material=材料費 */
+var COST_LABELS = {
+  labor:    '労務費',
+  vehicle:  '車両費',
+  disposal: '処分費',
+  subcon:   '外注費',
+  material: '材料費'
+};
+/* 請求書の費目選択肢（仕様: 外注費/材料費/処分費） */
+var INVOICE_TYPES = [
+  {key:'subcon',   name:'外注費'},
+  {key:'material', name:'材料費'},
+  {key:'disposal', name:'処分費'}
+];
+
+/* ---------- 職種（人工） ---------- */
+var WORKER_KINDS = ['解体作業員','普通作業員','軽作業員','重機オペ'];
+/* ---------- 車両種別 ---------- */
+var VEHICLE_KINDS = ['ダンプ','バン','軽トラ','重機回送'];
+
+/* ---------- 状態 ---------- */
+var DB = {
+  /* 案件＝実行予算の母体 */
+  /* sellTotal=税込売価, costBudget=見積原価(実行予算), budgetByType=費目別予算（見積から取込） */
+  projects: [],     // {id,name,status,estimate,sellTotal,costBudget,budgetByType,createdAt,fromCloud}
+  /* 日報（行動の記録）→ 原価を自動計算 */
+  dailyReports: [], // {id,projId,date,workers:[{kind,nin}],vehicles:[{kind,days}],wastes:[{kind,qty}],amounts:{labor,vehicle,disposal},memo}
+  /* 業者請求 */
+  invoices: [],     // {id,vendor,date,total,type,approved,lines:[{id,projId,amount}]}
+  /* 単価設定 */
+  settings: {
+    laborDailyRate: 15000,
+    vehicleDailyRate: 12000,
+    wasteRates: [
+      {kind:'混合廃材', unit:8000},
+      {kind:'木くず',   unit:5000},
+      {kind:'コンクリートがら', unit:6000},
+      {kind:'金属くず', unit:0},
+      {kind:'廃プラスチック', unit:7000}
+    ]
+  },
+  cloud: { gasUrl:'' }
+};
+var STORE_KEY = 'lcc_cost_v2';
+
+/* ---------- 保存/読込 ---------- */
+function load(){
+  try{
+    var raw = localStorage.getItem(STORE_KEY);
+    if(raw){
+      var d = JSON.parse(raw);
+      DB.projects     = d.projects||[];
+      /* 旧データ互換：sellTotal/costBudget/budgetByType が無い案件を補完 */
+      DB.projects.forEach(function(p){
+        if(p.costBudget==null) p.costBudget = num(p.estimate,0); // 見積原価＝実行予算
+        if(p.estimate==null)   p.estimate   = num(p.costBudget,0);
+        if(p.sellTotal==null)  p.sellTotal  = 0;                  // 税込売価（未取込は0）
+        if(!p.budgetByType)    p.budgetByType = {labor:0,vehicle:0,disposal:0,subcon:0,material:0};
+      });
+      DB.dailyReports = d.dailyReports||[];
+      DB.invoices     = d.invoices||[];
+      DB.cloud        = d.cloud||{gasUrl:''};
+      if(d.settings){
+        DB.settings.laborDailyRate   = num(d.settings.laborDailyRate, 15000);
+        DB.settings.vehicleDailyRate = num(d.settings.vehicleDailyRate, 12000);
+        if(Array.isArray(d.settings.wasteRates) && d.settings.wasteRates.length) DB.settings.wasteRates = d.settings.wasteRates;
+      }
+    }else{
+      seedDemo();
+      save();
+    }
+  }catch(e){ /* 破損時は初期状態のまま */ }
+}
+function save(){
+  // ★localStorage 例外ハンドリング：容量超過（QuotaExceeded）等を検知して警告
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(DB));
+  }catch(e){
+    if(e && (e.name==='QuotaExceededError' || /quota/i.test(e.name||'') || /quota/i.test(e.message||''))){
+      toast('保存容量が上限に達しました。古い日報・請求を整理するか、バックアップ後に不要データを削除してください','err');
+    }else{
+      toast('保存に失敗しました（ブラウザ設定を確認してください）','err');
+    }
+  }
+}
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+
+/* ---------- ユーティリティ ---------- */
+function uid(p){ return (p||'id')+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function num(v,def){ var n=parseFloat(v); return isNaN(n)?(def||0):n; }
+function yen(n){ n=Math.round(n||0); return '¥'+n.toLocaleString('ja-JP'); }
+function todayStr(){ var d=new Date(); var o=d.getTimezoneOffset(); d=new Date(d.getTime()-o*60000); return d.toISOString().slice(0,10); }
+function fmtDate(s){ s=safeDateStr(s); if(!s)return''; var p=String(s).split('-'); return (p[1]||'')+'/'+(p[2]||''); }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function findProj(id){ return DB.projects.find(function(p){return p.id===id;}); }
+
+/* ---------- 単価参照 ---------- */
+function laborRate(){ return num(DB.settings.laborDailyRate,15000); }
+function vehicleRate(){ return num(DB.settings.vehicleDailyRate,12000); }
+function wasteUnit(kind){
+  var w=DB.settings.wasteRates.find(function(x){return x.kind===kind;});
+  return w?num(w.unit,0):0;
+}
+
+/* ---------- 日報1件の金額を計算 ---------- */
+function calcDaily(dr){
+  var labor=0, vehicle=0, disposal=0;
+  (dr.workers||[]).forEach(function(w){ labor += num(w.nin,0)*laborRate(); });
+  (dr.vehicles||[]).forEach(function(v){ vehicle += num(v.days,0)*vehicleRate(); });
+  (dr.wastes||[]).forEach(function(z){ disposal += num(z.qty,0)*wasteUnit(z.kind); });
+  return {labor:labor, vehicle:vehicle, disposal:disposal, total:labor+vehicle+disposal};
+}
+
+/* ---------- 案件の実績原価を費目別に集約（日報＋請求書） ---------- */
+function projActualByType(projId){
+  var r={labor:0,vehicle:0,disposal:0,subcon:0,material:0};
+  /* 日報由来 */
+  DB.dailyReports.filter(function(d){return d.projId===projId;}).forEach(function(d){
+    var c=calcDaily(d);
+    r.labor+=c.labor; r.vehicle+=c.vehicle; r.disposal+=c.disposal;
+  });
+  /* 請求書由来（費目別／現場ごとの振り分け金額） */
+  DB.invoices.forEach(function(inv){
+    (inv.lines||[]).forEach(function(l){
+      if(l.projId===projId){
+        var t=inv.type||'subcon';
+        if(r[t]==null) r[t]=0;
+        r[t]+=num(l.amount,0);
+      }
+    });
+  });
+  return r;
+}
+function projActualTotal(projId){
+  var r=projActualByType(projId);
+  return r.labor+r.vehicle+r.disposal+r.subcon+r.material;
+}
+
+/* ============================================================
+   集計ヘルパー（月別／費目別／全社サマリー）― グラフ描画に使用
+   ============================================================ */
+/* 費目キーと表示名・CSSクラス（グラフ凡例で共通利用） */
+var EXP_TYPES=[
+  {key:'labor',    name:'労務費', cls:'c-labor'},
+  {key:'vehicle',  name:'車両費', cls:'c-vehicle'},
+  {key:'disposal', name:'処分費', cls:'c-disposal'},
+  {key:'subcon',   name:'外注費', cls:'c-subcon'},
+  {key:'material', name:'材料費', cls:'c-material'}
+];
+/* 全案件の実績原価を費目別に合計（請求書由来も含む） */
+function totalActualByType(){
+  var r={labor:0,vehicle:0,disposal:0,subcon:0,material:0};
+  DB.projects.forEach(function(p){
+    var bt=projActualByType(p.id);
+    EXP_TYPES.forEach(function(t){ r[t.key]+=bt[t.key]||0; });
+  });
+  return r;
+}
+/* 全社の合計実績原価 */
+function totalActual(){
+  var r=totalActualByType();
+  return r.labor+r.vehicle+r.disposal+r.subcon+r.material;
+}
+/* 全社の合計実行予算・合計売価 */
+function totalBudget(){ return DB.projects.reduce(function(s,p){return s+projBudget(p);},0); }
+function totalSell(){ return DB.projects.reduce(function(s,p){return s+projSell(p);},0); }
+/* 'YYYY-MM-DD' → 'YYYY-MM'（月キー）。不正値は ''（その他扱い） */
+function monthKey(dateStr){ var s=(dateStr||'').slice(0,7); return /^\d{4}-\d{2}$/.test(s)?s:''; }
+/* 'YYYY-MM' → '6月' / '2026年1月'（年が今年と異なれば年も表示） */
+function fmtMonth(mk){
+  if(!mk) return '日付なし';
+  var p=mk.split('-'); var y=+p[0], m=+p[1];
+  var thisYear=new Date().getFullYear();
+  return (y===thisYear? '' : y+'年') + m + '月';
+}
+/* 月別の実績原価合計（日報由来のみ：日付を持つのは日報のため）
+   → {monthKey: {labor,vehicle,disposal,total}} を返す */
+function actualByMonth(){
+  var map={};
+  DB.dailyReports.forEach(function(d){
+    var mk=monthKey(d.date);
+    var c=calcDaily(d);
+    if(!map[mk]) map[mk]={labor:0,vehicle:0,disposal:0,total:0};
+    map[mk].labor+=c.labor; map[mk].vehicle+=c.vehicle; map[mk].disposal+=c.disposal; map[mk].total+=c.total;
+  });
+  return map;
+}
+/* 月別合計を月キー昇順の配列で返す（直近 limit ヶ月のみ） */
+function monthlySeries(limit){
+  var map=actualByMonth();
+  var keys=Object.keys(map).filter(function(k){return k;}).sort();
+  if(limit && keys.length>limit) keys=keys.slice(keys.length-limit);
+  return keys.map(function(k){ return {month:k, label:fmtMonth(k), data:map[k]}; });
+}
+
+/* ---------- 信号機判定（消化率） ---------- */
+function signalOf(rate){
+  if(rate>=100) return 'red';
+  if(rate>=80)  return 'yellow';
+  return 'green';
+}
+
+/* ---------- 売価・粗利・予算 helper（連携強化） ---------- */
+/* 見積原価（実行予算）：costBudget を優先し、無ければ estimate を使う */
+function projBudget(p){ return num(p.costBudget!=null?p.costBudget:p.estimate, 0); }
+/* 税込売価 */
+function projSell(p){ return num(p.sellTotal, 0); }
+/* 消化率（実績÷予算×100） */
+function projRate(p){ var b=projBudget(p); return b>0?(projActualTotal(p.id)/b*100):0; }
+/* 粗利見込（税込売価 − 実績原価）。売価未取込は null */
+function projProfit(p){ var s=projSell(p); if(s<=0) return null; return s - projActualTotal(p.id); }
+/* 粗利率（粗利÷売価×100）。売価未取込は null */
+function projMargin(p){ var s=projSell(p); if(s<=0) return null; return (s-projActualTotal(p.id))/s*100; }
+/* 消化率80%超判定（赤信号フラグ） */
+function isOverBudget(p){ return projRate(p) >= 80; }
+function signalIcon(sig){
+  return sig==='red'?'🔴':(sig==='yellow'?'🟡':'🟢');
+}
+
+/* ---------- デモデータ ---------- */
+function seedDemo(){
+  var p1={id:uid('p'),name:'出雲市 平田町 木造解体',status:'着工',estimate:850000,createdAt:todayStr()};
+  var p2={id:uid('p'),name:'斐川町 庭木伐採・草刈り',status:'完工',estimate:180000,createdAt:todayStr()};
+  var p3={id:uid('p'),name:'大社町 駐車場 外構工事',status:'受注',estimate:1200000,createdAt:todayStr()};
+  DB.projects=[p1,p2,p3];
+  var d=todayStr();
+  DB.dailyReports=[
+    {id:uid('dr'),projId:p1.id,date:d,workers:[{kind:'解体作業員',nin:2}],vehicles:[{kind:'ダンプ',days:1}],wastes:[{kind:'混合廃材',qty:2}],memo:'山本・田中'},
+    {id:uid('dr'),projId:p2.id,date:d,workers:[{kind:'軽作業員',nin:2}],vehicles:[],wastes:[{kind:'木くず',qty:1}],memo:''}
+  ];
+  DB.invoices=[];
+}
+
+/* ============================================================
+   画面遷移（lccNav）
+   ============================================================ */
+var currentTab='projects'; /* 現在表示中のタブ（取込・取込後の再描画判定に使用） */
+function lccNav(tab){
+  currentTab=tab;
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  var el=document.getElementById('page-'+tab);
+  if(el) el.classList.add('active');
+  document.querySelectorAll('.nav button').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-tab')===tab);
+  });
+  if(tab==='projects') renderProjects();
+  if(tab==='report') renderReport();
+  if(tab==='daily'){ fillProjSelect('dr_proj'); ensureDate('dr_date'); renderDailyList(); }
+  if(tab==='invoice') renderInvoices();
+  if(tab==='match'){ fillProjSelect('mt_proj'); renderMatch(); }
+  if(tab==='quote') renderQuote();
+  if(tab==='settings') renderSettings();
+  window.scrollTo(0,0);
+}
+/* 現在タブを再描画（データ更新後の即反映用） */
+function refreshCurrentTab(){
+  if(currentTab==='projects') renderProjects();
+  else if(currentTab==='report') renderReport();
+  else if(currentTab==='daily'){ fillProjSelect('dr_proj'); renderDailyList(); }
+  else if(currentTab==='invoice') renderInvoices();
+  else if(currentTab==='match'){ fillProjSelect('mt_proj'); renderMatch(); }
+  else if(currentTab==='quote') renderQuote();
+  else if(currentTab==='settings') renderSettings();
+}
+/* タイムアウト付き fetch（GAS連携のハング防止）。ms 経過で abort */
+function fetchWithTimeout(url, opts, ms){
+  opts=opts||{};
+  if(typeof AbortController==='undefined'){ return fetch(url, opts); } /* 古い環境フォールバック */
+  var ctrl=new AbortController();
+  var timer=setTimeout(function(){ ctrl.abort(); }, ms||15000);
+  opts.signal=ctrl.signal;
+  return fetch(url, opts).finally(function(){ clearTimeout(timer); });
+}
+function ensureDate(id){ var el=document.getElementById(id); if(el && !el.value) el.value=todayStr(); }
+function fillProjSelect(selId){
+  var sel=document.getElementById(selId); if(!sel) return;
+  var cur=sel.value;
+  var html='<option value="">— 現場を選んでください —</option>';
+  DB.projects.forEach(function(p){ html+='<option value="'+p.id+'">'+esc(p.name)+'</option>'; });
+  sel.innerHTML=html;
+  if(cur) sel.value=cur;
+}
+
+/* ---------- トースト ---------- */
+var toastTimer=null;
+/* type: ''（通常 / 紺）, 'ok'（成功 / 緑）, 'err'（エラー / 赤）。エラーは少し長めに表示 */
+function toast(msg, type){
+  var t=safeGetEl('toast');
+  if(!t) return; // 要素が無ければ何もしない（null参照防止）
+  t.textContent=msg;
+  t.classList.remove('err','ok');
+  if(type==='err') t.classList.add('err');
+  else if(type==='ok') t.classList.add('ok');
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){ var tt=safeGetEl('toast'); if(tt) tt.classList.remove('show'); }, type==='err'?3200:1900);
+}
+
+/* ---------- モーダル ---------- */
+function openModal(html){
+  var box=safeGetEl('modalBox'), bg=safeGetEl('modalBg');
+  if(!box || !bg){ return; } // モーダル要素が無いときは何もしない
+  box.innerHTML=html;
+  bg.classList.add('open');
+  if(document.body) document.body.classList.add('modal-open');
+  box.scrollTop=0;
+}
+function closeModal(){
+  var bg=safeGetEl('modalBg');
+  if(bg) bg.classList.remove('open');
+  if(document.body) document.body.classList.remove('modal-open');
+}
+/* 背景クリックで閉じる（要素が存在するときだけ登録） */
+safeOn('modalBg','click',function(e){
+  if(e.target && e.target.id==='modalBg') closeModal();
+});
+
+/* ============================================================
+   集計ダッシュボード（renderReport）
+   依存ゼロ。HTML/CSS だけで横棒・積み上げ帯グラフを描画する。
+   【P0追加検収：Chart.js destroy対策について】
+   本画面のグラフは Chart.js を一切使用せず、innerHTML で div/CSS の棒を再描画する方式。
+   canvas も Chart インスタンスも存在しないため、再描画時は DOM が上書きされるだけで
+   Chart.js由来のメモリリークや「Canvas is already in use」エラーは原理的に発生しない。
+   （= destroy() 対策の必要ない設計。外部assets禁止の制約上もChart.jsを新規追加しない）
+   ============================================================ */
+function renderReport(){
+  var box=document.getElementById('reportBody');
+  if(!DB.projects.length){
+    box.innerHTML='<div class="empty"><div class="ico">📊</div><p>案件がありません。<br>案件を登録して日報を入力すると、ここに集計グラフが表示されます。</p></div>';
+    return;
+  }
+  var html='';
+  html+=reportKpiHtml();
+  html+=reportTypeStackHtml();
+  html+=reportProjBarsHtml();
+  html+=reportMonthlyHtml();
+  box.innerHTML=html;
+}
+
+/* --- KPIカード（全社サマリー） --- */
+function reportKpiHtml(){
+  var bud=totalBudget(), act=totalActual(), sell=totalSell();
+  var rate=bud>0?Math.round(act/bud*100):0;
+  var sig=signalOf(rate);
+  var rateColor= sig==='red'?'var(--red)':(sig==='yellow'?'#a36a00':'var(--green)');
+  /* 粗利見込（売価取込済の案件がある場合のみ意味を持つ） */
+  var profit=sell>0?(sell-act):null;
+  var marginPct=(sell>0)?Math.round((sell-act)/sell*100):null;
+  var over=DB.projects.filter(function(p){return signalOf(projRate(p))==='red';}).length;
+  var warn=DB.projects.filter(function(p){return signalOf(projRate(p))==='yellow';}).length;
+  var h='<div class="chart-card">'+
+    '<div class="chart-title">📈 全社サマリー</div>'+
+    '<div class="kpi" style="margin-bottom:10px">'+
+      '<div class="box"><div class="k">案件数</div><div class="v num">'+DB.projects.length+'</div></div>'+
+      '<div class="box"><div class="k">実行予算計</div><div class="v num" style="font-size:16px">'+yen(bud)+'</div></div>'+
+      '<div class="box"><div class="k">実績原価計</div><div class="v num" style="font-size:16px">'+yen(act)+'</div></div>'+
+    '</div>'+
+    '<div class="kpi" style="margin-bottom:0">'+
+      '<div class="box"><div class="k">全体消化率</div><div class="v num" style="color:'+rateColor+'">'+rate+'%</div></div>'+
+      (sell>0?'<div class="box"><div class="k">粗利見込計</div><div class="v num" style="font-size:16px;color:'+(profit<0?'var(--red)':'var(--green)')+'">'+yen(profit)+'</div></div>':'<div class="box"><div class="k">粗利見込</div><div class="v num" style="font-size:14px;color:var(--sub)">売価未取込</div></div>')+
+      '<div class="box"><div class="k">要注意案件</div><div class="v num" style="font-size:16px"><span style="color:var(--red)">'+over+'</span> / <span style="color:#a36a00">'+warn+'</span></div></div>'+
+    '</div>'+
+    (sell>0?'<div class="hint" style="margin:10px 0 0">要注意案件＝（🔴超過）/（🟡 80%超）。粗利率は約 '+marginPct+'%です。</div>':'<div class="hint" style="margin:10px 0 0">要注意案件＝（🔴超過）/（🟡 80%超）</div>')+
+  '</div>';
+  return h;
+}
+
+/* --- 費目別構成（積み上げ帯＋凡例） --- */
+function reportTypeStackHtml(){
+  var t=totalActualByType();
+  var total=EXP_TYPES.reduce(function(s,x){return s+(t[x.key]||0);},0);
+  var h='<div class="chart-card"><div class="chart-title">🧩 費目別構成（全社実績原価）</div>';
+  if(total<=0){
+    h+='<div class="empty" style="padding:16px">まだ実績原価がありません</div></div>';
+    return h;
+  }
+  /* 積み上げ帯 */
+  h+='<div class="stackbar">';
+  EXP_TYPES.forEach(function(x){
+    var v=t[x.key]||0; if(v<=0) return;
+    var w=(v/total*100);
+    h+='<div class="seg '+x.cls+'" style="width:'+w+'%" title="'+x.name+' '+yen(v)+'"></div>';
+  });
+  h+='</div>';
+  /* 凡例（金額・比率） */
+  h+='<div class="stack-legend">';
+  EXP_TYPES.forEach(function(x){
+    var v=t[x.key]||0; if(v<=0) return;
+    var pct=Math.round(v/total*100);
+    h+='<div class="lg"><span class="dot '+x.cls+'"></span>'+x.name+' <span class="amt">'+yen(v)+'（'+pct+'%）</span></div>';
+  });
+  h+='</div><div class="actline" style="border-top:2px solid var(--navy);margin-top:10px;border-bottom:none"><div class="al-l" style="font-weight:800">合計</div><div class="al-r num">'+yen(total)+'</div></div>';
+  h+='</div>';
+  return h;
+}
+
+/* --- 案件別消化率（横棒グラフ：高い順） --- */
+function reportProjBarsHtml(){
+  var rows=DB.projects.map(function(p){
+    return {name:p.name, rate:projRate(p), act:projActualTotal(p.id), bud:projBudget(p)};
+  }).sort(function(a,b){return b.rate-a.rate;});
+  var h='<div class="chart-card"><div class="chart-title">📊 案件別の予算消化率</div>';
+  rows.forEach(function(r){
+    var sig=signalOf(r.rate);
+    var cls=sig==='red'?'over':(sig==='yellow'?'warn':'ok');
+    var w=Math.min(100, r.rate);
+    var valColor=sig==='red'?'var(--red)':(sig==='yellow'?'#a36a00':'var(--green)');
+    h+='<div class="hbar">'+
+      '<div class="hb-head"><span class="hb-name">'+signalIcon(sig)+' '+esc(r.name)+'</span>'+
+        '<span class="hb-val" style="color:'+valColor+'">'+Math.round(r.rate)+'%</span></div>'+
+      '<div class="hb-track"><span class="hb-fill '+cls+'" style="width:'+w+'%"></span></div>'+
+      '<div style="font-size:11px;color:var(--sub);margin-top:2px">実績 '+yen(r.act)+' / 予算 '+yen(r.bud)+'</div>'+
+    '</div>';
+  });
+  h+='</div>';
+  return h;
+}
+
+/* --- 月別推移（月ごとの原価を横棒で・費目を色別で積み上げ） --- */
+function reportMonthlyHtml(){
+  var series=monthlySeries(12);
+  var h='<div class="chart-card"><div class="chart-title">🗓️ 月別の原価推移（日報由来）</div>';
+  if(!series.length){
+    h+='<div class="empty" style="padding:16px">日報がまだありません</div></div>';
+    return h;
+  }
+  var max=series.reduce(function(m,s){return Math.max(m,s.data.total);},0)||1;
+  var monthTypes=[{key:'labor',cls:'c-labor'},{key:'vehicle',cls:'c-vehicle'},{key:'disposal',cls:'c-disposal'}];
+  series.forEach(function(s){
+    var wTotal=(s.data.total/max*100);
+    h+='<div class="hbar">'+
+      '<div class="hb-head"><span class="hb-name">'+esc(s.label)+'</span><span class="hb-val">'+yen(s.data.total)+'</span></div>'+
+      '<div class="hb-track" style="background:#eef0f7">'+
+        '<div style="display:flex;height:100%;width:'+wTotal+'%">';
+    monthTypes.forEach(function(mt){
+      var v=s.data[mt.key]||0; if(v<=0||s.data.total<=0) return;
+      var seg=(v/s.data.total*100);
+      h+='<div class="'+mt.cls+'" style="width:'+seg+'%;height:100%"></div>';
+    });
+    h+='</div></div></div>';
+  });
+  /* 凡例 */
+  h+='<div class="stack-legend" style="margin-top:10px">'+
+    '<div class="lg"><span class="dot c-labor"></span>労務費</div>'+
+    '<div class="lg"><span class="dot c-vehicle"></span>車両費</div>'+
+    '<div class="lg"><span class="dot c-disposal"></span>処分費</div>'+
+  '</div>'+
+  '<div class="hint" style="margin:8px 0 0">※ 月別推移は日付を持つ「日報」の原価（労務・車両・処分）を集計しています。請求書の外注・材料は含みません。</div>';
+  h+='</div>';
+  return h;
+}
+
+/* ============================================================
+   ① 案件一覧
+   ============================================================ */
+function renderProjects(){
+  var alerts=document.getElementById('projAlerts');
+  var list=document.getElementById('projList');
+
+  if(!DB.projects.length){
+    alerts.innerHTML='';
+    list.innerHTML='<div class="empty"><div class="ico">📋</div><p>案件がありません。<br>設定タブの「見積から取り込む」か、下のボタンで登録してください。</p>'+
+      '<button class="btn btn-orange" style="margin-top:10px" onclick="openProjModal()">＋ 案件を手動で登録</button></div>';
+    return;
+  }
+
+  /* アラート集計 */
+  var red=[], yellow=[];
+  DB.projects.forEach(function(p){
+    var b=projBudget(p);
+    var act=projActualTotal(p.id);
+    var rate=b>0?(act/b*100):0;
+    var sig=signalOf(rate);
+    if(sig==='red') red.push(p);
+    else if(sig==='yellow') yellow.push(p);
+  });
+  var ah='';
+  if(red.length) ah+='<div class="alert alert-red"><span class="signal">🔴</span>予算オーバー '+red.length+'件：'+esc(red.map(function(p){return p.name;}).join('、'))+'</div>';
+  if(yellow.length) ah+='<div class="alert alert-yellow"><span class="signal">🟡</span>予算消化80%超 '+yellow.length+'件：もうすぐ上限です</div>';
+  ah+='<button class="btn btn-orange btn-block" style="margin-bottom:14px;" onclick="openProjModal()">＋ 新しい案件を登録</button>';
+  alerts.innerHTML=ah;
+
+  /* カード */
+  var html='';
+  DB.projects.forEach(function(p){
+    var bud=projBudget(p);
+    var act=projActualTotal(p.id);
+    var rate=bud>0?(act/bud*100):0;
+    var sig=signalOf(rate);
+    var diff=bud-act;
+    var barW=Math.min(100,rate);
+    var barCls=sig==='red'?'over':(sig==='yellow'?'warn':'');
+    /* 売価・粗利見込（見積から取込んだ売価がある場合のみ表示） */
+    var sell=projSell(p), profit=projProfit(p), margin=projMargin(p);
+    var profitLine='';
+    if(sell>0){
+      var pc = profit<0 ? 'var(--red)' : 'var(--green)';
+      profitLine='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:12px">'+
+        '<span style="color:#666">売価（税込） <b style="color:var(--navy)">'+yen(sell)+'</b></span>'+
+        '<span style="color:#666">粗利見込 <b style="color:'+pc+'">'+yen(profit)+'</b>（'+Math.round(margin)+'%）</span>'+
+      '</div>';
+    }
+    html+='<div class="proj sig-'+sig+'" onclick="openProjModal(\''+p.id+'\')">'+
+      '<div class="top">'+
+        '<div class="name"><span class="signal">'+signalIcon(sig)+'</span> '+esc(p.name)+'</div>'+
+        '<span class="chip chip-navy">'+esc(p.status||'')+'</span>'+
+      '</div>'+
+      '<div class="proj-figs">'+
+        '<div class="f"><div class="k">実行予算</div><div class="v num">'+yen(bud)+'</div></div>'+
+        '<div class="f"><div class="k">実績原価</div><div class="v num">'+yen(act)+'</div></div>'+
+        '<div class="f"><div class="k">残り</div><div class="v num '+(diff<0?'neg':'pos')+'">'+yen(diff)+'</div></div>'+
+      '</div>'+
+      '<div class="proj-bar"><i class="'+barCls+'" style="width:'+barW+'%"></i></div>'+
+      '<div style="text-align:right;font-size:13px;font-weight:700;margin-top:6px;color:'+(sig==='red'?'var(--red)':(sig==='yellow'?'#a36a00':'var(--green)'))+'">消化率 '+Math.round(rate)+'%</div>'+
+      profitLine+
+    '</div>';
+  });
+  list.innerHTML=html;
+}
+
+/* ---------- 案件 登録/編集/明細 モーダル ---------- */
+var STATUS=['見積','受注','着工','完工','請求済'];
+function openProjModal(id){
+  var p=id?findProj(id):null;
+  var isEdit=!!p;
+  var statusOpts=STATUS.map(function(s){return '<option value="'+s+'"'+(p&&p.status===s?' selected':'')+'>'+s+'</option>';}).join('');
+  var detail='';
+  if(isEdit){
+    var bt=projActualByType(p.id);
+    var act=bt.labor+bt.vehicle+bt.disposal+bt.subcon+bt.material;
+    var rows='';
+    ['labor','vehicle','disposal','subcon','material'].forEach(function(k){
+      if(bt[k]>0) rows+='<div class="actline"><div class="al-l">'+COST_LABELS[k]+'</div><div class="al-r num">'+yen(bt[k])+'</div></div>';
+    });
+    if(!rows) rows='<div class="empty" style="padding:16px">まだ原価がありません</div>';
+    /* 売価・粗利見込サマリ（見積から取込んだ売価がある場合） */
+    var mSell=projSell(p), mProfit=projProfit(p), mMargin=projMargin(p), mRate=projRate(p);
+    var mSig=signalOf(mRate);
+    var profitCard='';
+    if(mSell>0){
+      var mc = mProfit<0?'var(--red)':'var(--green)';
+      profitCard='<div class="sec-title">売上・粗利見込</div>'+
+        '<div class="card flat" style="border:1px solid var(--line)">'+
+          '<div class="actline"><div class="al-l">税込売価</div><div class="al-r num">'+yen(mSell)+'</div></div>'+
+          '<div class="actline"><div class="al-l">見積原価（予算）</div><div class="al-r num">'+yen(projBudget(p))+'</div></div>'+
+          '<div class="actline"><div class="al-l">実績原価</div><div class="al-r num">'+yen(act)+'</div></div>'+
+          '<div class="actline" style="border-top:2px solid var(--navy);margin-top:4px"><div class="al-l" style="font-weight:800">粗利見込（売価−実績）</div><div class="al-r num" style="font-weight:800;color:'+mc+'">'+yen(mProfit)+'（'+Math.round(mMargin)+'%）</div></div>'+
+          (mSig!=='green'?'<div class="alert '+(mSig==='red'?'alert-red':'alert-yellow')+'" style="margin:8px 0 0"><span class="signal">'+signalIcon(mSig)+'</span>'+(mSig==='red'?'予算を超過しています（消化率'+Math.round(mRate)+'%）':'消化率80%超（'+Math.round(mRate)+'%）')+'</div>':'')+
+        '</div>';
+    }
+    detail=profitCard+'<div class="sec-title">実績原価の内訳（日報＋請求書）</div>'+
+      '<div class="card flat" style="border:1px solid var(--line)">'+rows+
+      '<div class="actline" style="border-top:2px solid var(--navy);margin-top:4px"><div class="al-l" style="font-weight:800">合計</div><div class="al-r num">'+yen(act)+'</div></div></div>';
+  }
+  openModal(
+    '<div class="modal-head"><span class="mh-title">'+(isEdit?'案件の詳細':'新しい案件')+'</span><button class="close" onclick="closeModal()">×</button></div>'+
+    '<label class="fld"><span class="lbl">案件名（現場名）</span><input type="text" id="pm_name" value="'+(p?esc(p.name):'')+'" placeholder="例）出雲市 平田町 木造解体"></label>'+
+    '<div class="row2">'+
+      '<label class="fld"><span class="lbl">ステータス</span><select id="pm_status">'+statusOpts+'</select></label>'+
+      '<label class="fld"><span class="lbl">実行予算（見積原価・円）</span><input type="number" id="pm_est" inputmode="numeric" value="'+(p?projBudget(p):'')+'" placeholder="0"></label>'+
+    '</div>'+
+    (isEdit&&p.fromCloud?'<div class="hint">この案件は見積システムから取り込まれています。予算は見積の再取込で更新されます。</div>':'')+
+    '<button class="btn btn-primary btn-block btn-lg" onclick="saveProj('+(isEdit?'\''+p.id+'\'':'null')+')">保存する</button>'+
+    detail+
+    (isEdit?'<button class="btn btn-red btn-block" style="margin-top:12px" onclick="delProj(\''+p.id+'\')">この案件を削除</button>':'')
+  );
+}
+function saveProj(id){
+  var name=(document.getElementById('pm_name').value||'').trim();
+  var status=document.getElementById('pm_status').value;
+  var est=num(document.getElementById('pm_est').value,0);
+  if(!name){ toast('案件名を入力してください','err'); return; }
+  if(id){
+    var p=findProj(id); p.name=name; p.status=status; p.estimate=est; p.costBudget=est; /* costBudgetと同期 */
+  }else{
+    DB.projects.unshift({id:uid('p'),name:name,status:status,estimate:est,costBudget:est,sellTotal:0,budgetByType:{labor:0,vehicle:0,disposal:0,subcon:0,material:0},createdAt:todayStr()});
+  }
+  save(); closeModal(); renderProjects(); toast('保存しました','ok');
+}
+function delProj(id){
+  if(!confirm('この案件を削除します。関連する日報・請求書の紐付けも消えます。よろしいですか？')) return;
+  DB.projects=DB.projects.filter(function(p){return p.id!==id;});
+  DB.dailyReports=DB.dailyReports.filter(function(d){return d.projId!==id;});
+  DB.invoices.forEach(function(inv){ inv.lines=(inv.lines||[]).filter(function(l){return l.projId!==id;}); });
+  save(); closeModal(); renderProjects(); toast('削除しました','ok');
+}
+
+/* ============================================================
+   ② 日報入力
+   ============================================================ */
+function renderDailyList(){
+  var box=document.getElementById('dailyList');
+  var pid=document.getElementById('dr_proj').value;
+  var arr=DB.dailyReports.filter(function(d){ return pid? d.projId===pid : true; })
+    .slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+  if(!arr.length){
+    box.innerHTML='<div class="empty"><div class="ico">📝</div><p>日報がありません。<br>上のボタンから入力してください。</p></div>';
+    return;
+  }
+  var html='<div class="sec-title">入力済みの日報</div>';
+  arr.forEach(function(d){
+    var c=calcDaily(d);
+    var pj=findProj(d.projId);
+    var parts=[];
+    (d.workers||[]).forEach(function(w){ parts.push(w.kind+'×'+w.nin+'人工'); });
+    (d.vehicles||[]).forEach(function(v){ parts.push(v.kind+'×'+v.days+'台'); });
+    (d.wastes||[]).forEach(function(z){ parts.push(z.kind+'×'+z.qty); });
+    var memoHtml=d.memo?'<div style="font-size:12px;color:var(--sub);margin-top:2px">📝 '+esc(d.memo)+'</div>':'';
+    html+='<div class="card" style="padding:12px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+        '<div style="flex:1;min-width:0;cursor:pointer" onclick="openDailyModal(\''+d.id+'\')"><div style="font-weight:800">'+fmtDate(d.date)+'　'+esc(pj?pj.name:'(削除済み現場)')+'</div>'+
+          '<div style="font-size:13px;color:var(--sub);margin-top:4px">'+esc(parts.join(' / ')||'記録なし')+'</div>'+memoHtml+'</div>'+
+        '<div style="text-align:right;white-space:nowrap"><div class="num" style="font-weight:800;color:var(--navy)">'+yen(c.total)+'</div>'+
+          '<button class="btn btn-ghost" style="min-height:34px;padding:4px 12px;font-size:13px;margin-top:4px" onclick="openDailyModal(\''+d.id+'\')">✏️ 編集</button>'+
+          '<button class="del-x" onclick="delDaily(\''+d.id+'\')">×</button></div>'+
+      '</div></div>';
+  });
+  box.innerHTML=html;
+}
+function delDaily(id, fromModal){
+  if(!confirm('この日報を削除しますか？')) return;
+  DB.dailyReports=DB.dailyReports.filter(function(d){return d.id!==id;});
+  save();
+  if(fromModal){ closeModal(); DR.editId=null; }
+  renderDailyList(); toast('削除しました','ok');
+}
+
+/* 日報入力モーダルの一時状態。editId があれば編集モード */
+var DR={ workers:{}, vehicles:{}, wastes:{}, editId:null };
+/* 引数 editId を渡すとその日報を読み込んで編集。無ければ新規作成。 */
+function openDailyModal(editId){
+  var pid, date, editing=null;
+  if(editId){
+    editing=DB.dailyReports.find(function(d){return d.id===editId;});
+    if(!editing){ toast('対象の日報が見つかりません','err'); return; }
+    pid=editing.projId; date=editing.date||todayStr();
+  }else{
+    pid=document.getElementById('dr_proj').value;
+    date=document.getElementById('dr_date').value||todayStr();
+  }
+  if(!pid){ toast('先に現場を選んでください','err'); return; }
+  DR={ workers:{}, vehicles:{}, wastes:{}, editId:editId||null };
+  WORKER_KINDS.forEach(function(k){DR.workers[k]=0;});
+  VEHICLE_KINDS.forEach(function(k){DR.vehicles[k]=0;});
+  DB.settings.wasteRates.forEach(function(w){DR.wastes[w.kind]=0;});
+  /* 編集時は既存値を復元（マスタに無い種類は無視） */
+  if(editing){
+    (editing.workers||[]).forEach(function(w){ if(w.kind in DR.workers) DR.workers[w.kind]=num(w.nin,0); });
+    (editing.vehicles||[]).forEach(function(v){ if(v.kind in DR.vehicles) DR.vehicles[v.kind]=num(v.days,0); });
+    (editing.wastes||[]).forEach(function(z){ if(z.kind in DR.wastes) DR.wastes[z.kind]=num(z.qty,0); });
+  }
+  var pj=findProj(pid);
+  if(!pj){ toast('現場が見つかりません','err'); return; }
+
+  var workerHtml=WORKER_KINDS.map(function(k){ return stepperRow('w',k,DR.workers[k],'人工'); }).join('');
+  var vehicleHtml=VEHICLE_KINDS.map(function(k){ return stepperRow('v',k,DR.vehicles[k],'台'); }).join('');
+  var wasteHtml=DB.settings.wasteRates.map(function(w){ return stepperRow('z',w.kind,DR.wastes[w.kind],'台',w.unit); }).join('');
+
+  openModal(
+    '<div class="modal-head"><span class="mh-title">'+(DR.editId?'日報を編集':'日報入力')+'</span><button class="close" onclick="closeModal()">×</button></div>'+
+    '<div class="alert alert-navy" style="margin-bottom:14px"><span>📍</span>'+esc(pj.name)+'</div>'+
+    '<label class="fld"><span class="lbl">日付</span><input type="date" id="dr_modal_date" value="'+esc(date)+'"></label>'+
+    '<div class="sec-title">👷 人工（作業員の人数）</div>'+
+    '<div class="hint">1人工 ＝ '+yen(laborRate())+'</div>'+workerHtml+
+    '<div class="sec-title">🚚 車両の稼働（台数）</div>'+
+    '<div class="hint">1台 ＝ '+yen(vehicleRate())+'</div>'+vehicleHtml+
+    '<div class="sec-title">🗑️ 産業廃棄物（台数）</div>'+wasteHtml+
+    '<label class="fld" style="margin-top:14px"><span class="lbl">メモ（任意）</span><input type="text" id="dr_memo" value="'+esc((editing&&editing.memo)||'')+'" placeholder="作業員名・特記事項など"></label>'+
+    '<div class="card flat" style="border:2px solid var(--navy);background:#f7f8fc"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:800;color:var(--navy)">この日の原価合計</span><span class="num" id="dr_total" style="font-size:22px;font-weight:800;color:var(--navy)">¥0</span></div></div>'+
+    '<button class="btn btn-primary btn-block btn-lg" onclick="saveDaily(\''+pid+'\')">'+(DR.editId?'変更を保存する':'日報を保存する')+'</button>'+
+    (DR.editId?'<button class="btn btn-red btn-block" style="margin-top:10px" onclick="delDaily(\''+DR.editId+'\',true)">この日報を削除</button>':'')
+  );
+  updateDailyTotal();
+}
+function stepperRow(grp,kind,val,unitLabel,unitPrice){
+  var sub=unitPrice!=null?'<span style="font-size:12px;color:var(--sub)">（'+yen(unitPrice)+'/'+esc(unitLabel)+'）</span>':'';
+  // ★XSS対策：kind を onclick に埋め込まず、data-* 属性とイベント委譲で処理する。
+  // data-kind は esc() で属性値として安全化し、JS文字列リテラルへの注入を送本で防ぐ。
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
+    '<div style="flex:1;font-weight:700;font-size:15px">'+esc(kind)+' '+sub+'</div>'+
+    '<div class="stepper" style="width:180px">'+
+      '<button type="button" class="dr-step" data-grp="'+esc(grp)+'" data-kind="'+esc(kind)+'" data-delta="-1">−</button>'+
+      '<div class="val" id="st_'+grp+'_'+cssId(kind)+'">'+val+'</div>'+
+      '<button type="button" class="dr-step" data-grp="'+esc(grp)+'" data-kind="'+esc(kind)+'" data-delta="1">＋</button>'+
+    '</div></div>';
+}
+/* ステッパーの±ボタンはイベント委譲で処理（modalBoxに1回だけ登録）。
+   onclick に文字列を埋め込まないため XSS の余地がない。 */
+safeOn('modalBox','click',function(e){
+  var btn = e.target && e.target.closest ? e.target.closest('.dr-step') : null;
+  if(!btn) return;
+  var grp = btn.getAttribute('data-grp');
+  var kind = btn.getAttribute('data-kind');
+  var delta = parseInt(btn.getAttribute('data-delta'),10) || 0;
+  drStep(grp, kind, delta);
+});
+function cssId(s){ return s.replace(/[^a-zA-Z0-9]/g,function(c){return c.charCodeAt(0);}); }
+function drStep(grp,kind,delta){
+  var store=grp==='w'?DR.workers:(grp==='v'?DR.vehicles:DR.wastes);
+  var v=(store[kind]||0)+delta;
+  if(v<0) v=0;
+  store[kind]=v;
+  var el=document.getElementById('st_'+grp+'_'+cssId(kind));
+  if(el) el.textContent=v;
+  updateDailyTotal();
+}
+function updateDailyTotal(){
+  var labor=0,vehicle=0,disposal=0;
+  WORKER_KINDS.forEach(function(k){ labor+=(DR.workers[k]||0)*laborRate(); });
+  VEHICLE_KINDS.forEach(function(k){ vehicle+=(DR.vehicles[k]||0)*vehicleRate(); });
+  DB.settings.wasteRates.forEach(function(w){ disposal+=(DR.wastes[w.kind]||0)*num(w.unit,0); });
+  var el=document.getElementById('dr_total');
+  if(el) el.textContent=yen(labor+vehicle+disposal);
+}
+function saveDaily(pid){
+  var dateEl=document.getElementById('dr_modal_date');
+  var date=(dateEl&&dateEl.value)?dateEl.value:todayStr();
+  var workers=[],vehicles=[],wastes=[];
+  WORKER_KINDS.forEach(function(k){ if(DR.workers[k]>0) workers.push({kind:k,nin:DR.workers[k]}); });
+  VEHICLE_KINDS.forEach(function(k){ if(DR.vehicles[k]>0) vehicles.push({kind:k,days:DR.vehicles[k]}); });
+  DB.settings.wasteRates.forEach(function(w){ if(DR.wastes[w.kind]>0) wastes.push({kind:w.kind,qty:DR.wastes[w.kind]}); });
+  if(!workers.length && !vehicles.length && !wastes.length){ toast('人工・車両・産廃のいずれかを入力してください','err'); return; }
+  var memo=(document.getElementById('dr_memo').value||'').trim();
+  if(DR.editId){
+    /* 編集：既存レコードを上書き（idは維持） */
+    var d=DB.dailyReports.find(function(x){return x.id===DR.editId;});
+    if(!d){ toast('対象の日報が見つかりません','err'); return; }
+    d.projId=pid; d.date=date; d.workers=workers; d.vehicles=vehicles; d.wastes=wastes; d.memo=memo;
+  }else{
+    DB.dailyReports.push({id:uid('dr'),projId:pid,date:date,workers:workers,vehicles:vehicles,wastes:wastes,memo:memo});
+  }
+  save(); closeModal(); renderDailyList();
+  toast(DR.editId?'日報を更新しました':'日報を保存しました','ok');
+  DR.editId=null;
+}
+
+/* ============================================================
+   ③ 請求書仕分け
+   ============================================================ */
+function invLineSum(inv){ return (inv.lines||[]).reduce(function(s,l){return s+num(l.amount,0);},0); }
+function invIsBalanced(inv){ return Math.abs(invLineSum(inv)-num(inv.total,0))<1; }
+
+function renderInvoices(){
+  var box=document.getElementById('invoiceList');
+  if(!DB.invoices.length){
+    box.innerHTML='<div class="empty"><div class="ico">🧾</div><p>請求書がありません。<br>上のボタンから登録してください。</p></div>';
+    return;
+  }
+  var html='';
+  DB.invoices.slice().reverse().forEach(function(inv){
+    var bal=invIsBalanced(inv);
+    var typeName=(INVOICE_TYPES.find(function(t){return t.key===inv.type;})||{}).name||'';
+    html+='<div class="card" style="padding:14px;cursor:pointer" onclick="openInvoiceDetail(\''+inv.id+'\')">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+        '<div><div style="font-weight:800;font-size:16px">'+esc(inv.vendor)+'</div>'+
+          '<div style="font-size:13px;color:var(--sub);margin-top:2px">'+fmtDate(inv.date)+'　<span class="chip chip-gray">'+esc(typeName)+'</span></div></div>'+
+        '<div style="text-align:right;white-space:nowrap"><div class="num" style="font-weight:800;color:var(--navy)">'+yen(inv.total)+'</div>'+
+          (bal?'<span class="chip chip-green">仕分け完了</span>':'<span class="chip chip-red">未完了</span>')+'</div>'+
+      '</div></div>';
+  });
+  box.innerHTML=html;
+}
+
+function openInvoiceModal(){
+  var typeOpts=INVOICE_TYPES.map(function(t){return '<option value="'+t.key+'">'+t.name+'</option>';}).join('');
+  openModal(
+    '<div class="modal-head"><span class="mh-title">請求書を登録</span><button class="close" onclick="closeModal()">×</button></div>'+
+    '<label class="fld"><span class="lbl">業者名</span><input type="text" id="iv_vendor" placeholder="例）○○重機 / △△産廃"></label>'+
+    '<div class="row2">'+
+      '<label class="fld"><span class="lbl">請求日</span><input type="date" id="iv_date" value="'+todayStr()+'"></label>'+
+      '<label class="fld"><span class="lbl">請求総額（円）</span><input type="number" id="iv_total" inputmode="numeric" placeholder="0"></label>'+
+    '</div>'+
+    '<label class="fld"><span class="lbl">費目</span><select id="iv_type">'+typeOpts+'</select></label>'+
+    '<div class="hint">登録後、現場ごとに金額を振り分けます（合計が請求総額と一致するまで完了になりません）。</div>'+
+    '<button class="btn btn-primary btn-block btn-lg" onclick="saveInvoice()">登録して仕分けへ</button>'
+  );
+}
+function saveInvoice(){
+  var vendor=(document.getElementById('iv_vendor').value||'').trim();
+  var date=document.getElementById('iv_date').value||todayStr();
+  var total=num(document.getElementById('iv_total').value,0);
+  var type=document.getElementById('iv_type').value;
+  if(!vendor){ toast('業者名を入力してください','err'); return; }
+  if(total<=0){ toast('請求総額を入力してください','err'); return; }
+  var inv={id:uid('inv'),vendor:vendor,date:date,total:total,type:type,approved:false,lines:[]};
+  DB.invoices.push(inv); save();
+  openInvoiceDetail(inv.id);
+}
+
+function openInvoiceDetail(invId){
+  var inv=DB.invoices.find(function(x){return x.id===invId;});
+  if(!inv) return;
+  var lineSum=invLineSum(inv);
+  var remain=num(inv.total,0)-lineSum;
+  var bal=Math.abs(remain)<1;
+  var typeName=(INVOICE_TYPES.find(function(t){return t.key===inv.type;})||{}).name||'';
+
+  var linesHtml='';
+  if(inv.lines&&inv.lines.length){
+    inv.lines.forEach(function(l){
+      var projOpts='<option value="">▼ 現場を選ぶ</option>'+DB.projects.map(function(p){return '<option value="'+p.id+'"'+(l.projId===p.id?' selected':'')+'>'+esc(p.name)+'</option>';}).join('');
+      linesHtml+='<div class="card flat" style="border:1px solid var(--line);padding:12px">'+
+        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">'+
+          '<select style="flex:1" onchange="setLineProj(\''+inv.id+'\',\''+l.id+'\',this.value)">'+projOpts+'</select>'+
+          '<button class="del-x" onclick="delInvLine(\''+inv.id+'\',\''+l.id+'\')">×</button>'+
+        '</div>'+
+        '<div style="display:flex;gap:8px;align-items:center">'+
+          '<span style="font-size:13px;color:var(--sub);white-space:nowrap">金額</span>'+
+          '<input type="number" inputmode="numeric" value="'+(l.amount||'')+'" placeholder="0" onchange="setLineAmount(\''+inv.id+'\',\''+l.id+'\',this.value)" style="flex:1">'+
+        '</div></div>';
+    });
+  }else{
+    linesHtml='<div class="empty" style="padding:20px">「＋ 現場を追加」で振り分けを始めてください</div>';
+  }
+
+  var balBanner = bal
+    ? '<div class="alert alert-green"><span style="font-size:18px">✓</span>合計が一致しました（仕分け完了）</div>'
+    : '<div class="alert alert-yellow"><span style="font-size:18px">!</span>残り '+yen(remain)+' を振り分けてください</div>';
+
+  openModal(
+    '<div class="modal-head"><span class="mh-title">'+esc(inv.vendor)+'</span><button class="close" onclick="closeModal();renderInvoices()">×</button></div>'+
+    '<div class="kpi">'+
+      '<div class="box"><div class="k">請求総額</div><div class="v num" style="font-size:16px">'+yen(inv.total)+'</div></div>'+
+      '<div class="box"><div class="k">振分合計</div><div class="v num" style="font-size:16px">'+yen(lineSum)+'</div></div>'+
+      '<div class="box"><div class="k">残り</div><div class="v num '+(bal?'pos':'neg')+'" style="font-size:16px">'+yen(remain)+'</div></div>'+
+    '</div>'+
+    '<div class="hint">費目：<span class="chip chip-gray">'+esc(typeName)+'</span></div>'+
+    balBanner+
+    '<div class="sec-title">現場ごとの振り分け</div>'+
+    linesHtml+
+    '<button class="btn btn-ghost btn-block" style="margin-bottom:10px" onclick="addInvLine(\''+inv.id+'\')">＋ 現場を追加</button>'+
+    (remain>0?'<button class="btn btn-orange btn-block" style="margin-bottom:10px" onclick="addInvLineRemain(\''+inv.id+'\')">＋ 残り全額を1現場に振り分け</button>':'')+
+    '<div class="divline"></div>'+
+    '<button class="btn btn-primary btn-block btn-lg" onclick="closeModal();renderInvoices();lccNav(\'invoice\')">完了して一覧へ</button>'+
+    '<button class="btn btn-red btn-block" style="margin-top:10px" onclick="delInvoice(\''+inv.id+'\')">この請求書を削除</button>'
+  );
+}
+function addInvLine(invId){
+  var inv=DB.invoices.find(function(x){return x.id===invId;});
+  inv.lines.push({id:uid('ln'),projId:'',amount:0});
+  save(); openInvoiceDetail(invId);
+}
+function addInvLineRemain(invId){
+  var inv=DB.invoices.find(function(x){return x.id===invId;});
+  var remain=num(inv.total,0)-invLineSum(inv);
+  if(remain<=0){ toast('残りがありません','err'); return; }
+  inv.lines.push({id:uid('ln'),projId:'',amount:remain});
+  save(); openInvoiceDetail(invId);
+}
+function setLineProj(invId,lineId,projId){
+  var inv=DB.invoices.find(function(x){return x.id===invId;});
+  var l=inv.lines.find(function(x){return x.id===lineId;});
+  l.projId=projId; save();
+}
+function setLineAmount(invId,lineId,val){
+  var inv=DB.invoices.find(function(x){return x.id===invId;});
+  var l=inv.lines.find(function(x){return x.id===lineId;});
+  l.amount=num(val,0); save(); openInvoiceDetail(invId);
+}
+function delInvLine(invId,lineId){
+  var inv=DB.invoices.find(function(x){return x.id===invId;});
+  inv.lines=inv.lines.filter(function(x){return x.id!==lineId;});
+  save(); openInvoiceDetail(invId);
+}
+function delInvoice(id){
+  if(!confirm('この請求書を削除しますか？')) return;
+  DB.invoices=DB.invoices.filter(function(x){return x.id!==id;});
+  save(); closeModal(); renderInvoices(); toast('削除しました','ok');
+}
+
+/* ============================================================
+   ④ 突合せ
+   ============================================================ */
+function renderMatch(){
+  var box=document.getElementById('matchBody');
+  var pid=document.getElementById('mt_proj').value;
+  if(!pid){
+    box.innerHTML='<div class="empty"><div class="ico">⚖️</div><p>現場を選んでください。</p></div>';
+    return;
+  }
+  var p=findProj(pid);
+  var bt=projActualByType(pid);
+  var act=bt.labor+bt.vehicle+bt.disposal+bt.subcon+bt.material;
+  var budget=projBudget(p);
+  var rate=budget>0?(act/budget*100):0;
+  var sig=signalOf(rate);
+  var diff=budget-act;
+  /* 売価・粗利見込・粗利率（売価を見積から取込んだ場合のみ） */
+  var sell=projSell(p), profit=projProfit(p), margin=projMargin(p);
+  var sellHtml='';
+  if(sell>0){
+    var pcol = profit<0 ? 'var(--red)' : 'var(--green)';
+    sellHtml=
+      '<div class="sec-title">売上と粗利見込</div>'+
+      '<div class="card">'+
+        '<div class="proj-figs">'+
+          '<div class="f"><div class="k">税込売価</div><div class="v num">'+yen(sell)+'</div></div>'+
+          '<div class="f"><div class="k">実績原価</div><div class="v num">'+yen(act)+'</div></div>'+
+          '<div class="f"><div class="k">粗利見込</div><div class="v num" style="color:'+pcol+'">'+yen(profit)+'</div></div>'+
+        '</div>'+
+        '<div style="text-align:right;font-size:14px;font-weight:800;margin-top:8px;color:'+pcol+'">粗利率 '+Math.round(margin)+'%</div>'+
+      '</div>';
+  }
+
+  /* 予実バー（予算 vs 実績） */
+  var maxv=Math.max(budget,act,1);
+  var budgetW=Math.round(budget/maxv*100);
+  var actW=Math.round(act/maxv*100);
+  var actCls=sig==='red'?'over':(sig==='green'?'ok':'');
+  var cmp=
+    '<div class="sec-title">予算 vs 実績</div>'+
+    '<div class="card">'+
+      '<div class="cmp-row">'+
+        '<div class="cmp-head"><span>実行予算</span><span class="num">'+yen(budget)+'</span></div>'+
+        '<div class="cmp-bar"><span class="fillb fill-budget" style="width:'+budgetW+'%"></span><span class="lab">予算</span></div>'+
+        '<div class="cmp-head" style="margin-top:8px"><span>実績原価</span><span class="num">'+yen(act)+'</span></div>'+
+        '<div class="cmp-bar"><span class="fillb fill-actual '+actCls+'" style="width:'+actW+'%"></span><span class="lab">実績</span></div>'+
+      '</div>'+
+      '<div class="alert '+(sig==='red'?'alert-red':(sig==='yellow'?'alert-yellow':'alert-green'))+'" style="margin:6px 0 0">'+
+        '<span class="signal">'+signalIcon(sig)+'</span>'+
+        (sig==='red'?'⚠ 予算オーバー：'+yen(-diff)+' 超過（消化率'+Math.round(rate)+'%）':
+         sig==='yellow'?'⚠ 消化率80%超：残り '+yen(diff)+' （消化率'+Math.round(rate)+'%）―もうすぐ上限です':
+         '予算内：残り '+yen(diff)+'（消化率'+Math.round(rate)+'%）')+
+      '</div>'+
+    '</div>';
+
+  /* 費目別の内訳 */
+  var typeRows='';
+  ['labor','vehicle','disposal','subcon','material'].forEach(function(k){
+    if(bt[k]>0) typeRows+='<div class="actline"><div class="al-l">'+COST_LABELS[k]+'</div><div class="al-r num">'+yen(bt[k])+'</div></div>';
+  });
+  if(!typeRows) typeRows='<div class="empty" style="padding:16px">まだ原価がありません</div>';
+  var breakdown='<div class="sec-title">費目別の実績</div><div class="card flat" style="border:1px solid var(--line)">'+typeRows+'</div>';
+
+  /* 業者請求 vs 発注見込（この現場に紐づく請求書ごと） */
+  var vendorHtml=renderVendorMatch(pid);
+
+  box.innerHTML=sellHtml+cmp+breakdown+vendorHtml;
+}
+
+/* 業者請求 vs 発注見込（発注見込＝日報の処分費/車両費など現場実績を発注見込の目安として並列表示） */
+function renderVendorMatch(pid){
+  /* この現場に振り分けられた請求書明細を業者単位で集計 */
+  var byVendor={};
+  DB.invoices.forEach(function(inv){
+    var sum=0;
+    (inv.lines||[]).forEach(function(l){ if(l.projId===pid) sum+=num(l.amount,0); });
+    if(sum>0){
+      if(!byVendor[inv.vendor]) byVendor[inv.vendor]={vendor:inv.vendor,billed:0,type:inv.type,invIds:[]};
+      byVendor[inv.vendor].billed+=sum;
+      byVendor[inv.vendor].invIds.push(inv.id);
+    }
+  });
+  /* 発注見込＝同費目の日報実績（labor/vehicle/disposal）を目安に。請求費目がsubcon/materialは発注見込=0（日報に無いため）→日報の対応費目を見込として表示 */
+  var dailyByType={labor:0,vehicle:0,disposal:0};
+  DB.dailyReports.filter(function(d){return d.projId===pid;}).forEach(function(d){
+    var c=calcDaily(d); dailyByType.labor+=c.labor; dailyByType.vehicle+=c.vehicle; dailyByType.disposal+=c.disposal;
+  });
+
+  var keys=Object.keys(byVendor);
+  var rows='';
+  if(!keys.length){
+    rows='<div class="empty" style="padding:16px">この現場に紐づく業者請求はまだありません</div>';
+  }else{
+    keys.forEach(function(k){
+      var v=byVendor[k];
+      /* 発注見込：請求費目が日報対応(disposal/vehicle)なら日報実績、それ以外は請求額を見込とみなす */
+      var est=(v.type==='disposal')?dailyByType.disposal:((v.type==='vehicle')?dailyByType.vehicle:v.billed);
+      var diff=v.billed-est;
+      var diffRate=est>0?Math.abs(diff)/est*100:(v.billed>0?100:0);
+      var isDiff=diffRate>5 && est>0;
+      var typeName=(INVOICE_TYPES.find(function(t){return t.key===v.type;})||{}).name||'';
+      rows+='<div class="vrow'+(isDiff?' diff':'')+'">'+
+        '<div class="vtop"><span class="vname">'+esc(v.vendor)+'</span>'+
+          (isDiff?'<span class="chip chip-red">差異 '+Math.round(diffRate)+'%</span>':'<span class="chip chip-green">一致</span>')+'</div>'+
+        '<div class="vgrid">'+
+          '<div class="c"><div class="k">発注見込('+esc(typeName)+')</div><div class="v num">'+yen(est)+'</div></div>'+
+          '<div class="c"><div class="k">業者請求</div><div class="v num">'+yen(v.billed)+'</div></div>'+
+          '<div class="c"><div class="k">差額</div><div class="v num '+(diff>0?'neg':'pos')+'">'+yen(diff)+'</div></div>'+
+        '</div>'+
+        (isDiff?'<div style="font-size:12px;color:var(--red);margin-top:8px;font-weight:700">⚠ 差異が±5%を超えています。内容をご確認ください。</div>':'')+
+      '</div>';
+    });
+  }
+
+  /* 承認ロック：差異案件があると承認不可 */
+  var hasDiff=keys.some(function(k){
+    var v=byVendor[k];
+    var est=(v.type==='disposal')?dailyByType.disposal:((v.type==='vehicle')?dailyByType.vehicle:v.billed);
+    var diffRate=est>0?Math.abs(v.billed-est)/est*100:0;
+    return diffRate>5 && est>0;
+  });
+  var unbalanced=DB.invoices.some(function(inv){
+    var inThis=(inv.lines||[]).some(function(l){return l.projId===pid;});
+    return inThis && !invIsBalanced(inv);
+  });
+  var p=findProj(pid);
+  var approved=!!p.approved;
+
+  var lockHtml='<div class="sec-title">承認</div><div class="card">';
+  if(approved){
+    lockHtml+='<div class="alert alert-green" style="margin:0 0 10px"><span>🔒</span>この現場は承認済みです</div>'+
+      '<button class="btn btn-ghost btn-block" onclick="toggleApprove(\''+pid+'\',false)">承認を解除する</button>';
+  }else if(hasDiff || unbalanced){
+    lockHtml+='<div class="alert alert-red" style="margin:0 0 10px"><span>🚫</span>'+
+      (unbalanced?'未仕分けの請求書があります。':'')+
+      (hasDiff?'±5%超の差異があります。':'')+'解消するまで承認できません</div>'+
+      '<button class="btn btn-block" disabled>承認する（ロック中）</button>';
+  }else{
+    lockHtml+='<div class="alert alert-navy" style="margin:0 0 10px"><span>✅</span>差異はありません。承認できます</div>'+
+      '<button class="btn btn-green btn-block btn-lg" onclick="toggleApprove(\''+pid+'\',true)">この現場の原価を承認する</button>';
+  }
+  lockHtml+='</div>';
+
+  return '<div class="sec-title">業者請求 vs 発注見込</div>'+rows+lockHtml;
+}
+function toggleApprove(pid,val){
+  var p=findProj(pid); p.approved=val; save(); renderMatch();
+  toast(val?'承認しました':'承認を解除しました','ok');
+}
+
+/* ============================================================
+   ⑤ 設定
+   ============================================================ */
+function renderSettings(){
+  document.getElementById('set_labor').value   = DB.settings.laborDailyRate;
+  document.getElementById('set_vehicle').value = DB.settings.vehicleDailyRate;
+  document.getElementById('set_gas').value     = DB.cloud.gasUrl||'';
+  /* 産廃単価 */
+  var box=document.getElementById('wasteRateCard');
+  var html='';
+  DB.settings.wasteRates.forEach(function(w,i){
+    html+='<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">'+
+      '<div style="flex:1;font-weight:700;font-size:15px">'+esc(w.kind)+'</div>'+
+      '<input type="number" inputmode="numeric" value="'+w.unit+'" style="width:130px" onchange="saveWasteRate('+i+',this.value)">'+
+      '<span style="font-size:13px;color:var(--sub)">円/台</span></div>';
+  });
+  box.innerHTML=html;
+}
+function saveRate(key,val){
+  DB.settings[key]=num(val, key==='laborDailyRate'?15000:12000);
+  save(); toast('単価を保存しました','ok');
+}
+function saveWasteRate(idx,val){
+  DB.settings.wasteRates[idx].unit=num(val,0);
+  save(); toast('処分費単価を保存しました','ok');
+}
+function saveGasUrl(val){
+  DB.cloud.gasUrl=(val||'').trim();
+  save(); toast('GAS URLを保存しました','ok');
+}
+
+
+/* ============================================================
+   ★クイック積算（単価マスタ連動）
+   カテゴリ→取引先→項目一覧（数量入力で単価×数量を自動計算）
+   ============================================================ */
+function qeVendorList(cat){
+  /* カテゴリごとの取引先（キー）一覧を返す */
+  var src = PRICE_MASTER[cat] || {};
+  return Object.keys(src);
+}
+function qeItems(cat, vendor){
+  /* 指定カテゴリ・取引先の項目配列を返す（lease は name+item を結合表示） */
+  var src = (PRICE_MASTER[cat] || {})[vendor] || [];
+  if(cat==='lease'){
+    return src.map(function(r){
+      var label = (r.name? r.name+' / ':'') + r.item;
+      return {item:label, price:r.price, unit:r.unit, note:[r.category,r.note].filter(Boolean).join(' ')};
+    });
+  }
+  return src.map(function(r){
+    return {item:r.item, price:r.price, unit:r.unit, note:r.note||''};
+  });
+}
+function renderQuote(){
+  /* カテゴリ選択チップ */
+  var pick=document.getElementById('qe_cat_pick');
+  pick.innerHTML = QE_CATEGORIES.map(function(c){
+    return '<button class="'+(QE.cat===c.key?'on':'')+'" onclick="qeSelectCat(\''+c.key+'\')">'+c.icon+' '+c.name+'</button>';
+  }).join('');
+  /* 取引先セレクト */
+  fillQeVendorSelect();
+  /* 項目・合計リセット表示 */
+  renderQeItems();
+}
+function qeSelectCat(cat){
+  QE.cat=cat; QE.vendor=''; QE.qty={};
+  renderQuote();
+}
+function fillQeVendorSelect(){
+  var sel=document.getElementById('qe_vendor');
+  var list=qeVendorList(QE.cat);
+  /* 検索ボックスがあれば絞り込み */
+  var searchEl=document.getElementById('qe_vendor_search');
+  var kw=(searchEl?searchEl.value:'').trim().toLowerCase();
+  if(kw) list=list.filter(function(v){ return v.toLowerCase().indexOf(kw)>=0; });
+  var html='<option value="">— 取引先を選んでください —</option>';
+  if(!list.length) html+='<option value="" disabled>「'+esc(kw)+'」に一致する業者がありません</option>';
+  list.forEach(function(v){
+    var cnt=((PRICE_MASTER[QE.cat]||{})[v]||[]).length;
+    html+='<option value="'+esc(v)+'">'+esc(v)+'（'+cnt+'項目）</option>';
+  });
+  sel.innerHTML=html;
+  if(QE.vendor) sel.value=QE.vendor;
+}
+function qeSelectVendor(v){
+  QE.vendor=v; QE.qty={};
+  renderQeItems();
+}
+function renderQeItems(){
+  var box=document.getElementById('qe_items');
+  var totalCard=document.getElementById('qe_total_card');
+  if(!QE.vendor){
+    box.innerHTML='<div class="empty" style="padding:20px"><div class="ico">👆</div><p>カテゴリと取引先を選ぶと、<br>単価表がここに表示されます</p></div>';
+    totalCard.style.display='none';
+    return;
+  }
+  var items=qeItems(QE.cat, QE.vendor);
+  if(!items.length){
+    box.innerHTML='<div class="empty" style="padding:20px"><p>この取引先の単価データがありません</p></div>';
+    totalCard.style.display='none';
+    return;
+  }
+  var html='<div class="card"><div class="sec-title" style="margin-top:0">'+esc(QE.vendor)+' の単価表</div>';
+  items.forEach(function(it, i){
+    var unit=it.unit||'';
+    var noteHtml=it.note?'<div style="font-size:12px;color:var(--sub);margin-top:2px">'+esc(it.note)+'</div>':'';
+    var q=QE.qty[i]||0;
+    var sub=q>0?(it.price*q):0;
+    html+='<div style="border-bottom:1px solid var(--line);padding:10px 0">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+        '<div style="flex:1"><div style="font-weight:700;font-size:15px">'+esc(it.item)+'</div>'+
+          '<div style="font-size:13px;color:var(--navy);font-weight:700">'+yen(it.price)+(unit?' / '+esc(unit):'')+'</div>'+noteHtml+'</div>'+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:10px;margin-top:8px">'+
+        '<span style="font-size:13px;color:var(--sub);white-space:nowrap">数量</span>'+
+        '<input type="number" inputmode="decimal" min="0" step="any" value="'+(q||'')+'" placeholder="0" '+
+          'style="width:90px;min-height:46px;text-align:right" oninput="qeSetQty('+i+',this.value)">'+
+        (unit?'<span style="font-size:13px;color:var(--sub)">'+esc(unit)+'</span>':'')+
+        '<span style="flex:1;text-align:right;font-weight:800;font-size:16px;color:var(--navy)" id="qe_sub_'+i+'">'+(sub>0?yen(sub):'—')+'</span>'+
+      '</div>'+
+    '</div>';
+  });
+  html+='</div>';
+  box.innerHTML=html;
+  totalCard.style.display='block';
+  updateQeTotal();
+}
+function qeSetQty(i, val){
+  var n=parseFloat(val);
+  QE.qty[i]=isNaN(n)||n<0?0:n;
+  /* 小計だけ更新 */
+  var items=qeItems(QE.cat, QE.vendor);
+  var it=items[i];
+  var sub=(QE.qty[i]||0)*(it?it.price:0);
+  var el=document.getElementById('qe_sub_'+i);
+  if(el) el.textContent=sub>0?yen(sub):'—';
+  updateQeTotal();
+}
+function updateQeTotal(){
+  var items=qeItems(QE.cat, QE.vendor);
+  var total=0;
+  items.forEach(function(it,i){ total += (QE.qty[i]||0)*it.price; });
+  var el=document.getElementById('qe_total');
+  if(el) el.textContent=yen(total);
+}
+
+/* ============================================================
+   GAS連携（Googleスプレッドシート）
+   見積システムと同一仕様：
+   - pull: GET ?action=pull で案件＋見積原価(予算)を取得
+   - push: POST action=upsertExpenses（Content-Type:text/plain でCORS回避）
+   ============================================================ */
+function pullFromCloud(){
+  var url=(DB.cloud.gasUrl||'').trim();
+  if(!url){ toast('先にGAS URLを設定してください','err'); return; }
+  // ★https 強制：http は拒否し、GAS の正規 URL 形式を推奨
+  if(!/^https:\/\//.test(url)){ toast('GAS URLは https:// で始めてください（httpは使えません）','err'); return; }
+  toast('取り込み中…');
+  /* pullAll で Projects + Expenses を一括取得（見積システムと同じ仕様） */
+  fetchWithTimeout(url+(url.indexOf('?')>=0?'&':'?')+'action=pullAll', {}, 15000)
+    .then(function(r){
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.text();
+    })
+    .then(function(txt){
+      var data;
+      try{ data=JSON.parse(txt); }
+      catch(pe){ throw new Error('応答がJSONではありません（GASの公開設定・ログイン画面が返されている可能性）'); }
+      if(data && data.error){ throw new Error('GASエラー: '+data.error); }
+      var projects = data.projects || data.Projects || [];
+      if(!Array.isArray(projects)){ throw new Error('データ形式が不正です（projects配列がありません）'); }
+      if(!projects.length){ toast('取り込む案件がありませんでした','err'); return; }
+      var added=0, updated=0;
+      projects.forEach(function(rp){
+        var pid = rp.id || rp.ID;
+        if(!pid) return;
+        var exist = DB.projects.find(function(p){return p.id===pid;});
+        /* 見積原価（costBudget優先、無ければestimate） */
+        var budget = num(rp.costBudget!=null?rp.costBudget:(rp.estimate!=null?rp.estimate:rp.budget), 0);
+        /* 税込売価 */
+        var sell = num(rp.sellTotal, 0);
+        /* 費目別予算（見積から取込） */
+        var budgetByType = rp.budgetByType || {labor:0,vehicle:0,disposal:0,subcon:0,material:0};
+        if(exist){
+          exist.estimate = budget;      /* 後方互換 */
+          exist.costBudget = budget;    /* 新スキーマ */
+          exist.sellTotal = sell;
+          exist.budgetByType = budgetByType;
+          if(rp.name) exist.name=rp.name;
+          if(rp.status) exist.status=rp.status;
+          exist.fromCloud=true;
+          updated++;
+        }else{
+          DB.projects.unshift({
+            id:pid, name:rp.name||'(無名案件)', status:rp.status||'受注',
+            estimate:budget, costBudget:budget, sellTotal:sell, budgetByType:budgetByType,
+            createdAt:todayStr(), fromCloud:true
+          });
+          added++;
+        }
+      });
+      save();
+      refreshCurrentTab(); /* 現在タブを再描画して取込結果を即反映 */
+      toast('取込完了：新規'+added+'件・更新'+updated+'件','ok');
+    })
+    .catch(function(e){
+      var msg=(e&&e.message)||'';
+      if(/abort/i.test(msg)) toast('取込がタイムアウトしました（通信状態を確認）','err');
+      else toast('取込に失敗：'+(msg||'URL・公開設定を確認してください'),'err');
+    });
+}
+function pushToCloud(){
+  var url=(DB.cloud.gasUrl||'').trim();
+  if(!url){ toast('先にGAS URLを設定してください','err'); return; }
+  // ★https 強制：http は拒否
+  if(!/^https:\/\//.test(url)){ toast('GAS URLは https:// で始めてください（httpは使えません）','err'); return; }
+  if(!DB.projects.length){ toast('送信する案件がありません','err'); return; }
+  toast('送信中…');
+  /* 案件ごとの実績原価を費目別に集約して送信 */
+  /* 送信時刻（updatedAt）。GAS側 Expenses シートの updatedAt 列に入る */
+  var nowIso=new Date().toISOString();
+  var expenses=[];
+  DB.projects.forEach(function(p){
+    var bt=projActualByType(p.id);
+    var rate=projRate(p);
+    expenses.push({
+      projId:p.id, projName:p.name,
+      labor:bt.labor, vehicle:bt.vehicle, disposal:bt.disposal,
+      subcon:bt.subcon, material:bt.material,
+      total:bt.labor+bt.vehicle+bt.disposal+bt.subcon+bt.material,
+      overBudget: rate>=80,  /* 消化率80%超フラグ */
+      updatedAt:nowIso /* 更新日時を追加（projId をキーに1行へ上書き集約される） */
+    });
+  });
+  fetchWithTimeout(url,{
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify({action:'upsertExpenses', expenses:expenses})
+  }, 15000)
+  .then(function(r){
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.text();
+  })
+  .then(function(txt){
+    /* GASがJSONを返さない場合もあるため、パース失敗は警告にとどめる */
+    var res=null; try{ res=JSON.parse(txt); }catch(_){}
+    if(res && res.error){ throw new Error('GASエラー: '+res.error); }
+    toast('送信しました（'+expenses.length+'件）','ok');
+  })
+  .catch(function(e){
+    var msg=(e&&e.message)||'';
+    if(/abort/i.test(msg)) toast('送信がタイムアウトしました（通信状態を確認）','err');
+    else toast('送信に失敗：'+(msg||'URL・公開設定を確認してください'),'err');
+  });
+}
+
+/* ============================================================
+   データ管理（バックアップ／復元／消去）
+   ============================================================ */
+function exportData(){
+  var blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='lcc-genka-backup-'+todayStr()+'.json';
+  a.click();
+  // ★メモリリーク防止：生成した ObjectURL を解放する
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  toast('バックアップを書き出しました','ok');
+}
+function importData(ev){
+  var f=ev.target.files[0]; if(!f) return;
+  var rd=new FileReader();
+  rd.onerror=function(){ toast('ファイルの読み取りに失敗しました','err'); ev.target.value=''; };
+  rd.onload=function(){
+    var d;
+    try{ d=JSON.parse(rd.result); }
+    catch(e){ toast('JSONとして読み込めません（ファイルが破損している可能性）','err'); ev.target.value=''; return; }
+    /* 構造妥当性チェック：オブジェクトで、主要キーのいずれかを含むこと */
+    if(!d || typeof d!=='object' || Array.isArray(d) ||
+       (!('projects' in d) && !('dailyReports' in d) && !('invoices' in d) && !('settings' in d))){
+      toast('このファイルは原価管理のバックアップではないようです','err'); ev.target.value=''; return;
+    }
+    /* 配列キーは型も検証 */
+    if(('projects' in d) && !Array.isArray(d.projects)){ toast('projectsの形式が不正です','err'); ev.target.value=''; return; }
+    if(('dailyReports' in d) && !Array.isArray(d.dailyReports)){ toast('dailyReportsの形式が不正です','err'); ev.target.value=''; return; }
+    if(('invoices' in d) && !Array.isArray(d.invoices)){ toast('invoicesの形式が不正です','err'); ev.target.value=''; return; }
+    var cnt=(d.projects?d.projects.length:0)+'件の案件、'+(d.dailyReports?d.dailyReports.length:0)+'件の日報';
+    if(!confirm('現在のデータを、バックアップ（'+cnt+'）で上書きします。よろしいですか？')){ ev.target.value=''; return; }
+    try{
+      if(d.projects){ DB.projects=d.projects; }
+      if(d.dailyReports){ DB.dailyReports=d.dailyReports; }
+      if(d.invoices){ DB.invoices=d.invoices; }
+      // ★settings は既知キーのみを型チェックしてマージ（不明キーは取り込まない）
+      if(d.settings && typeof d.settings==='object'){
+        if(d.settings.laborDailyRate!=null)   DB.settings.laborDailyRate   = num(d.settings.laborDailyRate, DB.settings.laborDailyRate);
+        if(d.settings.vehicleDailyRate!=null) DB.settings.vehicleDailyRate = num(d.settings.vehicleDailyRate, DB.settings.vehicleDailyRate);
+        if(Array.isArray(d.settings.wasteRates) && d.settings.wasteRates.length) DB.settings.wasteRates = d.settings.wasteRates;
+      }
+      // ★cloud は gasUrl を https のときだけ取り込む（丸ごと置換しない）
+      if(d.cloud && typeof d.cloud==='object'){
+        var importedUrl=(d.cloud.gasUrl||'').trim();
+        if(/^https:\/\//.test(importedUrl)) DB.cloud.gasUrl=importedUrl;
+      }
+      save(); refreshCurrentTab(); toast('バックアップを読み込みました','ok');
+    }catch(e){ toast('取込中にエラーが発生しました','err'); }
+    ev.target.value='';
+  };
+  rd.readAsText(f);
+}
+function resetAll(){
+  if(!confirm('すべてのデータを消去します。元に戻せません。よろしいですか？')) return;
+  var url=DB.cloud.gasUrl;
+  localStorage.removeItem(STORE_KEY);
+  DB.projects=[]; DB.dailyReports=[]; DB.invoices=[];
+  DB.settings={laborDailyRate:15000,vehicleDailyRate:12000,wasteRates:[
+    {kind:'混合廃材',unit:8000},{kind:'木くず',unit:5000},{kind:'コンクリートがら',unit:6000},{kind:'金属くず',unit:0},{kind:'廃プラスチック',unit:7000}
+  ]};
+  DB.cloud={gasUrl:url||''};
+  save(); refreshCurrentTab(); toast('全データを消去しました','ok');
+}
+
+/* ============================================================
+   起動
+   ============================================================ */
+load();
+/* ============================================================
+   起動時の初期タブ判定
+   index.html の業務フローから #daily / #invoice / #match などで
+   遷移してきた場合、そのタブを開く（無ければ案件一覧）
+   ============================================================ */
+var VALID_TABS=['projects','report','quote','daily','invoice','match','settings'];
+var initTab=(location.hash||'').replace('#','');
+if(VALID_TABS.indexOf(initTab)<0) initTab='projects';
+lccNav(initTab);
+</script>
+</body>
+</html>
