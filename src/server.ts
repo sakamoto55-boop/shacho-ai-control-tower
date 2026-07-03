@@ -8,6 +8,7 @@ import { analyzeAndSaveMessage } from './jobs/analyzeIncomingMessages.js';
 import { generateAndSendReport } from './jobs/generateReports.js';
 import { createRepository } from './repositories/createRepository.js';
 import { createLineworksConnector, type LineworksWebhookPayload } from './connectors/lineworks.js';
+import { consoleHtml } from './web/consolePage.js';
 import { nowIso } from './utils/date.js';
 
 export const app = new Hono();
@@ -72,6 +73,13 @@ app.post('/dev/analyze-text', async (c) => {
   } catch (error) {
     return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
   }
+});
+
+app.get('/dev/console', (c) => {
+  if (!devEnabled()) {
+    return c.text('dev endpoints are disabled', 403);
+  }
+  return c.html(consoleHtml);
 });
 
 app.post('/dev/team-review', async (c) => {
