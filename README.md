@@ -118,6 +118,30 @@ curl -X POST http://localhost:8787/dev/analyze-and-save \
   }'
 ```
 
+### POST /dev/team-review
+
+任意の本文をAI分析し、さらに「会社運営チーム」（役割別AIエージェント）の合議レビューを保存せずに返します。
+
+会社運営チームは以下の役割別エージェントで構成されます。それぞれが自分の専門領域の観点だけで関連性・推奨対応を評価し、金額・契約・納期・謝罪・責任認定・外注費・労務・事故に関わる事項は必ず人間（社長）確認が必要と判定します（自動確定・自動送信はしません）。
+
+- 営業担当（sales）：見積・受注・失注
+- 工務担当（construction）：現場・工程・人員・資材
+- 業務サポート担当（backoffice）：入金・請求・支払
+- 協力会社対応担当（partner）：外注先・応援手配
+- リスク管理担当（risk_officer）：全メッセージを横断し、自動確定してはいけない事項を洗い出す
+- 社長室（president_office）：社長判断が必要な事項のエスカレーション
+
+```bash
+curl -X POST http://localhost:8787/dev/team-review \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "source":"lineworks",
+    "senderName":"工務部",
+    "roomName":"現場配置・緊急対応ルーム",
+    "text":"B現場で追加外注が必要。今日決めないと明日の作業が止まります。"
+  }'
+```
+
 ### GET /dev/inbox
 
 保存されたAI受信箱を返します。

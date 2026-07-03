@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { analyzeMessage } from './ai/analyzeMessage.js';
+import { reviewAsCompanyOperationsTeam } from './ai/team/companyOperationsTeam.js';
 import type { AnalyzeMessageInput, MessageSource, OriginalChannel } from './domain/types.js';
 import { analyzeAndSaveMessage } from './jobs/analyzeIncomingMessages.js';
 import { generateAndSendReport } from './jobs/generateReports.js';
@@ -68,6 +69,19 @@ app.post('/dev/analyze-text', async (c) => {
     const input = toAnalyzeInput(body);
     const result = await analyzeMessage(input);
     return c.json({ input, result });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+  }
+});
+
+app.post('/dev/team-review', async (c) => {
+  try {
+    requireDevEndpoint();
+    const body = (await c.req.json()) as DevAnalyzeBody;
+    const input = toAnalyzeInput(body);
+    const result = await analyzeMessage(input);
+    const team = reviewAsCompanyOperationsTeam(input.text, result);
+    return c.json({ input, result, team });
   } catch (error) {
     return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
   }

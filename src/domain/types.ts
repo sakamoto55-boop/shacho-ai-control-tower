@@ -192,3 +192,24 @@ export interface DailyReport {
   text: string;
   counts: ReportCounts;
 }
+
+/**
+ * 会社運営チームを構成する役割別AIエージェント。
+ * 'risk_officer'と'president_office'は担当者(OwnerType)ではなく、
+ * 全メッセージに目を通す横断的な役割として常に評価する。
+ */
+export type TeamRole = 'sales' | 'construction' | 'backoffice' | 'partner' | 'risk_officer' | 'president_office';
+
+export interface TeamRoleReview {
+  role: TeamRole;
+  relevant: boolean;
+  recommendation: string;
+  requiresPresident: boolean;
+  confidence: Confidence;
+}
+
+export interface CompanyOperationsTeamReview {
+  leadRole: OwnerType;
+  reviews: TeamRoleReview[];
+  teamSummary: string;
+}
