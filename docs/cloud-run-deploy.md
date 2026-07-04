@@ -4,7 +4,20 @@
 インターネット上（Google Cloud Run）に公開するための手順です。
 
 Phase 1の方針として、この手順は**必要になったときだけ**進めてください。
-実際にコマンドを実行する作業はパソコンが必要です（スマホだけではできません）。
+実際にコマンドを実行する作業はパソコンが必要です（スマホだけではできません。
+特にGoogleアカウントのログインをやり直す作業は、スマホのCloud Shellだと
+認証コードのコピーがうまくいかず失敗しやすいので、必ずパソコンのブラウザで
+行ってください）。
+
+## 現在の進捗（2026-07-04時点）
+
+- GCPプロジェクト：`lcc-morning-report`（組織: `lcc55.com`, 組織ID: `498916191164`）
+- Cloud Runサービスは**デプロイ済み**：`https://shacho-ai-control-tower-laxdn4yz3q-an.a.run.app`
+  （ブランチ `claude/company-operations-team-81933y` から `--source .` でビルド）
+- 合言葉（`CONSOLE_ACCESS_KEY`）: `88e2fe5104e7fc4f`
+- **残作業**：会社の組織ポリシー（Domain Restricted Sharing）が「誰でもアクセス可」設定を
+  ブロックしているため、まだ403 Forbiddenで開けない。下記「組織ポリシーでブロックされた場合」
+  の手順を、**パソコンのブラウザ**でCloud Shellを開いて実行すれば解決する見込み。
 
 ## 重要な注意点（先に読んでください）
 
@@ -74,3 +87,63 @@ https://shacho-ai-control-tower-xxxxx-an.a.run.app/dev/console?key=ここに秘�
 ## 再デプロイ（コードを更新したとき）
 
 ステップ3のコマンドをもう一度実行するだけです。
+
+## 組織ポリシーでブロックされた場合（`FAILED_PRECONDITION` / 403 Forbidden）
+
+`--allow-unauthenticated` でデプロイしても、会社のGoogle Cloud組織に
+「Domain Restricted Sharing」という制限がかかっていると、実際には
+`allUsers`（誰でもアクセス可）を設定できず、URLを開くと
+`Error: Forbidden` になることがある。以下のエラーが出た場合はこれが原因。
+
+```
+ERROR: (gcloud.run.services.add-iam-policy-binding) FAILED_PRECONDITION:
+One or more users named in the policy do not belong to a permitted customer,
+perhaps due to an organization policy.
+```
+
+対処：このプロジェクトだけ組織ポリシーの例外を設定する。
+**必ずパソコンのブラウザでCloud Shellを開いて**、以下を順番に実行する
+（`ORG_ID` は `gcloud organizations list` で確認できる。lcc55.comの場合は `498916191164`）。
+
+```bash
+# 1. 組織ポリシーを変更する権限を自分に付与（組織の管理者のみ実行可能）
+gcloud organizations add-iam-policy-binding ORG_ID \
+  --member="user:自分のメールアドレス" \
+  --role="roles/orgpolicy.policyAdmin"
+
+# 2. Organization Policy APIを有効化
+gcloud services enable orgpolicy.googleapis.com
+
+# 3. このプロジェクトだけ「allUsers」を許可する例外ポリシーを設定
+cat > /tmp/policy.yaml << 'EOF'
+name: projects/PROJECT_ID/policies/iam.allowedPolicyMemberDomains
+spec:
+  rules:
+  - allowAll: true
+EOF
+gcloud org-policies set-policy /tmp/policy.yaml
+
+# 4. あらためて公開設定
+gcloud run services add-iam-policy-binding SERVICE_NAME \
+  --region=REGION \
+  --member=allUsers \
+  --role=roles/run.invoker \
+  --condition=None
+
+# 5. 確認（allUsers / roles/run.invoker が表示されればOK）
+gcloud run services get-iam-policy SERVICE_NAME --region=REGION
+```
+
+### ハマりやすいポイント
+
+- IAMポリシーの変更コマンドは、既存の条件付きバインディングがあると
+  「[1]/[2]/[3]から選んでください」という対話プロンプトが出ることがある。
+  `--condition=None` を必ず付けて対話を回避する。
+- Cloud Shellは長時間放置したり、スマホアプリ経由で使うと認証が切れて
+  `You do not currently have an active account selected` になることがある。
+  その場合はCloud Shellを再起動するか、`gcloud auth login` をやり直す
+  （やり直す際は確認コードだけを貼り付け、他のコマンドと混ぜて貼り付けない）。
+- `gcloud organizations add-iam-policy-binding` は、実行するアカウントが
+  組織の管理者（`roles/resourcemanager.organizationAdmin`）である必要がある。
+  持っていない場合は `gcloud organizations get-iam-policy ORG_ID` で
+  誰が管理者か確認し、その人に依頼する。
