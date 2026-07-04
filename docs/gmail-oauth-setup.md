@@ -50,7 +50,27 @@
 5. 作成すると、**クライアントID**と**クライアントシークレット**が表示されます。
    この2つをメモしてください（`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` になります）。
 
-## ステップ4：リフレッシュトークンを取得する（OAuth 2.0 Playgroundを使用）
+## ステップ4：リフレッシュトークンを取得する
+
+パソコンが使える場合は、リポジトリ同梱のスクリプトを使う方法が確実です（推奨）。
+OAuth 2.0 Playgroundは「Use your own OAuth credentials」の設定が反映されず、
+Google共通の初期クライアントで認証してしまうことがあり、その場合Cloud Run側で
+認証エラーになります。
+
+### 方法A：ローカルスクリプトを使う（推奨、パソコンが必要）
+
+1. このリポジトリをパソコンにclone（または既にある場合はそのまま）
+2. ターミナルで以下を実行（`<CLIENT_ID>` `<CLIENT_SECRET>` はステップ3で取得した値に置き換える）
+
+   ```bash
+   node scripts/get-gmail-refresh-token.mjs <CLIENT_ID> <CLIENT_SECRET>
+   ```
+
+3. 表示されたURLをブラウザで開き、監視したいGmailアカウントでログイン・許可
+4. 許可すると自動的にターミナルに `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` /
+   `GOOGLE_REFRESH_TOKEN` の3行が表示されるので、そのまま次のステップ5で使う
+
+### 方法B：OAuth 2.0 Playgroundを使う（パソコンが無い場合）
 
 1. ブラウザで以下を開く
 
@@ -71,8 +91,11 @@
 7. 「Authorize APIs」をタップ
 8. 会社のGmailアカウント（`sakamoto55@lcc55.com` など、監視したいメールボックス）で
    ログイン・許可
-9. 「Step 2」の画面で **「Exchange authorization code for tokens」** をタップ
-10. 表示された **Refresh token** をコピー（これが `GOOGLE_REFRESH_TOKEN` になります）
+9. **認証後にリダイレクトされたURL、または「リクエスト/レスポンス」に表示されるURLの
+   `client_id=`が、ステップ3で作成した自分のクライアントIDと一致しているか必ず確認する**
+   （Googleの共通初期値`407408718192...`になっていた場合は、設定がやり直しになります）
+10. 「Step 2」の画面で **「Exchange authorization code for tokens」** をタップ
+11. 表示された **Refresh token** をコピー（これが `GOOGLE_REFRESH_TOKEN` になります）
 
 ## ステップ5：Cloud Runに環境変数を設定する
 
