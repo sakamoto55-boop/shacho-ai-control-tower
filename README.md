@@ -298,6 +298,9 @@ Cloud RunにはNode.js APIとしてデプロイします。Cloud Schedulerは以
 
 本番化前に、Cloud Schedulerからの認証、devエンドポイント無効化、LINE WORKS送信dry-run解除を行います。
 
+`/dev/console` をスマホからいつでも確認できるように公開したい場合の手順は
+[docs/cloud-run-deploy.md](./docs/cloud-run-deploy.md) を参照してください。
+
 ## セキュリティ注意事項
 
 - APIキー、秘密鍵、トークンは `.env` またはSecret Managerで管理します。
