@@ -50,4 +50,21 @@ describe('/dev/* CONSOLE_ACCESS_KEY protection', () => {
     });
     expect(res.status).toBe(401);
   });
+
+  it('rejects /jobs/fetch-messages without a key when CONSOLE_ACCESS_KEY is set', async () => {
+    process.env.CONSOLE_ACCESS_KEY = 'secret123';
+    const { app } = await import('../../src/server.js?with-key-4');
+    const res = await app.request('/jobs/fetch-messages', { method: 'POST' });
+    expect(res.status).toBe(401);
+  });
+
+  it('allows /jobs/fetch-messages with the correct x-console-key header', async () => {
+    process.env.CONSOLE_ACCESS_KEY = 'secret123';
+    const { app } = await import('../../src/server.js?with-key-5');
+    const res = await app.request('/jobs/fetch-messages', {
+      method: 'POST',
+      headers: { 'x-console-key': 'secret123' }
+    });
+    expect(res.status).toBe(200);
+  });
 });

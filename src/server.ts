@@ -1,10 +1,10 @@
 import 'dotenv/config';
 import { serve } from '@hono/node-server';
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 import { analyzeMessage } from './ai/analyzeMessage.js';
 import { reviewAsCompanyOperationsTeam } from './ai/team/companyOperationsTeam.js';
 import type { AnalyzeMessageInput, MessageSource, OriginalChannel } from './domain/types.js';
-import { analyzeAndSaveMessage } from './jobs/analyzeIncomingMessages.js';
+import { analyzeAndSaveMessage, analyzeIncomingMessages } from './jobs/analyzeIncomingMessages.js';
 import { generateAndSendReport } from './jobs/generateReports.js';
 import { createRepository } from './repositories/createRepository.js';
 import { createLineworksConnector, type LineworksWebhookPayload } from './connectors/lineworks.js';
@@ -53,10 +53,11 @@ function requireDevEndpoint() {
 }
 
 /**
- * CONSOLE_ACCESS_KEYが設定されている場合のみ、/dev/*への全リクエストにキー一致を要求する。
+ * CONSOLE_ACCESS_KEYが設定されている場合のみ、/dev/*と/jobs/*への全リクエストにキー一致を要求する。
  * 未設定の場合は既存のPhase 1ローカル動作（キー不要）を維持する。
+ * /webhooks/*はLINE WORKS等の外部サービスから直接呼ばれるため対象外。
  */
-app.use('/dev/*', async (c, next) => {
+const requireConsoleAccessKey: MiddlewareHandler = async (c, next) => {
   const requiredKey = process.env.CONSOLE_ACCESS_KEY;
   if (!requiredKey) {
     await next();
@@ -67,7 +68,10 @@ app.use('/dev/*', async (c, next) => {
     return c.text('unauthorized', 401);
   }
   await next();
-});
+};
+
+app.use('/dev/*', requireConsoleAccessKey);
+app.use('/jobs/*', requireConsoleAccessKey);
 
 app.get('/health', (c) =>
   c.json({
@@ -149,6 +153,15 @@ app.get('/dev/reply-drafts', async (c) => {
     requireDevEndpoint();
     const records = await repository.getReplyDraftsByDateRange();
     return c.json({ records });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+  }
+});
+
+app.post('/jobs/fetch-messages', async (c) => {
+  try {
+    const result = await analyzeIncomingMessages(repository);
+    return c.json(result);
   } catch (error) {
     return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
   }

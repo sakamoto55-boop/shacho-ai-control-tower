@@ -170,6 +170,10 @@ curl -X POST http://localhost:8787/dev/team-review \
 
 保存された返信下書きを返します。
 
+### POST /jobs/fetch-messages
+
+Gmailから最近の重要メール・未読メールを取得し、分析・保存します。`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`GOOGLE_REFRESH_TOKEN` が設定されていない場合は何も取得しません（`MockGmailConnector` が空配列を返します）。Cloud Schedulerから定期的に叩く想定です。
+
 ### POST /jobs/report/morning
 
 朝レポートを生成します。
@@ -261,11 +265,13 @@ kintoneは最初から社長が使う画面にせず、AI分析結果の台帳�
 
 `src/connectors/kintone.ts` にフィールドコード定数とpayload変換を置いています。正式接続時は `KintoneRepository` を実装します。
 
-## 将来的なGmail接続案
+## Gmail接続
 
-`src/connectors/gmail.ts` にConnector interfaceと正規化処理を置いています。
+`src/connectors/gmail.ts` にGmail API連携を実装済みです（追加ライブラリなし、標準の`fetch`のみ）。
 
-初期検索条件の候補：
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REFRESH_TOKEN` が設定されていれば `GmailApiConnector` が有効になり、未設定なら `MockGmailConnector`（何も取得しない）のままです。認証情報の取得手順は [docs/gmail-oauth-setup.md](./docs/gmail-oauth-setup.md) を参照してください。
+
+検索条件（`GMAIL_QUERY`）の初期候補：
 
 - `newer_than:1d`
 - `is:unread`

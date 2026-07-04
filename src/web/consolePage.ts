@@ -115,11 +115,19 @@ export const consoleHtml = `<!doctype html>
     </fieldset>
   </form>
 
+  <fieldset>
+    <label>Gmail連携（GOOGLE_CLIENT_ID等が設定されている場合のみ実際に取得します）</label>
+    <div class="buttons">
+      <button type="button" id="fetch-gmail-button" class="secondary">今すぐGmail取得を試す</button>
+    </div>
+  </fieldset>
+
   <div id="result"></div>
 
   <script>
     const form = document.getElementById('analyze-form');
     const resultEl = document.getElementById('result');
+    const fetchGmailButton = document.getElementById('fetch-gmail-button');
 
     function el(tag, props, children) {
       const node = document.createElement(tag);
@@ -258,6 +266,32 @@ export const consoleHtml = `<!doctype html>
         } else {
           renderResult(data, false);
         }
+      } catch (error) {
+        renderError('通信エラーが発生しました: ' + error.message);
+      }
+    });
+
+    fetchGmailButton.addEventListener('click', async () => {
+      resultEl.innerHTML = '';
+      resultEl.appendChild(el('p', { text: 'Gmailを確認中…' }));
+      try {
+        const headers = {};
+        if (accessKey) headers['x-console-key'] = accessKey;
+        const res = await fetch('/jobs/fetch-messages', { method: 'POST', headers });
+        const data = await res.json();
+        if (!res.ok) {
+          renderError(data.error || 'Gmail取得に失敗しました。');
+          return;
+        }
+        resultEl.innerHTML = '';
+        resultEl.appendChild(el('div', { class: 'card' }, [
+          el('h2', { text: 'Gmail取得結果' }),
+          el('p', { text: '処理件数: ' + data.processed }),
+          el('p', { text: '重要通知件数: ' + data.highPriorityNotifications.length }),
+          data.errors.length > 0
+            ? el('p', { class: 'error', text: 'エラー: ' + data.errors.join(' / ') })
+            : el('p', { text: 'エラーなし' })
+        ]));
       } catch (error) {
         renderError('通信エラーが発生しました: ' + error.message);
       }
