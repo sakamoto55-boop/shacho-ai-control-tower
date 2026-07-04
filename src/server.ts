@@ -52,6 +52,23 @@ function requireDevEndpoint() {
   }
 }
 
+/**
+ * CONSOLE_ACCESS_KEYが設定されている場合のみ、/dev/*への全リクエストにキー一致を要求する。
+ * 未設定の場合は既存のPhase 1ローカル動作（キー不要）を維持する。
+ */
+app.use('/dev/*', async (c, next) => {
+  const requiredKey = process.env.CONSOLE_ACCESS_KEY;
+  if (!requiredKey) {
+    await next();
+    return;
+  }
+  const providedKey = c.req.query('key') ?? c.req.header('x-console-key');
+  if (providedKey !== requiredKey) {
+    return c.text('unauthorized', 401);
+  }
+  await next();
+});
+
 app.get('/health', (c) =>
   c.json({
     ok: true,

@@ -216,6 +216,8 @@ export const consoleHtml = `<!doctype html>
       }
     }
 
+    const accessKey = new URLSearchParams(window.location.search).get('key');
+
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const action = event.submitter ? event.submitter.dataset.action : 'team-review';
@@ -232,9 +234,11 @@ export const consoleHtml = `<!doctype html>
 
       try {
         const endpoint = action === 'analyze-and-save' ? '/dev/analyze-and-save' : '/dev/team-review';
+        const headers = { 'Content-Type': 'application/json' };
+        if (accessKey) headers['x-console-key'] = accessKey;
         const res = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(body)
         });
         const data = await res.json();

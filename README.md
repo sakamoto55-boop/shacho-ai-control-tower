@@ -128,6 +128,12 @@ http://localhost:8787/dev/console
 
 `ENABLE_DEV_ENDPOINTS=false` にすると他の `/dev/*` と同様に無効化されます（本番では必ず無効化してください）。
 
+インターネット上に公開する場合（例：Cloud Run）は、`CONSOLE_ACCESS_KEY` に秘密のキーを設定してください。設定すると、`/dev/*` 配下すべてに `?key=...`（またはリクエストヘッダー `x-console-key`）が一致しないと401を返すようになります。未設定の場合は従来通りキー不要です（Phase 1ローカル利用向けのデフォルト）。
+
+```
+http://localhost:8787/dev/console?key=<CONSOLE_ACCESS_KEYの値>
+```
+
 ### POST /dev/team-review
 
 任意の本文をAI分析し、さらに「会社運営チーム」（役割別AIエージェント）の合議レビューを保存せずに返します。
