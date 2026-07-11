@@ -5,6 +5,7 @@ import { analyzeMessage } from './ai/analyzeMessage.js';
 import type { AnalyzeMessageInput, MessageSource, OriginalChannel } from './domain/types.js';
 import { analyzeAndSaveMessage } from './jobs/analyzeIncomingMessages.js';
 import { generateAndSendReport } from './jobs/generateReports.js';
+import { generateProblemDigest, type ProblemDigestSource } from './reports/generateProblemDigest.js';
 import { createRepository } from './repositories/createRepository.js';
 import { createLineworksConnector, type LineworksWebhookPayload } from './connectors/lineworks.js';
 import { nowIso } from './utils/date.js';
@@ -128,6 +129,29 @@ app.post('/jobs/report/noon', async (c) => {
 app.post('/jobs/report/evening', async (c) => {
   const report = await generateAndSendReport(repository, 'evening');
   return c.json(report);
+});
+
+const validDigestSources: ProblemDigestSource[] = ['gmail', 'lineworks', 'manual_import', 'external_forward', 'all'];
+
+app.get('/reports/problem-digest', async (c) => {
+  try {
+    const sourceParam = c.req.query('source') ?? 'lineworks';
+    if (!validDigestSources.includes(sourceParam as ProblemDigestSource)) {
+      throw new Error(`source must be one of: ${validDigestSources.join(', ')}`);
+    }
+    const daysParam = c.req.query('days');
+    const days = daysParam === undefined ? 30 : Number(daysParam);
+    if (!Number.isInteger(days) || days < 1 || days > 366) {
+      throw new Error('days must be an integer between 1 and 366');
+    }
+    const digest = await generateProblemDigest(repository, {
+      source: sourceParam as ProblemDigestSource,
+      days
+    });
+    return c.json(digest);
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+  }
 });
 
 app.post('/webhooks/lineworks', async (c) => {

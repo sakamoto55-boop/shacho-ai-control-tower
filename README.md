@@ -142,6 +142,19 @@ curl -X POST http://localhost:8787/dev/analyze-and-save \
 
 夜レポートを生成します。
 
+### GET /reports/problem-digest
+
+LINE WORKS等に集まったメッセージを期間集約し、問題案件（優先度A・リスク検知あり）をカテゴリ別にまとめてDX改善候補を提示します。デフォルトは直近30日のLINE WORKSが対象です。
+
+- `source`: `lineworks`（デフォルト） | `gmail` | `manual_import` | `external_forward` | `all`
+- `days`: 遡る日数（1〜366、デフォルト30）
+
+```bash
+curl "http://localhost:8787/reports/problem-digest?source=lineworks&days=30"
+```
+
+レスポンスには、カテゴリ別件数（入金遅延・クレーム・現場停止など）、問題が集中しているルーム・相手、繰り返し発生している問題から導いたDX改善候補、日本語レポート本文（`text`）が含まれます。
+
 ### POST /webhooks/lineworks
 
 将来的なLINE WORKS Bot Webhook受信用です。Phase 1ではMockLineworksConnectorで正規化してローカル保存します。
