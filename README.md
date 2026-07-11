@@ -142,6 +142,23 @@ curl -X POST http://localhost:8787/dev/analyze-and-save \
 
 夜レポートを生成します。
 
+### GET /dashboard
+
+可視化ダッシュボード（単一HTML・ビルド不要）を配信します。ブラウザで http://localhost:8787/dashboard を開くと、以下の4視点を20秒間隔で自動更新しながら表示します。
+
+- 今リアルタイムで溜まっているもの（未確認受信・最新メッセージ）
+- 行動決定（優先度Aの受信・社長判断タスク・期限超過）
+- 確認しなければならないこと（承認待ち返信下書き・要返信）
+- 改善できること（過去30日の問題集約から導いたDX改善候補）
+
+### GET /dashboard/summary
+
+ダッシュボードが利用する集約データ（JSON）を返します。
+
+```bash
+curl http://localhost:8787/dashboard/summary
+```
+
 ### GET /reports/problem-digest
 
 LINE WORKS等に集まったメッセージを期間集約し、問題案件（優先度A・リスク検知あり）をカテゴリ別にまとめてDX改善候補を提示します。デフォルトは直近30日のLINE WORKSが対象です。

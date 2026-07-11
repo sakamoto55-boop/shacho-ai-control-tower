@@ -74,7 +74,7 @@ HTTPリクエスト (src/server.ts, Hono)
 - 個人LINE由来の情報は、人間が必要部分だけを転記した `external_forward` として扱う。
 - AIによる外部自動返信は作らない。返信は下書き生成まで（`approvalStatus: 'waiting'` で保存）。
 - 金額、契約、納期、謝罪、責任認定、外注費、労務、事故は自動確定しない（`MockAIProvider` の `dangerousReplyWords` と各プロバイダの禁止事項プロンプトに反映済み）。
-- Phase 1ではUIや管理画面を作らない（`docs/` のLCCアプリは別系統の既存物）。
+- Phase 1では編集・承認操作を持つ管理画面を作らない（`docs/` のLCCアプリは別系統の既存物）。例外として、社長の要望により `GET /dashboard` で配信する閲覧専用の単一HTMLダッシュボード（`src/dashboard/dashboardPage.ts`、ビルド不要）のみ存在する。
 - `/dev/*` エンドポイントは `ENABLE_DEV_ENDPOINTS=false` または `NODE_ENV=production` で無効化される。この挙動を壊さない。
 
 ## やるべきでないこと

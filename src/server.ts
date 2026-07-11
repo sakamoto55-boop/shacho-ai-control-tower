@@ -6,6 +6,8 @@ import type { AnalyzeMessageInput, MessageSource, OriginalChannel } from './doma
 import { analyzeAndSaveMessage } from './jobs/analyzeIncomingMessages.js';
 import { generateAndSendReport } from './jobs/generateReports.js';
 import { generateProblemDigest, type ProblemDigestSource } from './reports/generateProblemDigest.js';
+import { buildDashboardSummary } from './reports/buildDashboardSummary.js';
+import { dashboardPage } from './dashboard/dashboardPage.js';
 import { createRepository } from './repositories/createRepository.js';
 import { createLineworksConnector, type LineworksWebhookPayload } from './connectors/lineworks.js';
 import { nowIso } from './utils/date.js';
@@ -129,6 +131,17 @@ app.post('/jobs/report/noon', async (c) => {
 app.post('/jobs/report/evening', async (c) => {
   const report = await generateAndSendReport(repository, 'evening');
   return c.json(report);
+});
+
+app.get('/dashboard', (c) => c.html(dashboardPage));
+
+app.get('/dashboard/summary', async (c) => {
+  try {
+    const summary = await buildDashboardSummary(repository);
+    return c.json(summary);
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+  }
 });
 
 const validDigestSources: ProblemDigestSource[] = ['gmail', 'lineworks', 'manual_import', 'external_forward', 'all'];
