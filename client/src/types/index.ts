@@ -1,0 +1,305 @@
+// ─── Screen / Navigation ─────────────────────────────────
+export type Screen = 'home' | 'chat' | 'actions' | 'create' | 'dashboard' | 'settings' | 'cockpit'
+
+// ─── Task / Priority ─────────────────────────────────────
+export type Priority = 'A' | 'B' | 'waiting-confirm' | 'waiting-create'
+export type TaskType =
+  | 'メール'
+  | 'LINE WORKS'
+  | '承認'
+  | '契約'
+  | '請求'
+  | '現場'
+  | '事故'
+  | '銀行'
+  | '福祉'
+export type Importance = 'high' | 'medium' | 'low'
+export type TaskStatus = '未対応' | '対応中' | '確認中' | '完了'
+
+// ─── AI Chat ─────────────────────────────────────────────
+export type AiMode =
+  | 'secretary'
+  | 'management'
+  | 'field'
+  | 'admin'
+  | 'sales'
+  | 'welfare'
+
+export interface AiModeConfig {
+  id: AiMode
+  label: string
+  icon: string
+  color: string
+  prompts: string[]
+}
+
+export interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: Date
+}
+
+// ─── Briefing ─────────────────────────────────────────────
+export type AlertLevel = 'danger' | 'warning' | 'info'
+
+export interface BriefingItem {
+  type: AlertLevel
+  icon: string
+  text: string
+}
+
+export interface Briefing {
+  date: string
+  greeting: string
+  changes: BriefingItem[]
+  topActions: string[]
+}
+
+// ─── Home Situation Cards ─────────────────────────────────
+export interface SituationCard {
+  id: string
+  label: string
+  value: string
+  sub?: string
+  alert?: boolean
+  alertLevel?: 'danger' | 'warning'
+  icon: string
+  screen?: Screen
+}
+
+// ─── Task / Action Items ──────────────────────────────────
+export interface TaskDetail {
+  summary: string
+  background: string
+  recommendedActions: string[]
+  replyDraft: string
+  nextSteps: string[]
+  relatedData: string[]
+}
+
+export interface ActionItem {
+  id: string
+  priority: Priority
+  subject: string
+  from: string
+  deadline: string
+  action: string
+  category: string
+  type: TaskType
+  importance: Importance
+  status: TaskStatus
+  isRead: boolean
+  detail: TaskDetail
+}
+
+// ─── Dashboard / Financial ────────────────────────────────
+export interface DashboardMetric {
+  id: string
+  label: string
+  value: string
+  subValue?: string
+  trend?: 'up' | 'down' | 'neutral'
+  alert?: boolean
+  alertLevel?: 'warning' | 'danger'
+}
+
+export interface CashflowWeek {
+  week: string
+  label: string
+  income: number
+  expense: number
+  balance: number
+  alert?: boolean
+  alertLevel?: 'danger' | 'warning'
+}
+
+export interface ProjectMetric {
+  id: string
+  name: string
+  client: string
+  grossProfit: number
+  grossProfitRate: number
+  status: string
+  alert?: boolean
+}
+
+export interface DepartmentMetric {
+  id: string
+  name: string
+  revenue: number
+  profit: number
+  profitRate: number
+}
+
+// ─── Create Request ───────────────────────────────────────
+export type OutputFormat =
+  | 'chat'
+  | 'gmail-draft'
+  | 'drive'
+  | 'manus'
+  | 'claude-code'
+  | 'gemini'
+
+export interface CreateTemplate {
+  id: string
+  label: string
+  icon: string
+  description: string
+  category: string
+}
+
+export interface CreationFormData {
+  purpose: string
+  recipient: string
+  background: string
+  content: string
+  tone: string
+  outputFormat: OutputFormat
+}
+
+// ─── Settings / Integrations ──────────────────────────────
+export type ConnectionStatus = 'connected' | 'planned' | 'auth-required'
+
+export interface Integration {
+  id: string
+  name: string
+  icon: string
+  status: ConnectionStatus
+  readMode: string
+  note: string
+  lastSync?: string
+}
+
+// ─── Companies ────────────────────────────────────────────
+export interface Company {
+  id: string
+  name: string
+  shortName: string
+}
+
+// ─── API Integration Points ───────────────────────────────
+export interface ApiIntegrationPoint {
+  feature: string
+  endpoint: string
+  provider: string
+  note: string
+  phase: number
+}
+
+// ─── Phase 3: AIコックピット ──────────────────────────────
+export type HealthStatus = 'good' | 'warning' | 'danger' | 'normal'
+export type ActionImportance = 'critical' | 'high' | 'medium'
+export type SuggestionType = 'reply' | 'document' | 'delegate' | 'schedule' | 'detail' | 'postpone'
+export type TimelinePeriod =
+  | 'yesterday'
+  | 'today'
+  | 'tomorrow'
+  | 'this-week'
+  | 'next-week'
+  | 'this-month'
+export type SearchCategory = '人' | '案件' | '連絡' | '書類' | '予定' | 'タスク'
+
+export interface HealthBreakdownItem {
+  category: string
+  status: HealthStatus
+  label: string
+  icon: string
+  score: number
+}
+
+export interface CompanyHealthScore {
+  total: number
+  grade: 'A' | 'B' | 'C' | 'D'
+  comment: string
+  breakdown: HealthBreakdownItem[]
+  updatedAt: string
+}
+
+export interface ActionSuggestion {
+  id: string
+  label: string
+  icon: string
+  type: SuggestionType
+  draft: string
+}
+
+export interface PriorityAction {
+  id: string
+  rank: number
+  title: string
+  importance: ActionImportance
+  deadline: string
+  reason: string
+  recommendedAction: string
+  category: string
+  relatedScreen?: Screen
+  suggestions: ActionSuggestion[]
+}
+
+export interface TimelineEvent {
+  id: string
+  title: string
+  category: string
+  alertLevel?: AlertLevel
+  time?: string
+}
+
+export interface TimelinePeriodData {
+  period: TimelinePeriod
+  label: string
+  events: TimelineEvent[]
+}
+
+export interface SearchResult {
+  id: string
+  category: SearchCategory
+  title: string
+  sub: string
+  alertLevel?: AlertLevel
+}
+
+export interface AiJudgement {
+  message: string
+  focusItems: string[]
+  generatedAt: string
+}
+
+// ─── Phase 4: Gmail読み取り専用 ─────────────────────────────
+export type GmailTaskType = 'メール' | '銀行' | '請求' | '契約' | '事故' | '営業' | '福祉' | 'その他'
+export type GmailPriority = 'A' | 'B' | 'C'
+
+export interface GmailDerivedTask {
+  id: string
+  gmailMessageId: string
+  subject: string
+  from: string
+  receivedAt: Date
+  summary: string
+  priority: GmailPriority
+  taskType: GmailTaskType
+  estimatedDeadline: string | null
+  recommendedAction: string
+  replyDraft: string
+  relatedKeywords: string[]
+  source: 'gmail'
+  writeProtected: true
+  replyStatus: '未送信'
+  requiresApproval: true
+}
+
+export interface GmailConnectionStatus {
+  connected: false
+  mode: 'demo' | 'production'
+  lastFetchAt: Date | null
+  permission: '読み取り専用'
+  writeEnabled: false
+  scope: string
+}
+
+export type GmailFetchRange = '24h' | '3d' | '7d'
+
+export interface AppSettings {
+  demoMode: boolean
+  productionReady: boolean
+}

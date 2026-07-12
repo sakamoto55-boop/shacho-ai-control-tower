@@ -1,6 +1,1006 @@
-# 社長AI管制塔 Phase 1
+# 社長AI管制塔 — AI社長室 v1.0.0 MVP
+
+> **まずはこちらを見てください**
+>
+> | | |
+> |--|--|
+> | 📱 **公開URL（スマホで開く）** | **https://sakamoto55-boop.github.io/shacho-ai-control-tower/** ✅ 公開中 |
+> | 📖 **使い方ガイド** | [docs/HOW_TO_USE.md](docs/HOW_TO_USE.md) |
+> | ✅ **現在できること** | [docs/CURRENT_STATUS.md](docs/CURRENT_STATUS.md) |
+> | 🔧 **本番接続手順** | [docs/NEXT_SETUP_STEPS.md](docs/NEXT_SETUP_STEPS.md) |
+> | 📦 **納品物一覧** | [docs/DELIVERY_SUMMARY.md](docs/DELIVERY_SUMMARY.md) |
+> | 🔌 **Gmail本番接続手順** | [docs/GOOGLE_OAUTH_SETUP.md](docs/GOOGLE_OAUTH_SETUP.md) |
+> | 🛰 **Google 4スコープ設定** | [docs/GOOGLE_SCOPES_SETUP.md](docs/GOOGLE_SCOPES_SETUP.md) |
+> | 📊 **Sheets データ形式** | [docs/SHEETS_DATA_FORMAT.md](docs/SHEETS_DATA_FORMAT.md) |
+> | 🗾 **Google実データ化(SHOGUN)** | [docs/PROJECT_SHOGUN_GOOGLE_REAL_DATA.md](docs/PROJECT_SHOGUN_GOOGLE_REAL_DATA.md) |
+>
+> **📐 最終設計書（本番運用前の確定版）**
+>
+> | | |
+> |--|--|
+> | 🏛 **最終アーキテクチャ** | [docs/FINAL_ARCHITECTURE.md](docs/FINAL_ARCHITECTURE.md) |
+> | 🗺 **運用ロードマップ** | [docs/OPERATION_ROADMAP.md](docs/OPERATION_ROADMAP.md) |
+> | 🤝 **ツール役割分担** | [docs/ROLE_SEPARATION.md](docs/ROLE_SEPARATION.md) |
+> | 🔧 **本番接続計画** | [docs/PRODUCTION_CONNECT_PLAN.md](docs/PRODUCTION_CONNECT_PLAN.md) |
+> | ✅ **最終意思決定ガイド** | [docs/FINAL_DECISION.md](docs/FINAL_DECISION.md) |
+
+> スマホ（Safari / Chrome）で上記URLを開くだけで使えます。アプリのインストールは不要です。
+
+> **🔔 Mission 1.3 — Google 4サービスを実データ化しました**
+> - ✅ **Gmail / Calendar / Drive / Sheets の実データ（読み取り専用）接続**に対応
+> - ⏳ LINE WORKS は当面デモのまま（バックエンド必須）
+> - ❌ 送信・返信・作成・更新・削除・既読化・共有変更は**不可**（永久に実装しない）
+> - 使用スコープは4つすべて readonly。バックエンド・有料リソースは作りません（費用ゼロ）
+> - 設定手順 → [docs/GOOGLE_SCOPES_SETUP.md](docs/GOOGLE_SCOPES_SETUP.md) ／ Sheets形式 → [docs/SHEETS_DATA_FORMAT.md](docs/SHEETS_DATA_FORMAT.md)
+> - 未接続・ID未設定のProviderはデモデータで動作します（朝のブリーフィングに取得状況を表示）
+
+---
 
 会社メール、LINE WORKS、手入力された外部連絡をAI分析し、要約、タスク抽出、返信下書き、リスク判定、朝昼晩レポートを作るローカルMVPです。
+
+---
+
+## AI社長室 スマホMVP（フロントエンド）
+
+`client/` ディレクトリに、**iPhone最優先のスマホ対応Webアプリ**が含まれています。
+
+> **現在のバージョン：v1.0.0 Phase 10**
+> Phase 10 で全5Provider（Gmail / Calendar / Drive / Sheets / LINE WORKS）を横断するAI Engineを統合し、MVP完成。社長の今日の優先判断・会社健康スコア・承認フロー（UIと型のみ）を実装。外部APIへの書き込みは一切なし。本番接続は Phase 11 以降。
+
+### v1.0.0 MVP 完成
+
+- **実用開始ライン到達** — 社長が毎朝起動して今日の判断を行う最小限の機能が揃いました
+- **本番接続前の安定版** — 全データはデモモック。外部APIキー不要で動作確認可能
+- **全5Provider接続完了**（デモ）— Inbox / Schedule / File / BusinessData / Notification
+- **AI Engine 6本統合完了** — crossProviderContext / companyHealthEngine / decisionEngine / actionDraftEngine / executiveBriefing / aiOrchestrator
+- **6画面完成** — Home / AIコックピット / 今日の要対応 / AI相談 / 経営ダッシュボード / 設定
+
+> Gitタグ候補: `v1.0.0-mvp`（実際のタグ作成は指示があるまで保留）
+
+### 検収ドキュメント
+
+| ファイル | 内容 |
+|---------|------|
+| [RELEASE_NOTES_v1.0.0.md](docs/release-check/RELEASE_NOTES_v1.0.0.md) | v1.0.0 リリースノート（Phase 1〜10 要約・Provider・AI Engine・安全設計） |
+| [V1_ACCEPTANCE_CHECKLIST.md](docs/release-check/V1_ACCEPTANCE_CHECKLIST.md) | v1.0.0 完成検収チェックリスト（12項目）|
+| [V1_SAFETY_LOCK.md](docs/release-check/V1_SAFETY_LOCK.md) | v1.0.0 安全凍結宣言（禁止操作一覧・ActionDraft安全確認）|
+| [V1_ARCHITECTURE_FREEZE.md](docs/release-check/V1_ARCHITECTURE_FREEZE.md) | v1.0.0 アーキテクチャ凍結宣言（Provider・AI Engine・画面・データフロー）|
+| [CHANGELOG_PHASE.md](docs/release-check/CHANGELOG_PHASE.md) | フェーズ別変更履歴 |
+| [FILES_CHANGED.md](docs/release-check/FILES_CHANGED.md) | 変更・追加・削除ファイル一覧 |
+| [IMPLEMENTATION_REPORT.md](docs/release-check/IMPLEMENTATION_REPORT.md) | 実装内容・未実装項目・注意点 |
+| [SAFETY_REPORT.md](docs/release-check/SAFETY_REPORT.md) | 外部API接続状況・書き込み禁止確認 |
+| [SCREEN_LIST.md](docs/release-check/SCREEN_LIST.md) | 変更画面・確認すべき画面・想定表示 |
+| [TEST_CHECKLIST.md](docs/release-check/TEST_CHECKLIST.md) | 手動検収チェックリスト |
+| [ROUTE_MAP.md](docs/release-check/ROUTE_MAP.md) | 画面遷移と主要導線 |
+| [DATA_FLOW.md](docs/release-check/DATA_FLOW.md) | データの流れ |
+| [NO_SCREENSHOT_REQUIRED.md](docs/release-check/NO_SCREENSHOT_REQUIRED.md) | スクリーンショット不要の検収フロー |
+| [OAUTH_SECURITY_REVIEW.md](docs/release-check/OAUTH_SECURITY_REVIEW.md) | OAuth安全設計レビュー（Phase 5.1追加） |
+| [GOOGLE_CONNECT_CHECKLIST.md](docs/release-check/GOOGLE_CONNECT_CHECKLIST.md) | Google Cloud Console 設定チェックリスト（Phase 5.1追加） |
+
+---
+
+### 画面一覧
+
+| 画面 | 説明 |
+|------|------|
+| ホーム | AIブリーフィングカード・今日の状況8枚・クイックアクション・業務ポータル |
+| **AIコックピット** ★新規 | 会社健康スコア・優先順位TOP5・ワンタップ実行・時系列ビュー・AI会社検索 |
+| 今日の要対応 | 優先度A/B・確認待ち・作成待ちをカード形式で管理、詳細モーダル付き |
+| 作成依頼 | 目的・相手・背景・内容・トーン・出力形式を指定してAI生成（仮） |
+| 経営ダッシュボード | 月次売上・粗利・13週資金繰りグラフ・案件粗利ランキング・部署別利益 |
+| 設定 | データ連携ステータス・会社選択・権限区分・接続予定ロードマップ |
+
+### フロントエンドのセットアップ・起動
+
+```bash
+cd client
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # ../public/ に本番ビルド出力
+```
+
+### 主要コンポーネント
+
+```
+client/src/
+├── components/
+│   ├── Navigation.tsx       # 下部固定ナビゲーション（5タブ）
+│   ├── VoiceModal.tsx       # 音声入力モーダル（接続準備中）
+│   └── screens/
+│       ├── Home.tsx         # ホーム（AIブリーフィング + 状況カード）
+│       ├── AiChat.tsx       # AI相談チャット（6モードタブ）
+│       ├── TodayActions.tsx # 今日の要対応（詳細モーダル付き）
+│       ├── CreateRequest.tsx # 作成依頼（目的→フォーム→生成結果）
+│       ├── Dashboard.tsx    # 経営ダッシュボード（13週資金繰りグラフ）
+│       └── Settings.tsx     # 設定・接続ロードマップ
+├── data/
+│   └── mockData.ts          # 仮データ（API連携まで使用）
+└── types/
+    └── index.ts             # 型定義
+```
+
+---
+
+## Phase 5 で追加した内容（Google OAuth 認証基盤）
+
+### 概要
+
+Phase 5 では「実データ連携基盤」を構築しました。  
+**Google OAuth Authorization Code + PKCE フロー**により、Googleアカウントへ安全に接続できる構造を実装しています。  
+**取得スコープは `gmail.readonly` のみ。書き込み系 API は一切実装していません。**
+
+---
+
+### OAuth 取得フロー図
+
+```
+ユーザー（設定画面）
+     │
+     ▼「Googleアカウントで接続」ボタン
+googleAuth.startOAuthFlow()
+     │ PKCE: code_verifier生成 → SHA256 → code_challenge
+     │ state生成（CSRF対策）
+     │ sessionStorageに保存
+     ▼
+Google 認証画面（accounts.google.com）
+     │ ユーザーが Gmail ReadOnly を承認
+     ▼
+アプリへリダイレクト（?code=...&state=...）
+     │
+     ▼ App.tsx useEffect が検知
+googleAuth.handleCallback(code, state)
+     │ state 検証（CSRF対策）
+     │ PKCE code_verifier を取り出し
+     │ https://oauth2.googleapis.com/token へ POST
+     │ → access_token, refresh_token, scope を取得
+     │ → https://www.googleapis.com/oauth2/v3/userinfo でメールアドレス確認
+     │ localStorage にトークン保存
+     ▼
+設定画面へ遷移 → 「✓ 接続済み」表示
+     │
+     ▼ Gmail取得時（AIコックピット等）
+fetchRawMessages()
+     │ googleToken.isValid() → キャッシュ確認（5分TTL）
+     │ キャッシュ有効 → キャッシュを返す（API呼び出しなし）
+     │ キャッシュ無効 → gmailFetcher.fetchMessages(accessToken)
+     │   ① GET /gmail/v1/users/me/messages?q=is:unread newer_than:3d
+     │   ② GET /gmail/v1/users/me/messages/{id}?format=full（並列最大10件）
+     │   → GmailMessage[] に変換
+     │ → gmailCache.set() でローカル保存
+     ▼
+gmailAnalyzer.ts で種別・優先度・期限を判定
+     ▼
+AIコックピット・今日の要対応・ホームに表示
+```
+
+---
+
+### Google サービス層（新規追加）
+
+```
+client/src/services/google/
+├── googleScopes.ts    — スコープ定数（Phase 5: gmail.readonly のみ）
+├── googleErrors.ts    — GoogleAuthError クラスとエラーコード定義
+├── googleStorage.ts   — localStorage/sessionStorage ラッパー（トークン・PKCE・キャッシュ・ログ）
+├── googleToken.ts     — トークン有効性確認・保存・リフレッシュ
+├── googleAuth.ts      — OAuth フロー実装（PKCE生成・認証URL生成・コールバック処理）
+└── googleSession.ts   — セッション状態管理（接続済み/接続中/エラー/未接続）
+```
+
+### Gmail サービス層（強化）
+
+```
+client/src/services/gmail/
+├── gmailFetcher.ts       — 新規: Gmail API 読み取り専用フェッチャー
+├── gmailCache.ts         — 新規: ローカルキャッシュ（5分TTL）
+├── briefingGenerator.ts  — 新規: メールデータからAIブリーフィングを生成する構造
+└── gmailClient.ts        — 更新: 認証済みなら本番API、未認証なら mockGmail を使用
+```
+
+### .env 設定
+
+`client/.env.example` を参照してください。
+
+```env
+# Gmail / Calendar / Drive 共通 Client ID（Phase 6以降は1つで全サービス対応）
+VITE_GOOGLE_CLIENT_ID=（Google Cloud Console で取得）
+VITE_GOOGLE_REDIRECT_URI=http://localhost:5173/
+# Phase 6時点のスコープ（gmail.readonly + calendar.readonly）
+VITE_GOOGLE_SCOPES=https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly
+```
+
+### ログ記録
+
+以下のイベントを localStorage に最大50件記録します：
+
+| イベント | タイミング |
+|---------|-----------|
+| `oauth_start` | OAuth認証フロー開始時 |
+| `oauth_success` | トークン取得・保存成功時（メールアドレス含む） |
+| `oauth_error` | 認証失敗・state不一致・トークン取得失敗時 |
+| `token_refresh` | アクセストークンのリフレッシュ時 |
+| `fetch_start` | Gmail API 取得開始時（query・件数） |
+| `fetch_success` | Gmail API 取得成功時（件数・所要時間） |
+| `fetch_error` | Gmail API 取得失敗時（エラー内容） |
+| `disconnect` | Googleアカウント切断時 |
+
+設定画面の「認証ログを見る」で確認できます。
+
+### キャッシュ設計
+
+- キャッシュ有効期限: **5分**
+- 保存先: **localStorage**（gmailCache.ts）
+- `gmailCache.isStale()` が true の場合のみ Google API を呼ぶ
+- 手動リフレッシュ: `refreshMessages()` でキャッシュクリア後に再取得
+
+### 書き込みAPIを実装していない証拠
+
+`client/src/services/` 配下に以下の関数・エンドポイントは**存在しない**：
+
+| 禁止処理 | 関数名 | 状態 |
+|---------|--------|------|
+| メール送信 | `sendMessage` | 未実装 |
+| メール返信 | `replyMessage` | 未実装 |
+| 下書き作成 | `createDraft` | 未実装 |
+| メール削除 | `deleteMessage` | 未実装 |
+| アーカイブ | `archiveMessage` | 未実装 |
+| 既読化 | `markAsRead` | 未実装 |
+| スター付与 | `addStar` | 未実装 |
+| ラベル変更 | `modifyLabels` | 未実装 |
+
+`gmailFetcher.ts` は `GET` リクエストのみ。`POST`/`PATCH`/`DELETE` は一切存在しない。
+
+### 安全設計
+
+- OAuth スコープ: `gmail.readonly` のみ（`gmail.modify` / `gmail.send` / `gmail.compose` は取得しない）
+- PKCE: code_verifier を sessionStorage に保存、トークン交換後に削除
+- state パラメータ: CSRF 対策として検証
+- トークン: localStorage に保存（HttpOnly Cookie は SPA では使用不可）
+- リフレッシュトークン: `google.accounts.oauth2` を通じて取得
+- 本番運用推奨: バックエンド Proxy 経由でのトークン交換（Phase 6 以降で対応予定）
+
+---
+
+## Phase 5.5 で追加した内容（Provider設計 + AI Engine基盤構築）
+
+### 概要
+
+Phase 5.5 では、AI社長室の**アーキテクチャをリファクタリング**しました。  
+**外部API接続なし・書き込みなし** — すべて純粋な TypeScript 型とロジックスタブです。
+
+### 設計思想: Googleサービス単位ではなく Provider 単位
+
+| ❌ 旧来の考え方 | ✅ Phase 5.5 からの設計 |
+|------------|----------------------|
+| Gmail 画面 | Inbox Provider（受信トレイ） |
+| カレンダー画面 | Schedule Provider（予定） |
+| Drive 画面 | File Provider（ファイル） |
+
+これにより LINE WORKS を追加しても InboxProvider に吸収でき、画面コンポーネントは変更不要です。
+
+### 追加したもの
+
+| 追加内容 | ファイル |
+|---------|--------|
+| Provider統一型・Unified型（9種） | `client/src/core/providers/providerTypes.ts` |
+| Inbox Provider（Gmail → UnifiedInboxItem） | `client/src/core/providers/inboxProvider.ts` |
+| Schedule / File / BusinessData / Workflow / Notification stub | `client/src/core/providers/` |
+| Provider Registry + Health | `client/src/core/providers/providerRegistry.ts` / `providerHealth.ts` |
+| AI Engine 8種（Normalizer / Priority / Risk / Briefing / Action / Search / Approval） | `client/src/core/ai-engine/` |
+| Settings.tsx に AI社長室データ基盤カード | Provider一覧・健全性表示 |
+| アーキテクチャ / Provider / AI Engine 設計書（3ファイル） | `docs/release-check/` |
+
+### 外部API接続は？
+
+ゼロです。追加したファイルはすべてローカル TypeScript のみです。  
+Gmail サービスは既存の `services/gmail/` を引き続き使用（変更なし）。  
+`ActionEngine` が生成する提案はすべて `requiresApproval: true, writeEnabled: false`。
+
+---
+
+## Phase 5.1 で追加した内容（OAuth安全性強化・接続前チェックUI）
+
+### 概要
+
+Phase 5.1 では、Phase 5 で構築した OAuth 基盤に対して**安全性レビューと接続前検証 UI** を追加しました。  
+新しい外部サービス連携は追加していません。
+
+### 追加したもの
+
+| 追加内容 | ファイル |
+|---------|--------|
+| OAuth接続前チェック機能 | `client/src/services/google/googleConfig.ts` |
+| 接続前チェックUI（設定画面） | `client/src/components/screens/Settings.tsx` |
+| OAuth安全設計レビュー | `docs/release-check/OAUTH_SECURITY_REVIEW.md` |
+| Google Cloud Console設定手順 | `docs/release-check/GOOGLE_CONNECT_CHECKLIST.md` |
+
+### 接続前チェック UI
+
+設定画面の Google 接続カード（未接続状態時）に「🔍 接続前チェック」パネルを追加しました。
+
+| チェック項目 | 内容 |
+|------------|------|
+| Client ID設定 | `VITE_GOOGLE_CLIENT_ID` の設定有無（設定済みは末尾のみ表示） |
+| Redirect URI設定 | `VITE_GOOGLE_REDIRECT_URI` の設定有無と現在値 |
+| スコープ | `gmail.readonly` のみであることを表示 |
+| 書き込みAPI | 未実装であることを表示 |
+| 本番接続準備 | Client ID と Redirect URI が両方設定済みなら「完了」 |
+
+### SPA における OAuth セキュリティリスクと対応方針
+
+#### 現行 SPA フローの制約
+
+```
+⚠️ SPA（ブラウザのみ）での OAuth には以下の制約があります：
+
+1. client_secret をフロントエンドに含められない
+   → client_secret は SPA に含めない（ビルド後に公開される）
+   → Google Cloud Console で「ウェブ アプリケーション」タイプを選択し、
+     SPA として登録することで client_secret なしで動作します
+
+2. アクセストークン・リフレッシュトークンが localStorage に存在する
+   → XSS 攻撃を受けた場合にトークンが窃取されるリスクがある
+
+3. VITE_ 変数はビルド時にバンドルに含まれる
+   → VITE_GOOGLE_CLIENT_ID は公開リポジトリの .env にコミット禁止
+```
+
+#### 絶対に行ってはいけないこと
+
+```
+❌ .env ファイルを Git にコミットしない（.gitignore に含まれています）
+❌ client_secret をコードや .env に記載しない（SPA では使用しない）
+❌ VITE_GOOGLE_CLIENT_ID を README やコードコメントに直書きしない
+❌ client_secret をフロントエンドコードに埋め込まない
+```
+
+#### 本番化前に推奨するアーキテクチャ変更
+
+```
+[現行] SPA がトークンを localStorage に直接保管
+  ブラウザ → Google OAuth → ブラウザ（localStorage にトークン保管）
+
+[本番推奨] バックエンドプロキシ経由でトークン管理
+  ブラウザ → バックエンド → Google OAuth → バックエンド
+                                                 ↓
+                                     HttpOnly Cookie でセッション管理
+                                     （ブラウザ JS からアクセス不可）
+```
+
+詳細は [OAUTH_SECURITY_REVIEW.md](docs/release-check/OAUTH_SECURITY_REVIEW.md) を参照してください。
+
+---
+
+---
+
+## Phase 6 で追加した内容（Google Calendar ReadOnly / Schedule Provider 接続）
+
+### 概要
+
+Phase 6 では **Google Calendar ReadOnly を Schedule Provider へ接続** しました。  
+取得スコープは `calendar.readonly` のみ。**予定作成・更新・削除・招待返信は未実装です。**
+
+### カレンダーサービス層（新規追加）
+
+```
+client/src/services/calendar/
+├── types.ts           — GoogleCalendarEvent / CalendarDerivedEvent / CalendarSummary 型定義
+├── mockCalendar.ts    — デモ予定データ（銀行打合せ・現場確認・行政手続き等 5件）
+├── calendarClient.ts  — Calendar ReadOnly 入口（認証なし → mock、認証済み → API）
+├── calendarFetcher.ts — GET 専用フェッチャー（createEvent/updateEvent/deleteEvent 未実装）
+├── calendarMapper.ts  — GoogleCalendarEvent → UnifiedScheduleItem 変換
+├── calendarAnalyzer.ts — 重要度・カテゴリ・期限リスク・推奨アクション判定
+└── calendarCache.ts   — ローカルキャッシュ（5分 TTL）
+```
+
+### Schedule Provider への接続
+
+```
+Google Calendar API ReadOnly
+  ↓ calendarFetcher.fetchCalendarEvents(accessToken)
+  ↓ 認証なし → mockCalendarEvents
+GoogleCalendarEvent[]
+  ↓ calendarMapper.mapToCalendarDerivedEvent()
+  ↓ calendarAnalyzer.analyzeCategory/analyzeImportance/hasDeadlineRisk
+CalendarDerivedEvent[]
+  ↓ calendarMapper.mapCalendarDerivedEventToUnifiedScheduleItem()
+UnifiedScheduleItem[]
+  ↓ scheduleProvider.getItems()
+  ↓ providerRegistry.getScheduleItems()
+AIコックピット / ホーム / AI相談 / Briefing Engine
+```
+
+### AI Engine 横断連携（Phase 6 強化）
+
+```
+Inbox Provider（Gmail）× Schedule Provider（Calendar）
+  ↓ priorityEngine.rankItems(inbox, schedule)
+  → Gmail '銀行' タスク + Calendar '銀行打合せ' 予定が同日 → 優先度 +20
+  → Calendar '行政' 予定 + Gmail 関連メール → ブリーフィングへ
+
+  ↓ briefingEngine.generateSections(inbox, risks, schedule)
+  → スケジュールセクション追加（最大5件）
+  → Inbox × Schedule 横断アクション（「10:00 銀行打合せは資料確認メールと関連」）
+```
+
+### 書き込みAPIを実装していない証拠（Calendar）
+
+`client/src/services/calendar/calendarFetcher.ts` には以下の関数は**存在しない**:
+
+| 禁止処理 | 関数名 | 状態 |
+|---------|--------|------|
+| 予定作成 | `createEvent` | 未実装 |
+| 予定更新 | `updateEvent` | 未実装 |
+| 予定削除 | `deleteEvent` | 未実装 |
+| 招待返信 | `respondEvent` | 未実装 |
+| 出席者変更 | `attendeeModify` | 未実装 |
+
+`calendarFetcher.ts` は `GET` リクエストのみ。`POST`/`PATCH`/`PUT`/`DELETE` は一切存在しない。
+
+### 使用スコープ
+
+```
+Phase 6 スコープ（PHASE6_SCOPES）:
+  https://www.googleapis.com/auth/gmail.readonly       ← Phase 5 から継続
+  https://www.googleapis.com/auth/calendar.readonly    ← Phase 6 で追加
+
+禁止スコープ（FORBIDDEN_SCOPES — 絶対に追加しない）:
+  gmail.modify / gmail.send / gmail.compose
+  calendar / calendar.events（書き込み可能）
+  drive / spreadsheets
+```
+
+### 次フェーズ
+
+**Phase 9**: LINE WORKS / Notification Provider 接続
+
+---
+
+## Phase 10 で追加した内容（AI Engine統合 · 全Provider横断 · 社長承認フロー）
+
+### 概要
+
+全5Provider（Gmail / Calendar / Drive / Sheets / LINE WORKS）を横断するAI Engineを構築し、社長室のMVPを完成させた。  
+**外部APIへの書き込みは一切なし。全データはデモモック。承認フローはUIと型のみ（外部実行はPhase 11以降）。**
+
+### AI Engine 新規6ファイル
+
+| ファイル | 役割 |
+|---------|------|
+| `client/src/core/ai-engine/crossProviderContext.ts` | 全Provider横断コンテキスト生成（銀行/請求/事故/人員/現場テーマ）|
+| `client/src/core/ai-engine/companyHealthEngine.ts` | 会社健康スコア（9カテゴリ・グレードA〜D）|
+| `client/src/core/ai-engine/decisionEngine.ts` | 社長の今日の優先判断リスト TOP7 |
+| `client/src/core/ai-engine/actionDraftEngine.ts` | 社長承認用下書き（最大6件・`externalSendDisabled: true`）|
+| `client/src/core/ai-engine/executiveBriefing.ts` | 朝ブリーフィングテキスト生成 |
+| `client/src/core/ai-engine/aiOrchestrator.ts` | `runOrchestrator()` → `OrchestratorResult`（全統合）|
+
+### 画面更新（5画面）
+
+| 画面 | Phase 10 追加 |
+|------|------------|
+| AIコックピット | AI優先アクション TOP5 / 社長承認キュー amber セクション |
+| 今日の要対応 | AI優先順タブ（emerald）/ `DecisionItem` カード |
+| AI相談 | 統合ショートカット indigo バー（8件）|
+| 経営ダッシュボード | 会社健康度カード（9カテゴリグリッド）|
+| 設定 | v1.0.0 / Phase 10 表記 |
+
+### 次フェーズ
+
+**Phase 11**: バックエンドProxy構築・本番OAuth接続・社長承認後の外部実行設計
+
+---
+
+## Phase 9 で追加した内容（LINE WORKS Notification / Inbox Provider デモ接続）
+
+### 概要
+
+LINE WORKS を **読み取り専用** でデモ接続し、AI社長室の Notification Provider / Inbox Provider に通知・社内連絡を流し込む。  
+Inbox × Schedule × File × BusinessData × Notification の **五元横断分析** を開始。
+
+- 緊急通知（事故・SOS・欠勤・車両・遅延）5件をデモ表示
+- 社内連絡（見積依頼・請求確認・シフト・銀行対応）4件をデモ表示
+- **メッセージ送信・返信・既読化・削除・Bot送信・Webhook返信 等の書き込みは一切実装していません**
+
+### 絶対禁止操作（LINE WORKS）
+
+| 操作 | 実装状態 |
+|------|---------|
+| メッセージ送信 | `WRITE_FORBIDDEN` エラー（throw） |
+| 返信送信 | `WRITE_FORBIDDEN` エラー（throw） |
+| 既読化（markAsRead） | `WRITE_FORBIDDEN` エラー（throw） |
+| トーク削除 | `WRITE_FORBIDDEN` エラー（throw） |
+| ファイル送信 | `WRITE_FORBIDDEN` エラー（throw） |
+| ユーザー追加 | `WRITE_FORBIDDEN` エラー（throw） |
+| Bot送信 | `WRITE_FORBIDDEN` エラー（throw） |
+| チャンネル投稿 | `WRITE_FORBIDDEN` エラー（throw） |
+| Webhook返信 | 未実装（Phase 10以降） |
+| メッセージ更新 | `WRITE_FORBIDDEN` エラー（throw） |
+
+### 追加したファイル（8ファイル）
+
+| ファイル | 役割 |
+|---------|------|
+| `client/src/services/lineworks/types.ts` | LINE WORKS固有型定義 |
+| `client/src/services/lineworks/mockLineworks.ts` | モックデータ9件（通知5件 + 受信箱4件） |
+| `client/src/services/lineworks/lineworksClient.ts` | fetchNotifications / fetchInboxMessages（読み取りのみ） |
+| `client/src/services/lineworks/lineworksFetcher.ts` | GET専用HTTPラッパー + WRITE_FORBIDDENガード |
+| `client/src/services/lineworks/lineworksMapper.ts` | LineWorksMessage → UnifiedNotification / UnifiedInboxItem 変換 |
+| `client/src/services/lineworks/lineworksAnalyzer.ts` | detectNotificationRisks / createNotificationSummary |
+| `client/src/services/lineworks/lineworksCache.ts` | 5分TTLキャッシュ（localStorage） |
+| `client/src/services/lineworks/lineworksWebhookTypes.ts` | 将来Webhook受信用型定義のみ（送信なし） |
+
+### LINE WORKS Notification Provider → データフロー
+
+```
+mockLineWorksNotifications（5件: 事故・SOS・欠勤・車両・遅延）
+  ↓ lineworksMapper.mapLineWorksToUnifiedNotification()
+UnifiedNotification[]
+  ↓ notificationProvider.getItems()
+  ↓ riskEngine.detectFromNotifications()   → UnifiedRisk[] (accident/sos→critical)
+  ↓ briefingEngine.generateSections()      → 'notification' セクション追加
+  ↓ priorityEngine.rankItems()             → LINE WORKS criticalクロス加点 +30
+AIコックピット（ティールセクション）/ ホーム（ティールカード）/ 今日の要対応 / AI相談
+```
+
+### 環境変数（本番接続時 — Phase 10以降）
+
+```env
+# LINE WORKS（Phase 9: デモ / Phase 10以降: 本番）
+VITE_LINEWORKS_CLIENT_ID=your_client_id_here
+VITE_LINEWORKS_DOMAIN_ID=your_domain_id_here
+VITE_LINEWORKS_BOT_ID=your_bot_id_here
+VITE_LINEWORKS_CHANNEL_ID=your_channel_id_here
+
+# ⚠️ 以下はフロントエンドに置かない（バックエンドのみで管理）
+# LINEWORKS_CLIENT_SECRET=絶対にフロントに置かない
+```
+
+### カラーテーマ（ティール — LINE WORKS統一）
+
+```
+bg:     #F0FDFA (teal-50)
+border: #CCFBF1 (teal-100)
+text:   #0F766E (teal-700)
+button: #14B8A6 (teal-500)
+```
+
+### 次フェーズ
+
+**Phase 11**: バックエンドProxy構築・本番OAuth接続・社長承認後の外部実行設計
+
+---
+
+## Phase 8 で追加した内容（Google Sheets ReadOnly / BusinessData Provider 接続）
+
+### 概要
+
+Google Sheets を **読み取り専用** で接続し、AI社長室の BusinessData Provider に経営数字を流し込む。  
+Inbox × Schedule × File × BusinessData の **四元横断分析** を開始。
+
+- 売上・粗利・資金繰り・未請求・未回収・稼働率・事故件数の 8指標をデモ表示
+- 13週資金繰り・案件粗利ランキング・部署別指標も対応
+- セル更新・行追加・削除・シート作成は **一切実装していません**
+
+### 追加スコープ
+
+| スコープ | 説明 | 書き込み |
+|---------|------|---------|
+| `spreadsheets.readonly` | Sheets 読み取り専用 | **なし** |
+
+### 追加したファイル（9ファイル）
+
+| ファイル | 役割 |
+|---------|------|
+| `client/src/services/sheets/types.ts` | Sheets API 型定義 |
+| `client/src/services/sheets/mockSheets.ts` | デモ経営数字データ（8指標・13週資金繰り等） |
+| `client/src/services/sheets/sheetsRegistry.ts` | スプレッドシートID管理（5ターゲット） |
+| `client/src/services/sheets/sheetsFetcher.ts` | GET 専用フェッチャー（書き込みAPI未実装） |
+| `client/src/services/sheets/sheetsMapper.ts` | シートデータ → UnifiedBusinessMetric 変換 |
+| `client/src/services/sheets/sheetsAnalyzer.ts` | リスク検知・経営サマリー生成 |
+| `client/src/services/sheets/sheetsCache.ts` | ローカルキャッシュ（5分 TTL） |
+| `client/src/services/sheets/sheetsClient.ts` | Sheets ReadOnly 入口 |
+| `docs/release-check/SHEETS_READONLY_DESIGN.md` | Sheets ReadOnly 設計書 |
+
+### 環境変数（本番接続時）
+
+```env
+VITE_GOOGLE_SHEETS_SALES_ID=<スプレッドシートID>
+VITE_GOOGLE_SHEETS_CASHFLOW_ID=<スプレッドシートID>
+VITE_GOOGLE_SHEETS_PROJECT_PROFIT_ID=<スプレッドシートID>
+VITE_GOOGLE_SHEETS_RECEIVABLE_ID=<スプレッドシートID>
+VITE_GOOGLE_SHEETS_PAYABLE_ID=<スプレッドシートID>
+```
+
+## Phase 7 で追加した内容（Google Drive ReadOnly / File Provider 接続）
+
+### 概要
+
+Phase 7 では **Google Drive ReadOnly を File Provider へ接続** しました。  
+取得スコープは `drive.readonly` のみ。**ファイル作成・更新・削除・移動・権限変更・共有設定変更・コメント追加は未実装です。**
+
+### Driveサービス層（新規追加）
+
+```
+client/src/services/drive/
+├── types.ts           — GoogleDriveFile / DriveDerivedFile / DriveSummary / DriveFileCategory 型定義
+├── mockDrive.ts       — デモファイルデータ（銀行・契約・請求・監査・事故・資金繰り・見積 7件）
+├── driveClient.ts     — Drive ReadOnly 入口（認証なし → mock、認証済み → API）
+├── driveFetcher.ts    — GET 専用フェッチャー（createFile/updateFile/deleteFile 未実装）
+├── driveMapper.ts     — GoogleDriveFile → UnifiedFileItem 変換
+├── driveAnalyzer.ts   — カテゴリ・重要度・リスクフラグ・推奨アクション・DriveSummary 判定
+├── driveCache.ts      — ローカルキャッシュ（5分 TTL）
+└── driveSearch.ts     — 関連度スコアリング付きファイル検索
+```
+
+### File Provider への接続
+
+```
+Google Drive API ReadOnly (GET /drive/v3/files)
+  ↓ driveFetcher.fetchDriveFiles(accessToken)
+  ↓ 認証なし → mockDriveFiles
+GoogleDriveFile[]
+  ↓ driveMapper.mapGoogleDriveFileToUnifiedFileItem()
+  ↓ driveAnalyzer.analyzeCategory/analyzeImportance/hasRiskFlag
+UnifiedFileItem[]  (readOnly: true, writeEnabled: false)
+  ↓ fileProvider.getItems()
+AIコックピット / ホーム / AI相談 / Briefing Engine / Search Engine
+```
+
+### AI Engine 三元横断連携（Phase 7 強化）
+
+```
+Inbox Provider（Gmail）× Schedule Provider（Calendar）× File Provider（Drive）
+  ↓ priorityEngine.rankItems(inbox, schedule, files)
+  → Gmail '銀行' タスク + Drive '銀行提出資料' ファイル同カテゴリ → +15
+  → Drive riskFlag ありのファイルが関連 → +10
+
+  ↓ briefingEngine.generateSections(inbox, risks, schedule, files)
+  → Drive ファイルセクション追加（重要A・リスクファイル）
+  → Inbox × Schedule × File 三元横断アクション
+  　（「10:00 銀行打合せは資料メールと「銀行提出資料.xlsx」が関連 → 先に資料確認」）
+
+  ↓ searchEngine.searchAll(query, inbox, files)
+  → Inbox + Drive 横断検索（SearchResults 型）
+```
+
+### 書き込みAPIを実装していない証拠（Drive）
+
+`client/src/services/drive/driveFetcher.ts` には以下の関数は**存在しない**:
+
+| 禁止処理 | 関数名 | 状態 |
+|---------|--------|------|
+| ファイル作成 | `createFile` | 未実装 |
+| ファイル更新 | `updateFile` | 未実装 |
+| ファイル削除 | `deleteFile` | 未実装 |
+| ファイル移動 | `moveFile` | 未実装 |
+| 権限変更 | `changePermission` | 未実装 |
+| 共有設定変更 | `shareFile` | 未実装 |
+| アップロード | `uploadFile` | 未実装 |
+| コピー作成 | `copyFile` | 未実装 |
+| コメント追加 | `addComment` | 未実装 |
+
+`driveFetcher.ts` は `GET` リクエストのみ。`POST`/`PATCH`/`PUT`/`DELETE` は一切存在しない。
+
+### 使用スコープ
+
+```
+Phase 7 スコープ（PHASE7_SCOPES）:
+  https://www.googleapis.com/auth/gmail.readonly       ← Phase 5 から継続
+  https://www.googleapis.com/auth/calendar.readonly    ← Phase 6 から継続
+  https://www.googleapis.com/auth/drive.readonly       ← Phase 7 で追加
+
+禁止スコープ（FORBIDDEN_SCOPES — 絶対に追加しない）:
+  gmail.modify / gmail.send / gmail.compose
+  calendar / calendar.events（書き込み可能）
+  drive（フルアクセス） / drive.file / drive.appdata
+  spreadsheets（書き込み可能）
+```
+
+### 次フェーズ
+
+**Phase 9**: LINE WORKS / Notification Provider 接続
+
+---
+
+## Phase 4.1 で追加した内容（Gmail由来データの画面表示強化）
+
+### 変更概要
+
+Phase 4.1では、Phase 4で追加したGmailサービス層を活かし、**全主要画面でGmail由来データが一目でわかる**ように表示を強化しました。
+
+### mockGmailのみを使用
+
+Phase 4.1においても、`mockGmail.ts` 内の仮データのみを使用しています。  
+外部Gmail APIには接続していません。本番認証情報は一切使用しません。
+
+### Gmail書き込み禁止の継続
+
+以下はすべて未実装のままです（Phase 4.1でも変更なし）：
+- 送信・返信
+- 下書き作成
+- 削除・アーカイブ
+- 既読化・未読化
+- ラベル変更・スター付与
+
+### 追加した関数：`createGmailSummary()`
+
+`gmailAnalyzer.ts` に `createGmailSummary()` 関数を追加しました。  
+mockGmailメッセージから以下の集計値を生成します：
+
+| フィールド | 内容 |
+|-----------|------|
+| `totalCount` | メール総数 |
+| `priorityACount` | 優先度A（重要）件数 |
+| `todayDueCount` | 本日中対応が必要な件数 |
+| `bankCount` | 銀行関連メール件数 |
+| `billingCount` | 請求・支払関連件数 |
+| `contractCount` | 契約関連件数 |
+| `replyDraftCount` | 返信たたき台生成数 |
+| `topItems` | TOP3メッセージ |
+| `safetyNotice` | 安全通知文 |
+
+### 画面ごとの強化内容
+
+| 画面 | Phase 4.1の変更 |
+|------|----------------|
+| ホーム | Gmail要対応サマリーカード追加（重要A/本日中/銀行/請求/契約/返信たたき台の件数チップ） |
+| AIコックピット | Gmailセクションを件数内訳＋TOP3詳細表示に強化（優先度バッジ・タイプバッジ・期限バッジ付き） |
+| 今日の要対応 | GmailタスクカードにデモGmailバッジ・返信未送信バッジ追加、モーダルに元データ・受信日時・推定重要度・書き込み禁止の明示 |
+| AI相談 | Gmailショートカット回答をmockGmail実データに基づく詳細内容に強化 |
+| 設定 | 常時表示のGmail読み取りテストカードを追加（本番準備モードOFF時でも確認可能） |
+
+### 読み取りテストについて
+
+設定画面の「Gmail読み取りテスト」ボタンは、mockGmailデータの件数を確認するものです。  
+実際のGmailアカウントへのアクセスは行いません。テスト結果に「デモGmail5件から取得」と明示しています。
+
+### 次フェーズ予定
+
+**Phase 4-2**: Googleカレンダー読み取り専用連携
+
+### 外部API未接続の確認
+
+Phase 4.1においても外部サービスへの接続は一切行っていません。  
+Gmail・Google Drive・LINE WORKS・Googleカレンダー・Googleスプレッドシート等へのアクセスはゼロです。  
+すべての変更はフロントエンド内のmockデータ表示強化のみです。
+
+---
+
+## Phase 4 で追加した内容（Gmail読み取り専用連携）
+
+### Gmail安全設計ポリシー
+
+**Phase 4はGmail読み取り専用のみ。以下は未実装：**
+- 送信・返信
+- 下書き作成・更新
+- 削除・アーカイブ
+- 既読化・未読化
+- ラベル変更
+- スター付与・解除
+- メールの移動
+
+**社長承認前に外部へ送信されることはない。Gmailデータは画面表示とAI判定用にのみ使用。**
+
+### Gmailサービス層（新規追加）
+
+```
+client/src/services/gmail/
+├── types.ts        — GmailMessage / GmailDerivedTask / GmailConnectionStatus 型定義
+├── mockGmail.ts    — デモGmailデータ5件（本番認証情報未設定時に使用）
+├── gmailAnalyzer.ts— 件名・本文・送信者からタイプ・優先度・期限キーワード判定
+├── gmailMapper.ts  — GmailMessage → GmailDerivedTask 変換（返信文たたき台生成含む）
+└── gmailClient.ts  — 読み取り専用クライアント（書き込み系関数は存在しない）
+```
+
+**書き込み系処理はコードに存在しない。gmailClient.ts は読み取り関数のみを定義。**
+
+### 本番接続に必要な環境変数（実際の値は未設定・コードに書かない）
+
+```env
+# Gmail読み取り専用スコープのみ
+GMAIL_CLIENT_ID=（取得後に設定）
+GMAIL_CLIENT_SECRET=（取得後に設定）
+GMAIL_REDIRECT_URI=（取得後に設定）
+GMAIL_READONLY_SCOPE=https://www.googleapis.com/auth/gmail.readonly
+```
+
+### mockGmailを使用していること
+
+現時点では認証情報が未設定のため、`gmailClient.ts` は常に `mockGmail.ts` の仮データを返します。  
+実際のGmailアカウントには接続していません。
+
+### 画面への反映
+
+| 画面 | Phase 4の変更 |
+|------|-------------|
+| 今日の要対応 | 「Gmailからの要対応」セクション追加（優先度A/Bのみ）、Gmail詳細モーダル（送信ボタンなし、返信文たたき台コピーのみ） |
+| AIコックピット | TOP5の後に「Gmailからの要対応」シンプルリスト追加（デモバッジ付き） |
+| AI相談 | 「📧 Gmailショートカット」横スクロールバー追加（5件のGmail特化クイック質問） |
+| 設定 | デモモード/本番準備モードのインタラクティブトグル化、本番準備モードON時にGmail連携カード表示 |
+
+### 設定画面のモード管理
+
+- **デモモード ON（デフォルト）**: mockGmailデータを表示
+- **本番準備モード ON**: Gmail連携カードが表示される（認証情報未設定のため「未接続」表示）
+- Gmail連携カードでは読み取りテストが可能（認証情報なし時はmock結果を表示）
+
+### 次フェーズ予定
+
+**Phase 4-2**: Googleカレンダー読み取り専用連携
+
+---
+
+## Phase 3 で追加した内容（AIコックピット）
+
+### AIコックピット画面（新規追加）
+
+社長が朝スマホを開いた瞬間に会社の状態を30秒で把握できる専用画面です。下部ナビの「🎯コックピット」またはホーム画面のブリーフィングカードから遷移できます。
+
+#### 1. AIからの一言判断
+今日フォーカスすべき事項をAIが自然文で提示します。優先フォーカスアイテムをタグ表示します。
+
+#### 2. 会社健康スコア
+会社の状態を0〜100点でスコア化し、A〜Dのグレードで表示します。
+- 内訳：資金繰り / 粗利率 / 未請求 / 事故対応 / 人員配置 / 営業の6カテゴリ
+- 各カテゴリは good / warning / danger / normal で色分け
+- なぜその点数なのかのコメントを表示
+- **現時点では仮データ。freee・TKC・Gmail連携後はリアルタイム計算される予定**
+
+#### 3. 今日の優先順位 TOP 5
+AIが考えた優先順位を5件表示します。各アイテムには以下が含まれます：
+- 件名・重要度（最優先/重要/通常）・期限・カテゴリ
+- なぜ優先すべきかの理由
+- 推奨アクション
+- ワンタップ実行ボタン群
+
+#### 4. ワンタップ実行候補
+各優先事項に対し、以下のボタンを表示します：
+- 返信文を作る / 資料作成へ / 担当へ依頼文を作る / 予定登録案を作る / 詳細を見る / 保留にする
+- タップするとボトムシートモーダルで仮生成結果を表示（コピー可能）
+- **実際の送信・登録は行わない。すべて仮生成サンプル**
+
+#### 5. 時系列ビュー（6タブ）
+昨日 / 今日 / 明日 / 今週 / 来週 / 今月 の6タブで重要事項を表示します。
+
+#### 6. AI会社検索
+「人・案件・会社・車両・書類」をキーワード検索できます。
+カテゴリ（人/案件/連絡/書類/予定/タスク）で色分けして表示します。
+**現時点は仮インデックス。Gmail・LINE WORKS連携後はリアルタイム検索が実現**
+
+### 追加したデータ型
+
+```typescript
+CompanyHealthScore   // 会社健康スコア（total, grade, breakdown, comment）
+PriorityAction       // 優先アクション（rank, importance, deadline, reason, suggestions）
+ActionSuggestion     // ワンタップ実行候補（type, draft）
+TimelinePeriodData   // 時系列データ（6期間）
+SearchResult         // 検索結果（category, title, sub, alertLevel）
+AiJudgement          // AI判断一言（message, focusItems, generatedAt）
+```
+
+---
+
+## Phase 3.5 で追加した内容（品質調整）
+
+### 1. ナビゲーション再編成
+ボトムナビを [ホーム / コックピット / **AI相談** / 要対応 / 経営] に変更。「作成」をナビから外し、AI相談タブを復活。
+
+### 2. 作成画面へのアクセス経路を整備
+「作成」はナビにはないが、以下から必ず遷移できます：
+- ホーム画面「クイックアクション」の「✍️ 資料を作る」カード
+- AI相談画面の「✍️ 作成依頼へ（文書・返信・指示文）」ボタン
+- AIコックピット「ワンタップ実行」の「資料作成へ」「担当へ依頼文」ボタン
+
+### 3. デモモード設定追加（設定画面）
+設定画面の最上部に「動作モード設定」セクションを追加：
+- デモモード: **ON**
+- 本番準備モード: **OFF**
+- 外部接続: **未接続**
+- 読み取り専用予定: **ON**
+- 書き込み禁止: **ON**
+
+### 4. デモバナー表示（全主要画面）
+「現在はデモデータ表示中 — 外部サービス未接続 · 書き込みなし」バナーを以下5画面の最上部に表示：
+ホーム / AIコックピット / AI相談 / 今日の要対応 / 経営ダッシュボード
+
+### 5. 法人名の修正
+AI相談の福祉モード説明を「みらい介護サポート」→「一般社団法人みらい創造公社の就労継続支援B型『お結び』」に修正。
+
+### 外部API未接続の明記
+Phase 3.5においても外部サービスへの接続は一切行っていません。Gmail・Google Drive・LINE WORKS・Googleカレンダー・Googleスプレッドシート等へのアクセスはゼロです。すべての変更はフロントエンド内の仮データ修正のみです。
+
+---
+
+## Phase 2 で追加した内容
+
+### 1. AIブリーフィングカード（ホーム）
+朝のブリーフィングカードを追加。変化リスト（danger/warning/normal）と「今日最初にやること」を展開表示。AI相談・要対応への直接ボタン付き。
+
+### 2. 状況カード8枚（ホーム）
+今日の予定・昨日からの変化・重要通知・今日の現場・今日の入金・今日の支払・社員からのSOS・未請求アラートを2列グリッドで表示。danger/warningレベルで色分け。
+
+### 3. AI相談チャット 6モード
+- AI秘書（ネイビー）：メール要約・返信文作成
+- AI経営（パープル）：資金繰り・損益分析
+- AI現場（アンバー）：工程管理・現場サポート
+- AI事務（グリーン）：書類・請求・スケジュール
+- AI営業（レッド）：見積・提案・顧客対応
+- AI福祉（ピンク）：一般社団法人みらい創造公社の就労継続支援B型「お結び」
+
+タブ切替時に各モードのウェルカムメッセージを表示。モード別のキーワードマッチングで仮応答を返す。
+
+### 4. 今日の要対応 詳細モーダル
+タスクタイプバッジ（メール/LINE WORKS/承認/契約/請求/現場/事故/銀行/福祉）と優先度・ステータスを表示。「詳細・返信文を見る」ボタンでボトムシートモーダルを開き、3タブ（概要・背景/返信文たたき台/次のアクション）に切り替えて確認できる。
+
+### 5. 経営ダッシュボード拡張
+- 13週資金繰り予測グラフ（入金/支出/残高の3色バー、横スクロール）
+- 案件粗利ランキング（1〜5位、粗利率の色分け）
+- 部署別利益（3部署）
+- 財務指標グリッド（通常指標10件）
+
+### 6. 作成依頼フォーム拡張
+作成目的・相手・背景・内容・希望トーン・出力形式（チャット/Gmail下書き/Drive保存/Manus/Claude Code/Gemini）を選択してAI生成（現在は仮データ返答）。
+
+### 7. 音声入力モーダル（接続準備中）
+フローティングマイクボタン（橙色、右下）をタップするとボトムシートが出現。現在は「接続準備中」表示のみ。将来的な音声認識と連携予定。
+
+### 8. 設定画面拡張
+- データ連携ステータスバナー（読み取り専用ON・書き込み禁止ON・外部接続未接続）
+- 接続予定ロードマップ（8フェーズ）
+- API連携ポイント一覧（開発者向け）
+
+---
+
+## 外部データへの接触について
+
+**Phase 3においても外部サービスへの接続は一切行っていません。**
+
+- Gmail、LINE WORKS、freee、Google Drive、Googleカレンダー、Googleスプレッドシート、TKC等の既存データへの読み取り・書き込みはゼロです。
+- AIコックピットに表示されるすべてのスコア・優先順位・検索結果は `client/src/data/mockData.ts` 内の仮データです。
+- 会社健康スコアおよび優先順位エンジンは現時点では仮データ。実接続後に自動計算される予定です。
+- ワンタップ実行ボタンが生成する文書もすべて仮サンプルです。実際の送信・保存は行いません。
+- 外部連携は「連携予定」「接続準備中」として表示するのみです。
+
+---
+
+## 今後の接続順序（予定）
+
+| フェーズ | 機能 | 対応時期 |
+|---------|------|---------|
+| ~~Phase 4~~ | ~~Gmail読み取り（サービス層構築）~~ | ✅ 完了 |
+| ~~Phase 4.1~~ | ~~Gmail由来データ全画面表示強化~~ | ✅ 完了 |
+| ~~Phase 5~~ | ~~Google OAuth + Gmail ReadOnly 実接続基盤~~ | ✅ 完了 |
+| ~~Phase 6~~ | ~~Google Calendar ReadOnly / Schedule Provider~~ | ✅ 完了 |
+| ~~Phase 7~~ | ~~Google Drive ReadOnly / File Provider~~ | ✅ 完了 |
+| ~~Phase 8~~ | ~~Google Sheets ReadOnly / BusinessData Provider~~ | ✅ 完了 |
+| ~~Phase 9~~ | ~~LINE WORKS Notification / Inbox Provider デモ接続~~ | ✅ 完了 |
+| ~~Phase 10~~ | ~~AI Engine統合・全Provider横断・社長承認フロー（UIと型のみ）~~ | ✅ 完了 |
+| **Phase 11** | **バックエンドProxy構築・本番OAuth接続・社長承認後の外部実行設計** | 次回 |
+| 将来 | Gmail下書き作成（送信なし・人間承認必須） | 将来 |
+
+**書き込み処理はすべて人間の最終確認を前提とし、自動送信・自動保存は行いません。**
+
+---
+
+### 今後のAPI連携ポイント
+
+| 機能 | エンドポイント | プロバイダー |
+|------|---------------|-------------|
+| AI相談チャット | `POST /api/chat` | Claude API（ストリーミング対応予定） |
+| 今日の要対応 | `GET /api/actions` | Gmail API + LINE WORKS API |
+| 経営ダッシュボード | `GET /api/dashboard` | freee API + Google Sheets API |
+| 作成依頼 | `POST /api/create` | Claude API（テンプレート別プロンプト） |
+| 設定保存 | `PUT /api/settings` | ローカルDB（Phase 1はlocalStorage） |
+
+### 技術スタック（フロントエンド）
+
+- React 18 + TypeScript
+- Vite 5
+- 純CSS変数（外部CSSフレームワーク不使用）
+- iPhone Safe Area対応（`env(safe-area-inset-*)` 使用）
+- PWA対応（apple-mobile-web-app-capable設定済み）
+
+---
 
 このリポジトリは、最初からGmail、LINE WORKS、kintone、AI APIへ本番接続しません。Phase 1では、外部APIキーなしで動くローカルMVPを優先します。
 
