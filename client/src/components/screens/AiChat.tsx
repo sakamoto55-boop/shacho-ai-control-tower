@@ -30,6 +30,7 @@ import { searchDriveFiles } from '../../services/drive/driveSearch'
 import { mockBusinessDataset } from '../../services/sheets/mockSheets'
 import { createBusinessSummary, detectBusinessRisks } from '../../services/sheets/sheetsAnalyzer'
 import { mockLineWorksNotifications, mockLineWorksInboxMessages } from '../../services/lineworks/mockLineworks'
+import { googleToken } from '../../services/google/googleToken'
 import { mapLineWorksToUnifiedNotification } from '../../services/lineworks/lineworksMapper'
 import { createNotificationSummary } from '../../services/lineworks/lineworksAnalyzer'
 
@@ -405,7 +406,7 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
 
   // Mission 1.1: 全Provider実データ対応・順次反映
   // 初期はデモ入力で即表示 → 各Providerが取得完了するたびに再計算・差し替え
-  const dataRef = useRef<OrchestratorInput>(getDemoInput())
+  const dataRef = useRef<OrchestratorInput>(googleToken.hasToken() ? { inbox: [], schedule: [], files: [], metrics: [], notifications: [] } : getDemoInput())
   const statusRef = useRef<ProviderStatusMap>({
     inbox: 'loading', schedule: 'loading', file: 'loading', business: 'loading', notification: 'loading',
   })
@@ -452,37 +453,37 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
   useEffect(() => {
     if (loadedRef.current) return
     loadedRef.current = true
-    refreshBriefingMessage() // デモ即表示（取得中）
+    refreshBriefingMessage() // 接続時は空データ、未接続時のみデモ
 
     loadInboxItems().then((r) => {
       dataRef.current = { ...dataRef.current, inbox: r.items }
       statusRef.current = { ...statusRef.current, inbox: r.source }
       refreshBriefingMessage()
-    }).catch(() => { statusRef.current = { ...statusRef.current, inbox: 'mock' }; refreshBriefingMessage() })
+    }).catch(() => { statusRef.current = { ...statusRef.current, inbox: googleToken.hasToken() ? 'error' : 'mock' }; refreshBriefingMessage() })
 
     loadScheduleItems().then((r) => {
       dataRef.current = { ...dataRef.current, schedule: r.items }
       statusRef.current = { ...statusRef.current, schedule: r.source }
       refreshBriefingMessage()
-    }).catch(() => { statusRef.current = { ...statusRef.current, schedule: 'mock' }; refreshBriefingMessage() })
+    }).catch(() => { statusRef.current = { ...statusRef.current, schedule: googleToken.hasToken() ? 'error' : 'mock' }; refreshBriefingMessage() })
 
     loadFileItems().then((r) => {
       dataRef.current = { ...dataRef.current, files: r.items }
       statusRef.current = { ...statusRef.current, file: r.source }
       refreshBriefingMessage()
-    }).catch(() => { statusRef.current = { ...statusRef.current, file: 'mock' }; refreshBriefingMessage() })
+    }).catch(() => { statusRef.current = { ...statusRef.current, file: googleToken.hasToken() ? 'error' : 'mock' }; refreshBriefingMessage() })
 
     loadMetricItems().then((r) => {
       dataRef.current = { ...dataRef.current, metrics: r.items }
       statusRef.current = { ...statusRef.current, business: r.source }
       refreshBriefingMessage()
-    }).catch(() => { statusRef.current = { ...statusRef.current, business: 'mock' }; refreshBriefingMessage() })
+    }).catch(() => { statusRef.current = { ...statusRef.current, business: googleToken.hasToken() ? 'error' : 'mock' }; refreshBriefingMessage() })
 
     loadNotificationItems().then((r) => {
       dataRef.current = { ...dataRef.current, notifications: r.items }
       statusRef.current = { ...statusRef.current, notification: r.source }
       refreshBriefingMessage()
-    }).catch(() => { statusRef.current = { ...statusRef.current, notification: 'mock' }; refreshBriefingMessage() })
+    }).catch(() => { statusRef.current = { ...statusRef.current, notification: googleToken.hasToken() ? 'error' : 'mock' }; refreshBriefingMessage() })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -502,7 +503,7 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: getMockResponse(activeMode, text, orchResult, dataStatus, currentBriefingInput()),
+        content: googleToken.hasToken() ? '現在は接続済みの実データだけを使用します。未接続・未設定Providerの情報は回答に含めません。ホームの実データ要約をご確認ください。' : getMockResponse(activeMode, text, orchResult, dataStatus, currentBriefingInput()),
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, aiMsg])
@@ -615,6 +616,8 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
         })}
       </div>
 
+      {/* 接続時はデモ用ショートカット（架空データ前提）を非表示にする */}
+      {!googleToken.hasToken() && (<>
       {/* ── 統合AI ショートカット（Phase 10）── */}
       <div
         style={{
@@ -890,6 +893,7 @@ export default function AiChat({ onVoice, onNavigate }: Props) {
           </button>
         ))}
       </div>
+      </>)}
 
       {/* ── メッセージリスト ── */}
       <div

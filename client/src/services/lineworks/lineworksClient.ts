@@ -4,13 +4,14 @@
 import type { LineWorksNotificationMessage, LineWorksInboxMessage } from './types'
 import { mockLineWorksNotifications, mockLineWorksInboxMessages } from './mockLineworks'
 import { lineworksCache } from './lineworksCache'
+import { googleToken } from '../google/googleToken'
 
 const hasBotId = (): boolean => !!import.meta.env.VITE_LINEWORKS_BOT_ID
 const hasDomainId = (): boolean => !!import.meta.env.VITE_LINEWORKS_DOMAIN_ID
 
 interface FetchResult<T> {
   data: T
-  source: 'mock' | 'cache' | 'api'
+  source: 'mock' | 'cache' | 'api' | 'unconfigured'
 }
 
 export const lineworksClient = {
@@ -25,11 +26,11 @@ export const lineworksClient = {
       // const data = await lineworksFetcher.getMessages(...)
     }
 
-    return { data: mockLineWorksNotifications, source: 'mock' }
+    return googleToken.hasToken() ? { data: [], source: 'unconfigured' } : { data: mockLineWorksNotifications, source: 'mock' }
   },
 
   async fetchInboxMessages(): Promise<FetchResult<LineWorksInboxMessage[]>> {
-    return { data: mockLineWorksInboxMessages, source: 'mock' }
+    return googleToken.hasToken() ? { data: [], source: 'unconfigured' } : { data: mockLineWorksInboxMessages, source: 'mock' }
   },
 
   async refresh(): Promise<void> {

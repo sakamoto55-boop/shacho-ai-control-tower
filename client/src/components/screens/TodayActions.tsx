@@ -8,6 +8,7 @@ import { mapLineWorksToUnifiedNotification, mapLineWorksToUnifiedInboxItem } fro
 import type { UnifiedNotification, UnifiedInboxItem } from '../../core/providers/providerTypes'
 import DemoBanner from '../DemoBanner'
 import { runOrchestrator } from '../../core/ai-engine/aiOrchestrator'
+import { googleToken } from '../../services/google/googleToken'
 
 interface Props {
   demoMode?: boolean
@@ -55,6 +56,9 @@ const TABS: { id: ActiveTab; label: string }[] = [
 ]
 
 export default function TodayActions({ demoMode }: Props) {
+  if (googleToken.hasToken()) {
+    return <div className="screen-content"><DemoBanner /><div style={{background:'#fff',borderRadius:14,padding:18,boxShadow:'var(--shadow)'}}><h3 style={{margin:'0 0 8px'}}>実データの要対応はホームに表示中</h3><p style={{margin:0,color:'var(--text-muted)',lineHeight:1.7}}>この旧画面はデモ専用データで構成されていたため、本番接続中は非表示にしました。架空の事故・SOS・社内通知は表示しません。</p></div></div>
+  }
   const [activeTab, setActiveTab] = useState<ActiveTab>('ai')
   const [expanded, setExpanded] = useState<Priority>('A')
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set())

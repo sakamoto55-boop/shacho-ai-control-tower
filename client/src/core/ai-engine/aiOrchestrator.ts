@@ -168,8 +168,14 @@ export async function loadInboxItems(): Promise<{ items: UnifiedInboxItem[]; sou
     gmailItems = mapGmailMessagesToInbox(messages)
     source = googleToken.hasToken() ? 'api' : 'mock'
   } catch {
-    gmailItems = mapGmailMessagesToInbox(mockGmailMessages)
-    source = 'mock'
+    // 接続時は架空データを出さない（取得失敗＝空）。未接続時のみデモ。
+    if (googleToken.hasToken()) {
+      gmailItems = []
+      source = 'error'
+    } else {
+      gmailItems = mapGmailMessagesToInbox(mockGmailMessages)
+      source = 'mock'
+    }
   }
   const lw = await lineworksClient.fetchInboxMessages()
   const lwItems = lw.data.map(mapLineWorksToUnifiedInboxItem)

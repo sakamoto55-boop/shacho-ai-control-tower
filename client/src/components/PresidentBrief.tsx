@@ -22,6 +22,14 @@ import { triageActionMail } from '../core/president/mailTriage'
 import { computeOverdue } from '../core/president/overdue'
 import { isTodayJst, formatJstTime } from '../core/president/dateUtil'
 import { projectLedgerClient, type LedgerSource } from '../core/president/projectLedgerClient'
+import { googleToken } from '../services/google/googleToken'
+
+// 接続時は架空データを一切使わない（空から実データローダーで埋める）。
+// 未接続時のみデモを表示する。
+const EMPTY_INPUT: OrchestratorInput = { inbox: [], schedule: [], files: [], metrics: [], notifications: [] }
+function initialInput(): OrchestratorInput {
+  return googleToken.hasToken() ? { ...EMPTY_INPUT } : getDemoInput()
+}
 
 type SourceState = DataSource | 'loading'
 
@@ -46,7 +54,7 @@ function sourceBadge(state: SourceState | LedgerSource): { text: string; color: 
 const isReal = (s: SourceState | LedgerSource) => s === 'api' || s === 'cache'
 
 export default function PresidentBrief({ onNavigate }: Props) {
-  const dataRef = useRef<OrchestratorInput>(getDemoInput())
+  const dataRef = useRef<OrchestratorInput>(initialInput())
   const [result, setResult] = useState<OrchestratorResult>(() => assembleOrchestratorResult(dataRef.current))
   const [status, setStatus] = useState<{ inbox: SourceState; schedule: SourceState; business: SourceState }>({
     inbox: 'loading', schedule: 'loading', business: 'loading',
@@ -143,7 +151,7 @@ export default function PresidentBrief({ onNavigate }: Props) {
             { k: 'メール', s: status.inbox, t: lastFetched.inbox },
             { k: '数字', s: status.business, t: lastFetched.business },
             { k: '案件', s: projects.source as SourceState, t: lastFetched.projects },
-            { k: '通知', s: 'mock' as SourceState, t: null },
+            { k: '通知', s: (googleToken.hasToken() ? 'unconfigured' : 'mock') as SourceState, t: null },
           ].map((x) => {
             const b = sourceBadge(x.s)
             return (

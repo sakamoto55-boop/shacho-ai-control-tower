@@ -29,6 +29,7 @@ import type { UnifiedScheduleItem, UnifiedFileItem } from '../../core/providers/
 import DemoBanner from '../DemoBanner'
 import { runOrchestrator } from '../../core/ai-engine/aiOrchestrator'
 import type { ActionDraft, DecisionItem } from '../../core/ai-engine/aiEngineTypes'
+import { googleToken } from '../../services/google/googleToken'
 
 // AI Engine: Schedule Provider (Phase 6) + File Provider (Phase 7) + BusinessData Provider (Phase 8) + Inbox Provider 横断参照
 
@@ -79,6 +80,9 @@ const demoFileItems = mockDriveFiles
 const demoDriveSummary = createDriveSummary(mockDriveFiles)
 
 export default function CockpitScreen({ demoMode }: { demoMode?: boolean }) {
+  if (googleToken.hasToken()) {
+    return <div className="screen-content"><DemoBanner /><div style={{background:'#fff',borderRadius:14,padding:18,boxShadow:'var(--shadow)'}}><h3 style={{margin:'0 0 8px'}}>コックピット実データ化中</h3><p style={{margin:0,color:'var(--text-muted)',lineHeight:1.7}}>メール以外の実データ連携が揃うまで、事故・SOS・財務・人員などの推定値は表示しません。ホームのProvider別状態をご確認ください。</p></div></div>
+  }
   const [expandedActionId, setExpandedActionId] = useState<string | null>('pa1')
   const [activeSuggestion, setActiveSuggestion] = useState<ActionSuggestion | null>(null)
   const [activeTimeline, setActiveTimeline] = useState<TimelinePeriod>('today')

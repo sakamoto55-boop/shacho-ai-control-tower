@@ -9,6 +9,8 @@
 import { googleToken } from '../google/googleToken'
 import { sheetsCache } from './sheetsCache'
 import { mockBusinessDataset } from './mockSheets'
+
+const emptyDataset: UnifiedBusinessDataset = { metrics: [], cashflowWeeks: [], projectProfits: [], departmentMetrics: [], source: 'api', fetchedAt: new Date(0).toISOString() }
 import { SHEET_TARGETS, getSheetId } from './sheetsRegistry'
 import { fetchSheetValues } from './sheetsFetcher'
 import { mapSheetValuesToMetrics } from './sheetsMapper'
@@ -35,7 +37,7 @@ export const sheetsClient = {
 
     // シートID未設定 → 未設定（デモへフォールバック）
     if (configured.length === 0) {
-      return { dataset: mockBusinessDataset, source: 'unconfigured' }
+      return { dataset: emptyDataset, source: 'unconfigured' }
     }
 
     // キャッシュ有効なら返す
@@ -55,7 +57,7 @@ export const sheetsClient = {
       if (metrics.length === 0) {
         const stale = sheetsCache.get()
         if (stale) return { dataset: stale, source: 'cache' }
-        return { dataset: mockBusinessDataset, source: 'error' }
+        return { dataset: emptyDataset, source: 'error' }
       }
 
       const dataset: UnifiedBusinessDataset = {
@@ -72,7 +74,7 @@ export const sheetsClient = {
       // エラー時は stale キャッシュ or デモ（取得失敗）
       const stale = sheetsCache.get()
       if (stale) return { dataset: stale, source: 'cache' }
-      return { dataset: mockBusinessDataset, source: 'error' }
+      return { dataset: emptyDataset, source: 'error' }
     }
   },
 

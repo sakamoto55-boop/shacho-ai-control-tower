@@ -14,7 +14,7 @@ import { fetchCalendarEvents } from './calendarFetcher'
 import { mockCalendarEvents } from './mockCalendar'
 import type { GoogleCalendarEvent } from './types'
 
-export type CalendarDataSource = 'mock' | 'cache' | 'api'
+export type CalendarDataSource = 'mock' | 'cache' | 'api' | 'error'
 
 interface FetchResult {
   events: GoogleCalendarEvent[]
@@ -42,7 +42,7 @@ export const calendarClient = {
       if (stale) {
         return { events: JSON.parse(stale) as GoogleCalendarEvent[], source: 'cache' }
       }
-      return { events: mockCalendarEvents, source: 'mock' }
+      return { events: [], source: 'error' }
     }
   },
 

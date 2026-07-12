@@ -10,12 +10,16 @@ import { mockBusinessDataset } from '../../services/sheets/mockSheets'
 import { detectBusinessRisks } from '../../services/sheets/sheetsAnalyzer'
 import DemoBanner from '../DemoBanner'
 import { runOrchestrator } from '../../core/ai-engine/aiOrchestrator'
+import { googleToken } from '../../services/google/googleToken'
 
 const TODAY = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' })
 const MAX_BALANCE = Math.max(...cashflowWeeks.map((w) => w.balance))
 const businessRisks = detectBusinessRisks(mockBusinessDataset.metrics)
 
 export default function Dashboard() {
+  if (googleToken.hasToken()) {
+    return <div className="screen-content"><DemoBanner /><div style={{background:'#fff',borderRadius:14,padding:18,boxShadow:'var(--shadow)'}}><h3 style={{margin:'0 0 8px'}}>経営データ未設定</h3><p style={{margin:0,color:'var(--text-muted)',lineHeight:1.7}}>Google認証は完了しています。対象スプレッドシートが未設定のため、売上・粗利・現金残高・健康度スコアは表示しません。架空データは使用していません。</p></div></div>
+  }
   const [cfExpanded, setCfExpanded] = useState(true)
   const [projExpanded, setProjExpanded] = useState(true)
   const orchestratorResult = useMemo(() => runOrchestrator(), [])

@@ -16,6 +16,7 @@ import { mockLineWorksNotifications } from '../../services/lineworks/mockLinewor
 import { mapLineWorksToUnifiedNotification } from '../../services/lineworks/lineworksMapper'
 import { createNotificationSummary } from '../../services/lineworks/lineworksAnalyzer'
 import { runOrchestrator } from '../../core/ai-engine/aiOrchestrator'
+import { googleToken } from '../../services/google/googleToken'
 
 interface Props {
   onNavigate: (screen: Screen) => void
@@ -92,6 +93,8 @@ export default function Home({ onNavigate, onVoice }: Props) {
       <ErrorBoundary label="AI社長室トップ">
         <PresidentBrief onNavigate={onNavigate} />
       </ErrorBoundary>
+
+      {!googleToken.hasToken() && (<>
 
       {/* ── Schedule Provider — 今日の予定 ── */}
       <div
@@ -732,6 +735,7 @@ export default function Home({ onNavigate, onVoice }: Props) {
           </div>
         ))}
       </div>
+      </>)}
     </div>
   )
 }

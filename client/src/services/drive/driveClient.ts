@@ -6,7 +6,7 @@ import type { GoogleDriveFile } from './types'
 
 interface FetchResult {
   files: GoogleDriveFile[]
-  source: 'mock' | 'cache' | 'api'
+  source: 'mock' | 'cache' | 'api' | 'error'
 }
 
 export const driveClient = {
@@ -26,7 +26,7 @@ export const driveClient = {
     } catch {
       const stale = driveCache.get()
       if (stale) return { files: stale, source: 'cache' }
-      return { files: mockDriveFiles, source: 'mock' }
+      return { files: [], source: 'error' }
     }
   },
 
