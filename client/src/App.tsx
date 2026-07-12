@@ -13,6 +13,7 @@ import Settings from './components/screens/Settings'
 import CockpitScreen from './components/screens/CockpitScreen'
 import { googleAuth } from './services/google/googleAuth'
 import { googleSession } from './services/google/googleSession'
+import { googleToken } from './services/google/googleToken'
 
 const SCREEN_TITLES: Record<Screen, string> = {
   home: 'AI社長室',
@@ -38,8 +39,9 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('home')
   const [company, setCompany] = useState('lcc')
   const [showVoice, setShowVoice] = useState(false)
-  const [demoMode, setDemoMode] = useState(true)
-  const [productionReady, setProductionReady] = useState(false)
+  // Google接続済みなら自動的にデモOFF（実データ運用）
+  const [demoMode, setDemoMode] = useState(() => !googleToken.hasToken())
+  const [productionReady, setProductionReady] = useState(() => googleToken.hasToken())
 
   const companyData = companies.find((c) => c.id === company)
   const sub = screen === 'home' ? (companyData?.name ?? 'LCC株式会社') : SCREEN_SUBS[screen]

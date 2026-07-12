@@ -4,6 +4,7 @@ import { getConnectionStatus, fetchInboxMessages } from '../../services/gmail/gm
 import { mockGmailMessages } from '../../services/gmail/mockGmail'
 import { createGmailSummary } from '../../services/gmail/gmailAnalyzer'
 import { googleAuth } from '../../services/google/googleAuth'
+import { googleGis } from '../../services/google/googleGis'
 import { googleSession } from '../../services/google/googleSession'
 import { GOOGLE_SCOPES, getScopeLabel } from '../../services/google/googleScopes'
 import { getOAuthPreConnectCheck } from '../../services/google/googleConfig'
@@ -110,15 +111,20 @@ export default function Settings({
     setGmailTesting(false)
   }
 
+  // GIS トークンモデルで接続（Client Secret不要・バックエンド不要・リダイレクトなし）
   async function handleGoogleConnect() {
     setGConnectError(null)
     setGConnecting(true)
     try {
-      await googleAuth.startOAuthFlow()
-      // startOAuthFlow() はページ遷移するため、ここには戻らない
+      await googleGis.connect()
+      googleSession.setConnected()
+      setGSession(googleSession.get())
+      // 実データで全Provider/画面を再初期化するためリロード
+      window.location.reload()
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Google接続の開始に失敗しました'
-      setGConnectError(msg)
+      const msg = e instanceof Error ? e.message : 'Google接続に失敗しました'
+      googleSession.setError(msg)
+      setGConnectError(msg) // 失敗時はデモへ黙って戻さず、原因を画面表示
       setGConnecting(false)
     }
   }
@@ -140,11 +146,20 @@ export default function Settings({
   const [ledgerSaved, setLedgerSaved] = useState(false)
   const ledgerConfigured = !!loadLedgerConfig()
 
-  function handleReconnect() {
+  async function handleReconnect() {
+    setGConnectError(null)
     googleAuth.disconnect()
     googleSession.clear()
     setGSession(googleSession.get())
-    void googleAuth.startOAuthFlow().catch(() => { /* ページ遷移 */ })
+    try {
+      await googleGis.connect()
+      googleSession.setConnected()
+      window.location.reload()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '再接続に失敗しました'
+      googleSession.setError(msg)
+      setGConnectError(msg)
+    }
   }
 
   function handleLedgerSave() {
@@ -251,7 +266,7 @@ export default function Settings({
                 Google 接続
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                {gSession.connectedEmail ?? 'Gmail 読み取り専用スコープのみ'}
+                {gSession.connectedEmail ?? 'Gmail / Calendar / Drive / Sheets 読み取り専用（4スコープ）'}
               </div>
             </div>
           </div>
@@ -365,7 +380,7 @@ export default function Settings({
           const rows = [
             { label: 'Client ID設定', ok: check.hasClientId, value: check.hasClientId ? (check.clientIdMasked ?? '設定済み') : '未設定' },
             { label: 'Redirect URI設定', ok: check.hasRedirectUri, value: check.hasRedirectUri ? check.redirectUri : '未設定' },
-            { label: 'スコープ', ok: true, value: 'gmail.readonly のみ（Phase 11）' },
+            { label: 'スコープ', ok: true, value: 'readonly 4スコープ（gmail/calendar/drive/sheets）' },
             { label: '書き込みAPI', ok: true, value: '未実装' },
             { label: '本番接続準備', ok: check.isReadyToConnect, value: check.isReadyToConnect ? '完了' : '未完了' },
           ]
@@ -465,7 +480,7 @@ export default function Settings({
               fontWeight: 800,
             }}
           >
-            {gConnecting ? '⏳ Googleへ接続中...' : '🔐 Googleアカウントで接続（Gmail ReadOnly のみ）'}
+            {gConnecting ? '⏳ Googleへ接続中...' : '🔐 Googleアカウントで接続（読み取り専用4スコープ）'}
           </button>
         )}
 
