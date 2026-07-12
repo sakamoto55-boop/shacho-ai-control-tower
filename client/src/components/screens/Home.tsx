@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react'
 import type { Screen } from '../../types'
 import { actionItems, todayBriefing, situationCards, dashboardMetrics } from '../../data/mockData'
 import DemoBanner from '../DemoBanner'
+import ErrorBoundary from '../ErrorBoundary'
+import PresidentBrief from '../PresidentBrief'
 import { mockGmailMessages } from '../../services/gmail/mockGmail'
 import { createGmailSummary } from '../../services/gmail/gmailAnalyzer'
 import { mockCalendarEvents } from '../../services/calendar/mockCalendar'
@@ -85,6 +87,11 @@ export default function Home({ onNavigate, onVoice }: Props) {
   return (
     <div className="screen-content">
       <DemoBanner />
+
+      {/* ── AI社長室トップ（LCC MVP 7領域集約・実データ対応）── */}
+      <ErrorBoundary label="AI社長室トップ">
+        <PresidentBrief onNavigate={onNavigate} />
+      </ErrorBoundary>
 
       {/* ── Schedule Provider — 今日の予定 ── */}
       <div

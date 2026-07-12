@@ -4,6 +4,7 @@ import { companies } from './data/mockData'
 import Navigation from './components/Navigation'
 import VoiceModal from './components/VoiceModal'
 import Home from './components/screens/Home'
+import ErrorBoundary from './components/ErrorBoundary'
 import AiChat from './components/screens/AiChat'
 import TodayActions from './components/screens/TodayActions'
 import CreateRequest from './components/screens/CreateRequest'
@@ -107,29 +108,31 @@ export default function App() {
         </button>
       </header>
 
-      {/* スクリーン */}
+      {/* スクリーン（画面ごとにエラー境界で保護し、全体停止を防ぐ）*/}
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {screen === 'home' && (
-          <Home onNavigate={navigate} company={companyData?.name ?? 'LCC株式会社'} onVoice={() => setShowVoice(true)} />
-        )}
-        {screen === 'chat' && <AiChat onVoice={() => setShowVoice(true)} onNavigate={navigate} />}
-        {screen === 'actions' && <TodayActions demoMode={demoMode} />}
-        {screen === 'create' && <CreateRequest onNavigateToChat={() => navigate('chat')} />}
-        {screen === 'dashboard' && <Dashboard />}
-        {screen === 'settings' && (
-          <Settings
-            company={company}
-            onCompanyChange={(id) => {
-              setCompany(id)
-              navigate('home')
-            }}
-            demoMode={demoMode}
-            productionReady={productionReady}
-            onDemoModeChange={setDemoMode}
-            onProductionReadyChange={setProductionReady}
-          />
-        )}
-        {screen === 'cockpit' && <CockpitScreen demoMode={demoMode} />}
+        <ErrorBoundary label={screen}>
+          {screen === 'home' && (
+            <Home onNavigate={navigate} company={companyData?.name ?? 'LCC株式会社'} onVoice={() => setShowVoice(true)} />
+          )}
+          {screen === 'chat' && <AiChat onVoice={() => setShowVoice(true)} onNavigate={navigate} />}
+          {screen === 'actions' && <TodayActions demoMode={demoMode} />}
+          {screen === 'create' && <CreateRequest onNavigateToChat={() => navigate('chat')} />}
+          {screen === 'dashboard' && <Dashboard />}
+          {screen === 'settings' && (
+            <Settings
+              company={company}
+              onCompanyChange={(id) => {
+                setCompany(id)
+                navigate('home')
+              }}
+              demoMode={demoMode}
+              productionReady={productionReady}
+              onDemoModeChange={setDemoMode}
+              onProductionReadyChange={setProductionReady}
+            />
+          )}
+          {screen === 'cockpit' && <CockpitScreen demoMode={demoMode} />}
+        </ErrorBoundary>
       </main>
 
       {/* フローティングマイクボタン（チャット画面以外） */}
