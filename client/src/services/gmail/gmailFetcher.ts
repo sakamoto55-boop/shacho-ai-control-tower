@@ -6,10 +6,13 @@ import { googleStorage } from '../google/googleStorage'
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me'
 
-// 既定の検索クエリ（受信トレイ・未読・過去24時間）
-// Phase 11: 本番接続は「過去24時間・未読」を対象とする
-const DEFAULT_QUERY = 'is:unread newer_than:1d'
-const MAX_RESULTS = 20
+// 既定の検索クエリ（受信トレイ・過去72時間）
+// 未読に限定せず、過去72時間の受信を対象にトリアージ側で「要返信」を推定する
+// （自動送信/広告/メルマガ/通知は mailTriage で優先度を下げる）
+export const GMAIL_DEFAULT_QUERY = 'in:inbox newer_than:3d'
+const DEFAULT_QUERY = GMAIL_DEFAULT_QUERY
+const MAX_RESULTS = 30
+const MAX_DETAIL = 20
 
 interface GmailApiListMessage {
   id: string
@@ -116,9 +119,9 @@ export const gmailFetcher = {
       return []
     }
 
-    // 2. 各メッセージの詳細を並列取得（最大10件）
+    // 2. 各メッセージの詳細を並列取得（最大 MAX_DETAIL 件）
     const details = await Promise.all(
-      ids.slice(0, 10).map(async (id): Promise<GmailApiMessageDetail | null> => {
+      ids.slice(0, MAX_DETAIL).map(async (id): Promise<GmailApiMessageDetail | null> => {
         const res = await fetch(`${GMAIL_API}/messages/${id}?format=full`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         })

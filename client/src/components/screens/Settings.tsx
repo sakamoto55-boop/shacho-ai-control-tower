@@ -16,6 +16,13 @@ import {
   loadMetricItems,
   type DataSource,
 } from '../../core/ai-engine/aiOrchestrator'
+import { getOAuthDiagnostics } from '../../services/google/oauthDiagnostics'
+import {
+  loadLedgerConfig,
+  saveLedgerConfig,
+  clearLedgerConfig,
+  type LedgerConfig,
+} from '../../core/president/projectLedger'
 import type { GoogleSession } from '../../services/google/googleSession'
 import type { GmailFetchRange, GmailDerivedTask } from '../../types'
 import type { ProviderDescriptor } from '../../core/providers/providerTypes'
@@ -121,6 +128,33 @@ export default function Settings({
     googleSession.clear()
     setGSession(googleSession.get())
     setGConnectError(null)
+  }
+
+  // Mission: OAuth診断 / 案件台帳設定
+  const diag = getOAuthDiagnostics()
+  const emptyLedger: LedgerConfig = {
+    spreadsheetId: '', sheetName: '',
+    columns: { projectName: '案件名', assignee: '担当者', status: 'ステータス', revenue: '売上', cost: '原価', grossProfit: '粗利', deadline: '期限', updatedAt: '最終更新' },
+  }
+  const [ledger, setLedger] = useState<LedgerConfig>(() => loadLedgerConfig() ?? emptyLedger)
+  const [ledgerSaved, setLedgerSaved] = useState(false)
+  const ledgerConfigured = !!loadLedgerConfig()
+
+  function handleReconnect() {
+    googleAuth.disconnect()
+    googleSession.clear()
+    setGSession(googleSession.get())
+    void googleAuth.startOAuthFlow().catch(() => { /* ページ遷移 */ })
+  }
+
+  function handleLedgerSave() {
+    saveLedgerConfig(ledger)
+    setLedgerSaved(true)
+    setTimeout(() => setLedgerSaved(false), 2000)
+  }
+  function handleLedgerClear() {
+    clearLedgerConfig()
+    setLedger(emptyLedger)
   }
 
   const MODE_ROWS = [
@@ -605,6 +639,79 @@ export default function Settings({
           </div>
         )
       })()}
+
+      {/* ── Google OAuth 接続診断 ── */}
+      <div style={{ background: '#fff', borderRadius: 'var(--radius)', padding: '14px 16px', marginBottom: 14, boxShadow: 'var(--shadow)', border: `1.5px solid ${diag.needsReconnect ? '#FCA5A5' : '#BBF7D0'}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <span style={{ fontSize: 20 }}>🔐</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--navy)' }}>Google 接続診断</div>
+            <div style={{ fontSize: 10, color: '#6B7280', fontWeight: 600 }}>アクセストークンは表示しません</div>
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 800, borderRadius: 999, padding: '3px 9px', color: diag.connected ? '#065F46' : '#991B1B', background: diag.connected ? '#D1FAE5' : '#FEE2E2' }}>
+            {diag.connected ? '接続済み' : '未接続'}
+          </span>
+        </div>
+
+        {diag.connected && (
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
+            アカウント：{diag.email ?? '（不明）'}<br />
+            有効期限：{diag.expired ? '⚠️ 期限切れ' : diag.expiresInMinutes !== null ? `あと約${diag.expiresInMinutes}分` : '不明'}
+          </div>
+        )}
+
+        {/* サービス別 取得可否 */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+          {([['Gmail', diag.services.gmail], ['Calendar', diag.services.calendar], ['Drive', diag.services.drive], ['Sheets', diag.services.sheets]] as const).map(([name, ok]) => (
+            <span key={name} style={{ fontSize: 11, fontWeight: 700, borderRadius: 8, padding: '4px 9px', color: ok ? '#065F46' : '#92400E', background: ok ? '#D1FAE5' : '#FEF3C7' }}>
+              {name}：{ok ? '取得可' : 'スコープ無'}
+            </span>
+          ))}
+        </div>
+
+        {diag.needsReconnect && diag.reconnectReason && (
+          <div style={{ fontSize: 11, color: '#991B1B', background: '#FEE2E2', borderRadius: 8, padding: '8px 10px', marginBottom: 10, lineHeight: 1.5 }}>
+            ⚠️ {diag.reconnectReason}
+          </div>
+        )}
+
+        <button onClick={handleReconnect} style={{ width: '100%', padding: '11px', borderRadius: 10, background: '#1B3D6F', color: '#fff', fontSize: 13, fontWeight: 800, minHeight: 44 }}>
+          🔄 切断して再接続（gmail/calendar/drive/sheets 読み取り）
+        </button>
+      </div>
+
+      {/* ── 進行中プロジェクト：案件台帳の設定 ── */}
+      <div style={{ background: '#fff', borderRadius: 'var(--radius)', padding: '14px 16px', marginBottom: 14, boxShadow: 'var(--shadow)', border: '1.5px solid #FDE68A' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 20 }}>📁</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#92400E' }}>案件台帳（進行中プロジェクト）</div>
+            <div style={{ fontSize: 10, color: '#B45309', fontWeight: 600 }}>{ledgerConfigured ? '設定済み · 読み取り専用' : '案件台帳未設定'}</div>
+          </div>
+        </div>
+        <div style={{ fontSize: 10, color: '#6B7280', marginBottom: 10, lineHeight: 1.5 }}>
+          スプレッドシートIDとシート名、各列の「ヘッダー名」を登録します（列順は自由）。認証情報は保存しません。
+        </div>
+
+        {([['spreadsheetID', 'spreadsheetId'], ['シート名', 'sheetName']] as const).map(([label, key]) => (
+          <LedgerField key={key} label={label} value={ledger[key]}
+            onChange={(v) => setLedger((c) => ({ ...c, [key]: v }))} />
+        ))}
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#92400E', margin: '8px 0 4px' }}>列のヘッダー名</div>
+        {([['案件名(必須)', 'projectName'], ['担当者', 'assignee'], ['ステータス', 'status'], ['売上', 'revenue'], ['原価', 'cost'], ['粗利', 'grossProfit'], ['期限', 'deadline'], ['最終更新', 'updatedAt']] as const).map(([label, key]) => (
+          <LedgerField key={key} label={label} value={ledger.columns[key]}
+            onChange={(v) => setLedger((c) => ({ ...c, columns: { ...c.columns, [key]: v } }))} />
+        ))}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          <button onClick={handleLedgerSave} disabled={!ledger.spreadsheetId || !ledger.sheetName} style={{ flex: 1, padding: '10px', borderRadius: 10, background: (!ledger.spreadsheetId || !ledger.sheetName) ? 'var(--border)' : '#B45309', color: '#fff', fontSize: 13, fontWeight: 800, minHeight: 44 }}>
+            {ledgerSaved ? '✓ 保存しました' : '保存'}
+          </button>
+          <button onClick={handleLedgerClear} style={{ padding: '10px 16px', borderRadius: 10, background: '#F1F5F9', color: '#475569', fontSize: 13, fontWeight: 700, minHeight: 44 }}>
+            クリア
+          </button>
+        </div>
+      </div>
 
       {/* ── SHOGUN データ接続状態（Mission 1.3）── */}
       {(() => {
@@ -1323,6 +1430,20 @@ function StatusBadge({
           }}
         />
       )}
+    </div>
+  )
+}
+
+// 案件台帳 設定用の入力フィールド
+function LedgerField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', minWidth: 96, flexShrink: 0 }}>{label}</span>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ flex: 1, minWidth: 0, fontSize: 13, padding: '8px 10px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)' }}
+      />
     </div>
   )
 }
