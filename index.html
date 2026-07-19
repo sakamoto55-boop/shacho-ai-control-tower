@@ -1,18 +1,705 @@
 <!DOCTYPE html>
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#1B3D6F" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Crect width='32' height='32' rx='8' fill='%231B3D6F'/%3E%3Ctext x='16' y='22' font-size='18' font-weight='900' text-anchor='middle' fill='white' font-family='sans-serif'%3EA%3C/text%3E%3C/svg%3E" />
-    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Crect width='180' height='180' rx='40' fill='%231B3D6F'/%3E%3Ctext x='90' y='120' font-size='90' font-weight='900' text-anchor='middle' fill='white' font-family='sans-serif'%3EA%3C/text%3E%3C/svg%3E" />
-    <title>AI社長室</title>
-    <script type="module" crossorigin src="/shacho-ai-control-tower/assets/index-CvGh96rR.js"></script>
-    <link rel="stylesheet" crossorigin href="/shacho-ai-control-tower/assets/index-TzTFvXO9.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="LCC業務">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a2a5e">
+<meta name="description" content="LCC株式会社 統合業務システム ポータル。見積システムと原価管理アプリへの入口。">
+<title>LCC株式会社 統合業務システム</title>
+
+<!-- ============================================================
+     PWA manifest（インライン / 外部ファイル不使用）
+     - icons に SVG データURIを2サイズ登録し、ホーム追加時にアイコンが出るよう修正
+       （元ファイルは icons:[] で空だったためアイコンが表示されない不具合があった）
+     ============================================================ -->
+<link rel="manifest" href='data:application/manifest+json,{"name":"LCC統合業務システム","short_name":"LCC業務","start_url":"./index.html","scope":"./","display":"standalone","orientation":"portrait","background_color":"%230a2a5e","theme_color":"%230a2a5e","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27192%27 height=%27192%27%3E%3Crect width=%27192%27 height=%27192%27 rx=%2738%27 fill=%27%230a2a5e%27/%3E%3Ctext x=%2796%27 y=%27126%27 font-size=%2796%27 font-weight=%27900%27 text-anchor=%27middle%27 fill=%27white%27 font-family=%27sans-serif%27%3EL%3Ctspan fill=%27%23ff7a18%27%3EC%3C/tspan%3EC%3C/text%3E%3C/svg%3E","sizes":"192x192","type":"image/svg+xml","purpose":"any maskable"},{"src":"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27512%27 height=%27512%27%3E%3Crect width=%27512%27 height=%27512%27 rx=%27102%27 fill=%27%230a2a5e%27/%3E%3Ctext x=%27256%27 y=%27336%27 font-size=%27256%27 font-weight=%27900%27 text-anchor=%27middle%27 fill=%27white%27 font-family=%27sans-serif%27%3EL%3Ctspan fill=%27%23ff7a18%27%3EC%3C/tspan%3EC%3C/text%3E%3C/svg%3E","sizes":"512x512","type":"image/svg+xml","purpose":"any maskable"}]}'>
+
+<!-- iOS ホーム追加用アイコン（apple-touch-icon） -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Crect width='180' height='180' fill='%230a2a5e'/%3E%3Ctext x='90' y='118' font-size='90' font-weight='900' text-anchor='middle' fill='white' font-family='sans-serif'%3EL%3Ctspan fill='%23ff7a18'%3EC%3C/tspan%3EC%3C/text%3E%3C/svg%3E">
+<!-- ブラウザタブ用 favicon（SVG） -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' rx='12' fill='%230a2a5e'/%3E%3Ctext x='32' y='44' font-size='34' font-weight='900' text-anchor='middle' fill='white' font-family='sans-serif'%3EL%3Ctspan fill='%23ff7a18'%3EC%3C/tspan%3EC%3C/text%3E%3C/svg%3E">
+
+<!-- Vue 3 / Tailwind は CDN 読み込み（ビルドツール不使用） -->
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+  /* ============================================================
+     カラーパレット（紺グラデ + オレンジアクセント）
+     ============================================================ */
+  :root{
+    --lcc-navy:#0a2a5e;        /* 基調の紺 */
+    --lcc-navy-deep:#06183a;   /* 深い紺（グラデの終点） */
+    --lcc-blue:#1d6fe0;        /* 補助のブルー */
+    --lcc-orange:#ff7a18;      /* アクセントのオレンジ */
+    --lcc-orange-soft:#ffb066; /* やわらかいオレンジ */
+    --lcc-green:#16a34a;       /* 完了・正常を表す緑 */
+  }
+
+  /* タップ時のハイライトを消す／ボックスモデル統一 */
+  *{ -webkit-tap-highlight-color:transparent; box-sizing:border-box; }
+  html,body{
+    margin:0;
+    /* 全面の紺グラデ背景 */
+    background:linear-gradient(160deg,var(--lcc-navy) 0%,var(--lcc-navy-deep) 100%);
+    background-attachment:fixed;
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    color:#1f2937;
+    min-height:100vh;
+  }
+  html,body{ max-width:100%; overflow-x:hidden; } /* 横スクロール禁止 */
+
+  /* iOSのズーム防止：入力系は16px以上 */
+  input,select,textarea,button{ font-size:16px; }
+
+  /* 本文の基準フォントを底上げ（現場・高齢者向けに最低14px以上を確保） */
+  body{ font-size:15px; line-height:1.6; }
+
+  /* タップ領域を44px以上に（押しやすさ最優先） */
+  button{ min-height:44px; cursor:pointer; }
+
+  /* ============================================================
+     タップフィードバック共通クラス（.tap）
+     - 指でタップした瞬間に軽く縮むアニメーションで「押した感」を統一
+     - ボタン／カード／チップなど押せる要素に付与する
+     ============================================================ */
+  .tap{ transition:transform .12s cubic-bezier(0.23,1,0.32,1), filter .12s; }
+  .tap:active{ transform:scale(.96); filter:brightness(.97); }
+
+  [v-cloak]{ display:none; }
+
+  /* ============================================================
+     オープニングアニメーション
+     紺背景 → LCCロゴ ポップアップ → スイープ光 → 社名表示 → フェードアウト
+     ============================================================ */
+  .opening{
+    position:fixed; inset:0; z-index:9999;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:linear-gradient(160deg,var(--lcc-navy) 0%,var(--lcc-navy-deep) 100%);
+    overflow:hidden;
+  }
+  /* フェードアウト用クラス（2秒後に付与） */
+  .opening.fade-out{ animation:openingFade .6s ease forwards; }
+  @keyframes openingFade{ to{ opacity:0; visibility:hidden; } }
+
+  /* ロゴ枠（L[オレンジのC]C）がポップアップ */
+  .op-logo{
+    position:relative;
+    font-weight:900; letter-spacing:.06em;
+    font-size:64px; line-height:1;
+    color:#fff;
+    padding:14px 26px;
+    border:4px solid var(--lcc-orange);
+    border-radius:18px;
+    opacity:0;
+    transform:scale(.4);
+    animation:logoPop .7s cubic-bezier(0.18,1.25,0.4,1) .15s forwards;
+    overflow:hidden;
+  }
+  .op-logo .c{ color:var(--lcc-orange); }
+  @keyframes logoPop{
+    0%{ opacity:0; transform:scale(.4); }
+    70%{ opacity:1; transform:scale(1.08); }
+    100%{ opacity:1; transform:scale(1); }
+  }
+
+  /* スイープ光（ロゴの上を斜めに通過する光の帯） */
+  .op-logo::after{
+    content:"";
+    position:absolute; top:0; left:-130%;
+    width:60%; height:100%;
+    background:linear-gradient(100deg,transparent 0%,rgba(255,255,255,.0) 20%,rgba(255,255,255,.55) 50%,rgba(255,255,255,0) 80%,transparent 100%);
+    transform:skewX(-18deg);
+    animation:logoSweep .8s ease-in-out .85s forwards;
+  }
+  @keyframes logoSweep{ 0%{ left:-130%; } 100%{ left:130%; } }
+
+  /* 社名（LCC株式会社） */
+  .op-name{
+    margin-top:22px;
+    color:#fff; font-weight:800; font-size:22px; letter-spacing:.08em;
+    opacity:0; transform:translateY(10px);
+    animation:nameIn .6s ease 1.05s forwards;
+  }
+  /* 英字サブ（SHIMANE IZUMO） */
+  .op-sub{
+    margin-top:6px;
+    color:var(--lcc-orange-soft); font-weight:700; font-size:12px; letter-spacing:.32em;
+    opacity:0; transform:translateY(10px);
+    animation:nameIn .6s ease 1.3s forwards;
+  }
+  @keyframes nameIn{ to{ opacity:1; transform:translateY(0); } }
+
+  /* オープニングをスキップするための小さなヒント */
+  .op-skip{
+    position:absolute; bottom:calc(24px + env(safe-area-inset-bottom));
+    color:rgba(255,255,255,.5); font-size:11px; letter-spacing:.1em;
+    opacity:0; animation:nameIn .6s ease 1.6s forwards;
+  }
+
+  /* ============================================================
+     システムカード（見積システム / 原価管理）
+     ============================================================ */
+  .sys-card{
+    display:block; text-decoration:none;
+    background:#ffffff; border-radius:20px;
+    padding:18px;
+    box-shadow:0 8px 24px rgba(0,0,0,.18);
+    border:1px solid rgba(255,255,255,.5);
+    transition:transform .16s cubic-bezier(0.23,1,0.32,1), box-shadow .16s;
+  }
+  /* .tapと重複しないよう:activeは維持（より強い視覚フィードバック） */
+  .sys-card:active{ transform:scale(.97); box-shadow:0 4px 14px rgba(0,0,0,.22); }
+  .sys-icon{
+    width:56px; height:56px; border-radius:16px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:28px; flex-shrink:0;
+  }
+  /* カード内のクイックリンク（チップ） */
+  /* タップ領域を44px以上に拡大し、本文サイズも14pxへ底上げ（押しやすさ最優先） */
+  .chip{
+    display:inline-flex; align-items:center; gap:6px;
+    border-radius:999px; padding:10px 14px;
+    font-size:14px; font-weight:700;
+    text-decoration:none;
+    transition:transform .12s, filter .12s;
+    min-height:44px;
+  }
+  .chip:active{ transform:scale(.94); filter:brightness(.96); }
+
+  /* ============================================================
+     業務フロー（今やるべきこと）ステップ
+     ============================================================ */
+  .flow-step{
+    display:flex; align-items:center; gap:14px;
+    background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:16px;
+    padding:14px;
+  }
+  .flow-badge{
+    width:46px; height:46px; flex-shrink:0;
+    border-radius:14px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:22px; font-weight:900; color:#fff;
+    background:linear-gradient(135deg,var(--lcc-orange) 0%,#e85d00 100%);
+    box-shadow:0 4px 10px rgba(255,122,24,.35);
+  }
+  .flow-jump{
+    flex-shrink:0;
+    border:none; border-radius:12px;
+    padding:0 18px; min-height:48px;
+    font-weight:800; font-size:15px; color:#fff;
+    background:var(--lcc-blue);
+    box-shadow:0 3px 8px rgba(29,111,224,.4);
+    transition:transform .12s;
+  }
+  .flow-jump:active{ transform:scale(.94); }
+
+  /* ============================================================
+     お知らせ / 更新履歴セクション 共通パネル
+     ============================================================ */
+  .panel{
+    background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:16px;
+    padding:14px 16px;
+  }
+  /* お知らせ1件 */
+  .news-item{
+    display:flex; gap:10px; align-items:flex-start;
+    padding:11px 0;
+    border-bottom:1px dashed rgba(255,255,255,.14);
+  }
+  .news-item:last-child{ border-bottom:none; }
+  /* 種別ラベル（重要 / 更新 / 案内） */
+  .news-tag{
+    flex-shrink:0; font-size:12px; font-weight:800; color:#fff;
+    border-radius:6px; padding:4px 9px; line-height:1.3; letter-spacing:.02em;
+  }
+
+  /* 更新履歴のタイムライン */
+  .log-item{
+    display:flex; gap:12px; padding:9px 0;
+    border-bottom:1px dashed rgba(255,255,255,.12);
+  }
+  .log-item:last-child{ border-bottom:none; }
+  .log-ver{
+    flex-shrink:0; width:64px;
+    font-size:13px; font-weight:800; color:var(--lcc-orange-soft);
+  }
+
+  /* 折りたたみの開閉アイコン回転 */
+  .chevron{ transition:transform .2s; }
+  .chevron.open{ transform:rotate(180deg); }
+
+  /* safe-area 対応の下部余白 */
+  .safe-bottom{ padding-bottom:calc(28px + env(safe-area-inset-bottom)); }
+
+  /* PWAインストール案内バー */
+  .install-bar{
+    background:linear-gradient(135deg,var(--lcc-orange) 0%,#e85d00 100%);
+    border-radius:14px; padding:12px 14px;
+    box-shadow:0 6px 16px rgba(255,122,24,.35);
+  }
+</style>
+</head>
+<body>
+<div id="app" v-cloak>
+
+  <!-- ============================================================
+       オープニングアニメーション
+       showOpening が true の間だけ表示。2秒後に fadeOut → 非表示
+       画面タップで即スキップできる（現場の方の待ち時間短縮）
+       ============================================================ -->
+  <div v-if="showOpening" class="opening" :class="{ 'fade-out': openingFade }" @click="skipOpening">
+    <div class="op-logo">L<span class="c">C</span>C</div>
+    <div class="op-name">LCC株式会社</div>
+    <div class="op-sub">SHIMANE IZUMO</div>
+    <div class="op-skip">タップでスキップ</div>
+  </div>
+
+  <!-- ============================================================
+       メイン：統合トップ画面（分岐ハブ）
+       ============================================================ -->
+  <main class="safe-bottom" style="padding-top:calc(env(safe-area-inset-top) + 22px)">
+    <div class="mx-auto px-4" style="max-width:620px">
+
+      <!-- ヘッダー（ロゴ + 社名 + 日付） -->
+      <header class="flex items-center gap-3 mb-5 text-white">
+        <span class="font-black text-xl px-2.5 py-1 rounded-lg"
+              style="border:2.5px solid var(--lcc-orange); letter-spacing:.05em">
+          L<span style="color:var(--lcc-orange)">C</span>C
+        </span>
+        <div class="leading-tight flex-1 min-w-0">
+          <div class="text-lg font-bold">LCC株式会社</div>
+          <div class="text-[11px] tracking-[.25em]" style="color:var(--lcc-orange-soft)">SHIMANE IZUMO</div>
+        </div>
+        <!-- 今日の日付（自動表示） -->
+        <div class="text-right leading-tight">
+          <div class="text-[12px] text-blue-200">{{ today.dow }}</div>
+          <div class="text-[15px] font-bold">{{ today.md }}</div>
+        </div>
+      </header>
+
+      <!-- 見出し -->
+      <h1 class="text-white font-bold text-[22px] mb-1">統合業務システム</h1>
+      <p class="text-blue-200 text-[13px] mb-5">使うシステムを選んでください</p>
+
+      <!-- ============================================================
+           PWAインストール案内（ホーム追加未済のときだけ表示）
+           - Android/Chrome: beforeinstallprompt を捕捉してワンタップ追加
+           - iOS Safari: 手順を案内
+           ============================================================ -->
+      <div v-if="showInstall" class="install-bar mb-5 flex items-center gap-3 text-white">
+        <div class="text-2xl">📲</div>
+        <div class="flex-1 min-w-0 leading-snug">
+          <div class="font-bold text-[14px]">ホーム画面に追加すると便利です</div>
+          <div class="text-[11.5px] opacity-90">{{ installHint }}</div>
+        </div>
+        <button v-if="canPrompt" @click="doInstall"
+                class="bg-white/95 rounded-lg px-4 py-2 font-bold text-[14px] tap" style="color:#e85d00; min-height:44px">追加</button>
+        <button @click="dismissInstall"
+                class="text-white/80 text-2xl px-2 py-1 tap" aria-label="閉じる" style="min-height:44px">×</button>
+      </div>
+
+      <!-- ============================================================
+           【案件起点】クイック案件登録（トップから1タップ）
+           スマホで 30～60 秒で新規案件を登録できるよう、最上位に大きく配置。
+           見積起点ではなく「案件起点」を明示するため、システムカードより上に置く。
+           ============================================================ -->
+      <div class="mb-5">
+        <!-- 新規案件を登録：lcc.html#new でクイック案件登録モーダルが開く -->
+        <a href="lcc.html#new" class="no-underline block rounded-2xl px-5 py-4 mb-3 shadow-md"
+           style="background:linear-gradient(135deg,#ff7a18,#e85d00); color:#fff">
+          <div class="flex items-center gap-4">
+            <div class="text-4xl">➕</div>
+            <div class="flex-1 min-w-0">
+              <div class="font-black text-[19px] leading-tight">新規案件を登録</div>
+              <div class="text-[12.5px] opacity-90 mt-0.5">顧客・現場・種別を入れてその場で受付（30秒～）</div>
+            </div>
+            <div class="text-3xl opacity-80">›</div>
+          </div>
+        </a>
+        <!-- その他の案件起点導線（3ボタン） -->
+        <div class="grid grid-cols-3 gap-2">
+          <a href="lcc.html#estimate" class="no-underline rounded-xl bg-white border border-gray-200 px-2 py-3 text-center shadow-sm tap">
+            <div class="text-2xl">📄</div><div class="text-[12px] font-bold text-gray-700 mt-1">見積を作る</div>
+          </a>
+          <a href="lcc.html#projects" class="no-underline rounded-xl bg-white border border-gray-200 px-2 py-3 text-center shadow-sm tap">
+            <div class="text-2xl">📁</div><div class="text-[12px] font-bold text-gray-700 mt-1">案件を開く</div>
+          </a>
+          <a href="lcc.html#customers" class="no-underline rounded-xl bg-white border border-gray-200 px-2 py-3 text-center shadow-sm tap">
+            <div class="text-2xl">👤</div><div class="text-[12px] font-bold text-gray-700 mt-1">顧客から</div>
+          </a>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           2つのシステムカード（概要 + クイックアクセスチップ）
+           ============================================================ -->
+      <div class="grid grid-cols-1 gap-4 mb-7">
+
+        <!-- ---------- 見積システム → lcc.html ---------- -->
+        <div class="sys-card">
+          <!-- カード本体（タップで見積システムトップへ） -->
+          <a href="lcc.html" class="flex items-center gap-4 no-underline">
+            <div class="sys-icon" style="background:#fff2e6; color:var(--lcc-orange)">🧮</div>
+            <div class="flex-1 min-w-0">
+              <div class="font-bold text-[17px]" style="color:var(--lcc-navy)">見積システム</div>
+              <div class="text-[12.5px] text-gray-500 mt-0.5">案件登録・見積書作成・実行予算</div>
+            </div>
+            <div class="text-gray-300 text-2xl">›</div>
+          </a>
+          <!-- 概要説明 -->
+          <p class="text-[12px] text-gray-500 mt-3 leading-relaxed">
+            お客様向けの見積書と、社内用の実行予算（積算）を同時に作成。粗利率は設定値を初期値として、明細ごとに調整できます。運搬費は見積書では「一式」表示、社内では個別表示に切り替わります。
+          </p>
+          <!-- クイックアクセスチップ（主要機能へ直接ジャンプ） -->
+          <div class="flex flex-wrap gap-2 mt-3">
+            <a v-for="q in estimateQuick" :key="q.label" :href="q.url"
+               class="chip tap" style="background:#fff2e6; color:#e85d00">
+              <span>{{ q.icon }}</span>{{ q.label }}
+            </a>
+          </div>
+        </div>
+
+        <!-- ---------- 原価管理 → lcc-cost.html ---------- -->
+        <div class="sys-card">
+          <a href="lcc-cost.html" class="flex items-center gap-4 no-underline">
+            <div class="sys-icon" style="background:#e6f0ff; color:var(--lcc-blue)">📊</div>
+            <div class="flex-1 min-w-0">
+              <div class="font-bold text-[17px]" style="color:var(--lcc-navy)">原価管理</div>
+              <div class="text-[12.5px] text-gray-500 mt-0.5">日報・請求書仕分け・予実突合せ</div>
+            </div>
+            <div class="text-gray-300 text-2xl">›</div>
+          </a>
+          <p class="text-[12px] text-gray-500 mt-3 leading-relaxed">
+            現場の人工・車両・産廃を日報でタップ入力し、業者請求を現場ごとに仕分け。実行予算（見積）と実績原価を並べて突合せ、利益を確認できます。
+          </p>
+          <div class="flex flex-wrap gap-2 mt-3">
+            <a v-for="q in costQuick" :key="q.label" :href="q.url"
+               class="chip tap" style="background:#e6f0ff; color:#1558b0">
+              <span>{{ q.icon }}</span>{{ q.label }}
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           今やるべきこと（業務フロー案内）
+           ① 見積作成 → ② 日報入力 → ③ 請求書仕分け → ④ 突合せ確認
+           ============================================================ -->
+      <section class="mb-7">
+        <h2 class="text-white font-bold text-[16px] mb-1 flex items-center gap-2">
+          <span>✅</span> 今やるべきこと
+        </h2>
+        <p class="text-blue-200 text-[12px] mb-3">上から順に進めると業務が完了します</p>
+
+        <div class="grid grid-cols-1 gap-2.5">
+          <div v-for="step in flowSteps" :key="step.no" class="flow-step">
+            <div class="flow-badge">{{ step.no }}</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-white font-bold text-[15px]">{{ step.title }}</div>
+              <div class="text-blue-200 text-[12px] mt-0.5 leading-snug">{{ step.desc }}</div>
+            </div>
+            <button class="flow-jump tap" @click="lccGo(step.url)">開く</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           お知らせ（社内連絡・システム案内）
+           ============================================================ -->
+      <section class="mb-7">
+        <h2 class="text-white font-bold text-[16px] mb-3 flex items-center gap-2">
+          <span>📢</span> お知らせ
+        </h2>
+        <div class="panel">
+          <div v-for="n in news" :key="n.date + n.title" class="news-item">
+            <span class="news-tag" :style="{ background:n.color }">{{ n.tag }}</span>
+            <div class="flex-1 min-w-0">
+              <div class="text-white font-bold text-[13.5px] leading-snug">{{ n.title }}</div>
+              <div class="text-blue-200 text-[12px] mt-0.5 leading-snug">{{ n.body }}</div>
+              <div class="text-blue-300/70 text-[11px] mt-1">{{ n.date }}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           更新履歴（折りたたみ）
+           - 初期は閉じておき、必要な人だけ開く（画面をすっきり保つ）
+           ============================================================ -->
+      <section class="mb-7">
+        <button @click="logOpen = !logOpen"
+                class="w-full flex items-center gap-2 text-white font-bold text-[16px] mb-3 bg-transparent border-0 p-0 tap">
+          <span>🛠️</span>
+          <span>更新履歴</span>
+          <span class="text-[12px] font-normal text-blue-300 ml-1">v{{ changelog[0].ver }} 最新</span>
+          <span class="ml-auto text-blue-200 text-sm chevron" :class="{ open: logOpen }">▼</span>
+        </button>
+        <div v-show="logOpen" class="panel">
+          <div v-for="c in changelog" :key="c.ver" class="log-item">
+            <div class="log-ver">v{{ c.ver }}</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-white text-[13px] font-bold leading-snug">{{ c.title }}</div>
+              <ul class="text-blue-200 text-[12px] mt-1 leading-snug list-disc pl-4">
+                <li v-for="(item, i) in c.items" :key="i">{{ item }}</li>
+              </ul>
+              <div class="text-blue-300/70 text-[11px] mt-1">{{ c.date }}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           サポート / 連絡先（現場で困ったときの導線）
+           ============================================================ -->
+      <section class="mb-7">
+        <div class="panel flex items-center gap-3">
+          <div class="text-2xl">🆘</div>
+          <div class="flex-1 min-w-0 leading-snug">
+            <div class="text-white font-bold text-[13.5px]">使い方で困ったら</div>
+            <div class="text-blue-200 text-[12px] mt-0.5">事務所までご連絡ください（内線・電話）</div>
+          </div>
+          <!-- 電話発信（スマホでタップすると発信画面が開く） -->
+          <a href="tel:0853000000"
+             class="chip tap" style="background:var(--lcc-green); color:#fff">📞 電話</a>
+        </div>
+      </section>
+
+      <!-- フッター -->
+      <footer class="text-center text-blue-300 text-[11px] mt-8">
+        © LCC株式会社 / 島根県出雲市<br>
+        <span class="text-blue-300/60">統合業務システム ポータル v{{ changelog[0].ver }}</span>
+      </footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   統合トップ画面（分岐ハブ）の Vue アプリ
+   - ビルドツールは使わず、CDN の Vue 3 をそのまま利用
+   - すべて1ファイル完結（外部assets不使用）
+   ============================================================ */
+const { createApp, ref, reactive, computed, onMounted } = Vue;
+
+createApp({
+  setup(){
+    /* ---------- オープニング表示制御 ---------- */
+    const showOpening = ref(true);  // 起動直後は表示
+    const openingFade = ref(false); // フェードアウト開始フラグ
+
+    /* 今日の日付（ヘッダー右上に表示） */
+    const today = reactive({ md:'', dow:'' });
+
+    /* ============================================================
+       クイックアクセス（見積システム lcc.html の主要機能）
+       ※ 各 url のハッシュ（#new 等）は、lcc.html 側が
+         location.hash を見て該当画面/タブを開く前提。
+         ハッシュ未対応でも lcc.html トップが開くので安全。
+       ============================================================ */
+    const estimateQuick = [
+      { icon:'➕', label:'新規案件',   url:'lcc.html#new' },        // クイック案件登録モーダル
+      { icon:'📄', label:'見積を作る', url:'lcc.html#estimate' },   // 案件を選んでから見積作成
+      { icon:'📁', label:'案件一覧',   url:'lcc.html#projects' },   // 案件一覧（旧 #list を #projects に統一）
+    ];
+
+    /* クイックアクセス（原価管理 lcc-cost.html の主要機能） */
+    const costQuick = [
+      { icon:'📝', label:'日報入力',     url:'lcc-cost.html#daily' },
+      { icon:'🧾', label:'請求書仕分け', url:'lcc-cost.html#invoice' },
+      { icon:'⚖️', label:'予実突合せ',   url:'lcc-cost.html#match' },
+    ];
+
+    /* ============================================================
+       今やるべきこと：4ステップの業務フロー
+       ============================================================ */
+    const flowSteps = [
+      { no:1, title:'見積作成',     desc:'案件を登録し、見積書（実行予算）を作る', url:'lcc.html#new' },
+      { no:2, title:'日報入力',     desc:'現場の人工・車両・産廃をタップ入力',     url:'lcc-cost.html#daily' },
+      { no:3, title:'請求書仕分け', desc:'業者請求を現場ごとに金額を振り分ける',   url:'lcc-cost.html#invoice' },
+      { no:4, title:'突合せ確認',   desc:'予算と実績を並べて確認し承認する',       url:'lcc-cost.html#match' },
+    ];
+
+    /* ============================================================
+       お知らせ（社内連絡・運用案内）
+       ※ 実運用では事務所の方が date/title/body を書き換えて使う。
+         色（color）は重要=赤系 / 更新=青 / 案内=緑 で統一。
+       ============================================================ */
+    const news = [
+      { date:'2026-06-25', tag:'重要', color:'#dc2626',
+        title:'月末の日報入力をお願いします',
+        body:'当月分の日報は月末までに入力を完了してください。未入力があると突合せができません。' },
+      { date:'2026-06-20', tag:'更新', color:'#1d6fe0',
+        title:'見積書PDFの運搬費表示を改善',
+        body:'お客様向け見積書では車両費を「運搬費一式」にまとめて表示するようになりました。' },
+      { date:'2026-06-10', tag:'案内', color:'#16a34a',
+        title:'ホーム画面への追加を推奨',
+        body:'スマホのホーム画面に追加すると、アプリのように1タップで起動できます。' },
+    ];
+
+    /* ============================================================
+       更新履歴（changelog）— 先頭が最新
+       ============================================================ */
+    const changelog = [
+      { ver:'1.2.0', date:'2026-06-26', title:'ポータル機能強化',
+        items:[
+          'お知らせ・更新履歴セクションを追加',
+          '各アプリへのクイックアクセス（直接リンク）を追加',
+          'PWAアイコンを設定し、ホーム追加に対応',
+          'PC表示の最適化とデザイン調整',
+        ] },
+      { ver:'1.1.0', date:'2026-05-15', title:'業務フロー案内を追加',
+        items:[ '「今やるべきこと」4ステップを追加', '各ステップから該当画面へジャンプ可能に' ] },
+      { ver:'1.0.0', date:'2026-04-01', title:'統合ポータル公開',
+        items:[ '見積システムと原価管理アプリへの入口を統合', 'オープニングアニメーションを実装' ] },
+    ];
+
+    /* ---------- 更新履歴の開閉 ---------- */
+    const logOpen = ref(false);
+
+    /* ============================================================
+       PWAインストール案内
+       ============================================================ */
+    const showInstall = ref(false);   // 案内バーを出すか
+    const canPrompt = ref(false);     // ネイティブの追加プロンプトが使えるか
+    const installHint = ref('');      // 端末別の案内文
+    let deferredPrompt = null;        // beforeinstallprompt を保持
+
+    /* スタンドアロン（既にホームから起動）かどうか判定 */
+    function isStandalone(){
+      return window.matchMedia('(display-mode: standalone)').matches
+          || window.navigator.standalone === true;
+    }
+    /* iOS / iPadOS Safari かどうかの判定
+       ※ iPadOS 13 以降は UA が Mac を名乗るため、
+         「Macintosh かつタッチ操作可能」を iPad とみなして補完する */
+    function isiOS(){
+      const ua = navigator.userAgent || '';
+      if(/iphone|ipad|ipod/i.test(ua)) return true;
+      // iPadOS（デスクトップ表示）判定：Macかつタッチポイントあり
+      const isIpadOS = /Macintosh/.test(ua) && typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 1;
+      return isIpadOS;
+    }
+    /* OSのアニメーション低減設定（prefers-reduced-motion）が有効か */
+    function prefersReducedMotion(){
+      try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+      catch(e){ return false; }
+    }
+
+    /* ============================================================
+       画面遷移関数
+       ※ Manusスペースエディタが window.go を上書きする不具合を避けるため、
+         グローバル関数名は "go" を使わず "lccGo" とする。
+       ============================================================ */
+    function lccGo(url){ window.location.href = url; }
+
+    /* オープニングを閉じる処理を一本化（タイマー重複・二重発火を防ぐ）
+       once=true のときは既に閉じ処理が走っていれば何もしない */
+    let openingClosing = false;
+    function closeOpening(){
+      if(openingClosing) return;       // 二重発火ガード
+      openingClosing = true;
+      openingFade.value = true;
+      setTimeout(() => { showOpening.value = false; }, 450);
+    }
+    /* オープニングを即スキップ（クリック時） */
+    function skipOpening(){ closeOpening(); }
+
+    /* インストール案内を閉じる（この端末では当面出さない） */
+    function dismissInstall(){
+      showInstall.value = false;
+      try { localStorage.setItem('lcc_install_dismissed', String(Date.now())); } catch(e){}
+    }
+
+    /* ネイティブの追加プロンプトを実行（Android/Chrome）
+       outcome を確認し、追加されたら以後出さないよう記録する */
+    async function doInstall(){
+      if(!deferredPrompt) return;
+      try{
+        deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        // 追加された場合は「閉じた」扱いで記録し、再表示を防ぐ
+        if(choice && choice.outcome === 'accepted'){
+          try { localStorage.setItem('lcc_install_dismissed', String(Date.now())); } catch(e){}
+        }
+      }catch(e){ /* prompt 失敗時は何もしない（案内バーは閉じる） */ }
+      finally{
+        deferredPrompt = null;
+        canPrompt.value = false;
+        showInstall.value = false;
+      }
+    }
+
+    /* ============================================================
+       起動時処理
+       ============================================================ */
+    onMounted(() => {
+      /* --- 日付の組み立て --- */
+      const d = new Date();
+      const dows = ['日','月','火','水','木','金','土'];
+      today.md  = (d.getMonth() + 1) + '月' + d.getDate() + '日';
+      today.dow = dows[d.getDay()] + '曜日';
+
+      /* --- オープニング再生 → フェードアウト ---
+         アニメーション低減設定が有効な端末では即座に閉じる（視覚負荷の配慮）
+         それ以外は約2秒後に自動で閉じる。閉じ処理は closeOpening に一本化 */
+      if(prefersReducedMotion()){
+        closeOpening();
+      }else{
+        setTimeout(() => { closeOpening(); }, 2200);
+      }
+
+      /* --- PWAインストール案内の判定 --- */
+      // 既にホームから起動済み、または以前に閉じた場合は出さない
+      let dismissed = false;
+      try { dismissed = !!localStorage.getItem('lcc_install_dismissed'); } catch(e){}
+      if(!isStandalone() && !dismissed){
+        if(isiOS()){
+          // iOS は beforeinstallprompt 非対応のため手順を案内
+          installHint.value = '共有ボタン → 「ホーム画面に追加」';
+          canPrompt.value = false;
+          showInstall.value = true;
+        }
+      }
+
+      /* Android/Chrome：追加可能になったらワンタップ追加を提示 */
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        let dis = false;
+        try { dis = !!localStorage.getItem('lcc_install_dismissed'); } catch(err){}
+        if(!isStandalone() && !dis){
+          installHint.value = 'ワンタップでアプリのように使えます';
+          canPrompt.value = true;
+          showInstall.value = true;
+        }
+      });
+
+      /* 追加完了したら案内を消す */
+      window.addEventListener('appinstalled', () => {
+        showInstall.value = false;
+        canPrompt.value = false;
+      });
+    });
+
+    return {
+      showOpening, openingFade, today,
+      estimateQuick, costQuick, flowSteps,
+      news, changelog, logOpen,
+      showInstall, canPrompt, installHint,
+      lccGo, skipOpening, dismissInstall, doInstall,
+    };
+  }
+}).mount('#app');
+</script>
+</body>
 </html>
