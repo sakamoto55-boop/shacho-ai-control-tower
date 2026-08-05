@@ -146,6 +146,10 @@ curl -X POST http://localhost:8787/dev/analyze-and-save \
 
 将来的なLINE WORKS Bot Webhook受信用です。Phase 1ではMockLineworksConnectorで正規化してローカル保存します。
 
+### POST /mcp/:token
+
+claude.ai カスタムコネクタ用のMCPエンドポイントです。ClaudeからLINE WORKSの社内宛先（許可リスト制）へメッセージを送れます。`LINEWORKS_MCP_TOKEN` 未設定時は無効（404）、`LINEWORKS_DRY_RUN=true`（既定）では実送信せずプレビューのみ返します。セットアップ手順は `LINEWORKS_MCP_SETUP.md` を参照してください。
+
 ## MessageSource
 
 扱う `source` は以下だけです。

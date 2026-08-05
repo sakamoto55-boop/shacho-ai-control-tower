@@ -7,6 +7,7 @@ import { analyzeAndSaveMessage } from './jobs/analyzeIncomingMessages.js';
 import { generateAndSendReport } from './jobs/generateReports.js';
 import { createRepository } from './repositories/createRepository.js';
 import { createLineworksConnector, type LineworksWebhookPayload } from './connectors/lineworks.js';
+import { handleMcpMessage } from './mcp/lineworksMcpServer.js';
 import { nowIso } from './utils/date.js';
 
 export const app = new Hono();
@@ -129,6 +130,43 @@ app.post('/jobs/report/evening', async (c) => {
   const report = await generateAndSendReport(repository, 'evening');
   return c.json(report);
 });
+
+// claude.ai カスタムコネクタ用 MCP エンドポイント（LINE WORKS送信）。
+// LINEWORKS_MCP_TOKEN が未設定の間は無効。トークンはURLの一部として照合する。
+const mcpTokenValid = (token: string): boolean => {
+  const expected = process.env.LINEWORKS_MCP_TOKEN;
+  return Boolean(expected) && token === expected;
+};
+
+app.post('/mcp/:token', async (c) => {
+  if (!process.env.LINEWORKS_MCP_TOKEN) {
+    return c.json({ error: 'mcp endpoint is disabled' }, 404);
+  }
+  if (!mcpTokenValid(c.req.param('token'))) {
+    return c.json({ error: 'forbidden' }, 403);
+  }
+  try {
+    const body = (await c.req.json()) as Record<string, unknown> | Array<Record<string, unknown>>;
+    if (Array.isArray(body)) {
+      const responses = (await Promise.all(body.map((message) => handleMcpMessage(message)))).filter(
+        (response) => response !== null
+      );
+      if (responses.length === 0) return c.body(null, 202);
+      return c.json(responses);
+    }
+    const response = await handleMcpMessage(body);
+    if (response === null) return c.body(null, 202);
+    return c.json(response);
+  } catch (error) {
+    return c.json(
+      { jsonrpc: '2.0', id: null, error: { code: -32700, message: error instanceof Error ? error.message : 'parse error' } },
+      400
+    );
+  }
+});
+
+app.get('/mcp/:token', (c) => c.text('Method Not Allowed', 405));
+app.delete('/mcp/:token', (c) => c.body(null, 200));
 
 app.post('/webhooks/lineworks', async (c) => {
   try {

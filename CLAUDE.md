@@ -38,6 +38,7 @@ HTTPリクエスト (src/server.ts, Hono)
 - `src/domain/types.ts` が全型の起点。`MessageSource` は `gmail` | `lineworks` | `manual_import` | `external_forward` の4種のみ。
 - `src/repositories/`：`Repository` interface に対し `LocalRepository`（JSON保存、デフォルト `./data/shacho-ai-local.json`）と `KintoneRepository`（将来用スタブ）。`STORAGE_DRIVER` で切替。
 - `src/connectors/`：Gmail / LINE WORKS / kintone の将来接続用。Phase 1は全てmock実装（LINE WORKS送信は dry-run 固定）。
+- `src/connectors/lineworksApi.ts` + `src/mcp/lineworksMcpServer.ts`：claude.ai カスタムコネクタ用のMCPエンドポイント（`POST /mcp/:token`）。ClaudeからLINE WORKSの**社内宛先**へメッセージを送るためのもの。宛先は `LINEWORKS_RECIPIENTS` の許可リスト制、`LINEWORKS_DRY_RUN=true`（既定）ではプレビューのみ、`LINEWORKS_MCP_TOKEN` 未設定時は無効。これは社長の指示による社内連絡用であり、「AIによる外部自動返信は作らない」制約の対象外（社外宛の自動送信には使わない）。セットアップは `LINEWORKS_MCP_SETUP.md` を参照。
 - `src/reports/generateDailyReport.ts`：朝昼晩レポート。優先度A・高リスク・返信要否などのスコアリングで上位数件に絞る設計。
 - 重複排除：`externalMessageId` がない入力は `source + receivedAt + senderName + normalizedText` のsha256で生成。
 
