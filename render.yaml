@@ -1,0 +1,42 @@
+# Render Blueprint（https://render.com）
+# Renderのダッシュボードで「New +」→「Blueprint」→ このリポジトリを選ぶと、
+# このファイルの内容どおりにWebサービスが作成されます。
+# sync: false の環境変数は、作成時に入力を求められます（値はRender側にのみ保存）。
+services:
+  - type: web
+    name: shacho-ai-control-tower
+    runtime: node
+    plan: free
+    # NODE_ENV=production でも devDependencies（tsc）が必要なため --include=dev を付ける
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AI_PROVIDER
+        value: mock
+      - key: STORAGE_DRIVER
+        value: local
+      # --- LINE WORKS API 2.0（Developer Consoleで取得した値を入力） ---
+      - key: LINEWORKS_CLIENT_ID
+        sync: false
+      - key: LINEWORKS_CLIENT_SECRET
+        sync: false
+      - key: LINEWORKS_SERVICE_ACCOUNT
+        sync: false
+      - key: LINEWORKS_PRIVATE_KEY
+        sync: false
+      - key: LINEWORKS_BOT_ID
+        sync: false
+      # --- MCPエンドポイント設定 ---
+      # LINEWORKS_MCP_TOKEN: 長いランダム文字列（claude.aiに登録するURLの一部になる）
+      - key: LINEWORKS_MCP_TOKEN
+        sync: false
+      # LINEWORKS_RECIPIENTS: 送信を許可する宛先のJSON配列（1行で）
+      # 例: [{"name":"竹内","type":"user","id":"k.takeuchi@your-domain"},{"name":"平良","type":"user","id":"taira@your-domain"}]
+      - key: LINEWORKS_RECIPIENTS
+        sync: false
+      # まずはドライラン（プレビューのみ）。動作確認後に false へ変更すると実送信
+      - key: LINEWORKS_DRY_RUN
+        value: "true"

@@ -58,12 +58,24 @@ LINEWORKS_DRY_RUN=true
 
 `type` は `user`（個別トーク）のほか `channel`（トークルーム。`id` にチャンネルIDを指定）が使えます。
 
-## 手順4: サーバーを公開する
+## 手順4: サーバーを公開する（Render Blueprint対応済み）
 
 claude.ai のカスタムコネクタは **公開HTTPSのURL** が必要です。ローカルPCのままでは登録できません。
 
-- 恒久運用: Render / Railway / Fly.io などに `npm run build && npm start` でデプロイ
-  （`PORT` は各サービスが注入します。`NODE_ENV=production` にすると `/dev/*` は自動で無効になります）
+リポジトリに `render.yaml`（Render Blueprint）を同梱しているので、Renderの無料プランなら以下だけでデプロイできます。
+
+1. [render.com](https://render.com) にGitHubアカウントでサインアップ（無料）
+2. ダッシュボードで **「New +」→「Blueprint」** を選択
+3. `shacho-ai-control-tower` リポジトリを接続（対象ブランチを選択）
+4. 環境変数の入力を求められるので、手順1〜3で控えた値を貼り付ける
+5. 「Apply」でデプロイ開始。完了すると `https://shacho-ai-control-tower-xxxx.onrender.com` のようなURLが発行される
+
+`PORT` はRenderが自動注入し、`NODE_ENV=production` により `/dev/*` エンドポイントは自動で無効になります。
+
+※無料プランは15分間アクセスがないとスリープし、次のアクセス時に起動へ数十秒かかります。
+　実運用で気になる場合は有料プラン（月$7〜）にすると常時起動になります。
+
+- Railway / Fly.io など他のサービスでも `npm ci --include=dev && npm run build` → `npm start` でデプロイ可能
 - 動作検証だけなら: `ngrok http 8787` などのトンネルでも可
 
 公開後、以下で疎通確認できます（`{TOKEN}` は `LINEWORKS_MCP_TOKEN` の値）:
