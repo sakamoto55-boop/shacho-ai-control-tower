@@ -61,6 +61,17 @@ HTTPリクエスト (src/server.ts, Hono)
 
 `docs/` にはGitHub Pages公開用の単一HTML完結アプリ（LCC統合見積システム `lcc.html`、原価管理 `lcc-cost.html`、ポータル `index.html`）がある。Vue3 + Tailwind をCDN読み込みし、ビルドツール不使用。ルートの `lcc-redesigned.html` はその開発版。これらは `src/` のAPIとは独立しており、npmビルド・テストの対象外。
 
+### gas/ のグループ経営情報システム（APIとは独立）
+
+`gas/` は Google Sheets + Google Apps Script で完結する「グループ経営情報 自動収集＋日次AI報告システム 第1期」。4法人のGmail（サービスアカウント＋ドメイン全体の委任、`gmail.readonly`）、LINE WORKS（モニタリングAPI）、LINE公式アカウント（Webhook `doPost`）、既存の経営データシートを日次で集約し、Gemini APIで事業別に要約して LINE WORKS Bot で経営者へ送る。`src/` のAPIとは独立しており、npmビルド・テストの対象外（GASエディタ上で実行する）。
+
+- 認証情報はすべてスクリプトプロパティ。CONFIG系シート（`CONFIG` / `CONFIG_ORG` / `CONFIG_MAIL_TARGET` / `CONFIG_MASK`）で挙動を変えられる設計。
+- 読み取りと社内通知のみ。外部送信・返信・データ変更の経路を追加しないこと（第2期でHuman-in-the-Loop承認つきで実装予定）。
+- 数値はAIに計算させない。件数はGAS側で数え、売上等はシートの確定値をそのまま渡す。
+- AIへ渡す前に必ず `maskForAi_()` を通す。マスキングを迂回する経路を作らないこと。
+- GASの6分制限があるため、収集は法人別・ソース別ジョブに分割し `10_Runner.gs` の進捗保存＋自己再スケジュールで継続する。この仕組みを壊さない。
+- 導入手順は `gas/SETUP_GUIDE.md`、動作確認は `gas/CHECKLIST.md`。
+
 ## コーディング規約
 
 - ESM（`"type": "module"`）+ NodeNext解決のため、相対importは `.js` 拡張子必須（例：`from '../domain/types.js'`）。
