@@ -103,6 +103,14 @@ HTTPリクエスト (src/server.ts, Hono)
 - Criticは答えを書き換えずissuesを返す。SYNTHESISの回答構造（結論→事実→分析→リスク→別案→推奨→次）を維持する。
 - 内部Role名・Provider名をユーザー向け回答テキストへ露出しない。
 
+### Phase VUI（docs/lcc-command-vui.html — Visual Intelligence UI）
+
+- 粒子AI COREの視覚仕様の正本は `src/command/vui/visualSpec.ts`。UI側（HTML内のCORE_VISUALS）と同期させ、変更時は両方更新する（`tests/command/vui/` が検査）。
+- 激しい点滅禁止（blinkHz≦2）。prefers-reduced-motionでは静的表示+状態ラベルで情報を保持する。
+- 主画面へ内部Provider名（Claude/GPT等）を出さない（Detail Modeのみ）。UIはRole日本語ラベルで表示する。
+- 未接続データは「未接続」「—」を明示し、架空金額を表示しない。API障害時は「データ取得できません」（デモ数値は ?demo=1 明示時のみ）。
+- Approvalは承認/修正/却下UIを持つがdry-run固定。音声はプロバイダ未設定なら「準備中」と正直に表示し、偽の音声処理をしない。
+
 ### docs/ のLCC業務アプリ（APIとは独立）
 
 `docs/` にはGitHub Pages公開用の単一HTML完結アプリ（LCC統合見積システム `lcc.html`、原価管理 `lcc-cost.html`、ポータル `index.html`）がある。Vue3 + Tailwind をCDN読み込みし、ビルドツール不使用。ルートの `lcc-redesigned.html` はその開発版。これらは `src/` のAPIとは独立しており、npmビルド・テストの対象外。

@@ -258,11 +258,38 @@ Phase A/B0の決定論エンジン・Canonical Model・Source Adapter・RBAC・E
   未達のため、LIVE READ-ONLY BETA READYは未宣言。ただし配置/日報・銀行/会計の未接続はBeta阻害条件にしない
   （該当CapabilityのみPARTIAL/NOT_AVAILABLE明示で段階開放）。
 
-### 次Phase: Phase VUI（LCC COMMAND Visual Intelligence Interface）
+## Phase VUI（Visual Intelligence Interface）の状態
 
-粒子AI CORE（Event Busの状態と同期）・Agent Activity可視化・Voice会話・Generative UI描画・
-レスポンシブ・Memory/Evidence/Approval UI・Proactive AIを実装する。
-本Phaseで用意したEvent Bus / AI CORE State / UI Schema / AgentTraceをそのまま利用できる。
+- **UI本体**: `docs/lcc-command-vui.html`（単一HTML・Vue3+Tailwind CDN・ビルド不要）。
+  Dark/Premium/Executive Command Centerの方向（§40 Visual Reference準拠）。
+- **粒子AI CORE（§2-§3）**: Canvas 2Dパーティクルシステム（§28比較の結果、Three.js等の
+  巨大依存なし＝Mobile/バッテリー/バンドル/保守性最良を採用）。13状態すべてに視覚挙動
+  （drift/converge/radiate/orbit/stream/link/tighten/reform/hold/pulse/alert/calm-error）。
+  激しい点滅なし（blinkHz≦1）。正本仕様は `src/command/vui/visualSpec.ts`（テストで検証）。
+- **Event Bus購読（§3-§4）**: 会話ごとに `/command/events` を購読し、ROLE_STARTED等から
+  Role Ring（戦略/資金/営業/現場/分析/調査/記憶/検証/創発/統合）の発光とCORE状態遷移を再生。
+  活動中Roleのみ反応。内部Provider名は主画面へ出さない（§5。Detail Modeでのみ「使用Provider」）。
+- **Conversation First（§8-§10）**: チャット主役・Streaming表示（RESPONDING状態と同期）・
+  Morning Experience（§35。データ未取得時は件数を捏造しない挨拶）。
+- **Generative UI（§11-§12）**: UI Schema 17型すべてのRenderer（KPI/RANKING/CASH_FLOW/
+  APPROVAL/ALERT/PROJECT_CARD…）。AIの自由HTMLは描画しない。会話に応じて画面が変わる。
+- **Evidence/Confidence/Freshness（§13-§15）**: 「根拠を見る」展開（Source/Record/更新日）、
+  確信度はHIGH以外のみバッジ表示、KPIに更新時刻とstale警告。古いデータを最新に見せない。
+- **Memory/Correction/Critic/Innovation/Approval UX（§16-§22）**: 記憶Role反応・
+  Contextual Suggested Actions（覚えて/訂正/反対意見/類似事例…を文脈で動的表示）・
+  Approval Cardは承認/修正/却下（dry-run固定。本番実行なし）。
+- **Mobile First（§23-§27）**: CORE高さ25-35%（スクロールで縮小）・横スクロールなし・
+  マイクボタンは「音声機能は準備中（プロバイダ未設定）」と正直表示（偽の音声処理なし）。
+- **Reduced Motion / Performance / A11y（§29-§31）**: prefers-reduced-motionで静的CORE
+  （状態はラベルで保持）・Particle数の端末別自動削減・非表示タブで描画停止・aria-live/
+  aria-label/キーボード操作/focus-visible。
+- **Executive/Detail Mode（§32-§34）**: 通常は情報を絞り、詳細（AgentTrace/Tool/Provider/
+  Latency）は展開時のみ。AI COREタップで稼働中の能力を自然な日本語で表示。
+- **Unknown State / Demo Isolation（§36-§37・§41）**: 銀行未接続=「未接続」、配置=
+  「実績日報との案件紐付け準備中」を明示。API障害時は「データ取得できません」でデモ数値非表示。
+- **検証**: `tests/command/vui/`（visualSpec全状態・UI完成条件・§44会話シーケンス）+
+  Chromium実機レンダリング確認（Desktop/Mobile/reduced-motion/ライブ会話でRole発光・
+  Generative UI・Streaming・Approval動作をスクリーンショット確認済み）。
 
 ## フェーズ計画
 

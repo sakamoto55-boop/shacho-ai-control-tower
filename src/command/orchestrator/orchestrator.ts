@@ -271,6 +271,9 @@ export class CommandOrchestrator {
       }
     }
 
+    if (result.memoryIds && result.memoryIds.length > 0) {
+      this.emitEvent('MEMORY_UPDATED', { sessionId });
+    }
     if (result.response.approvalRequest) this.emitEvent('APPROVAL_REQUIRED', { sessionId });
     if (result.response.dataStatus !== 'OK') this.emitEvent('WARNING', { sessionId });
     this.emitEvent('ANSWER_COMPLETED', { sessionId });
