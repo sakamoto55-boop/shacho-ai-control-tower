@@ -385,6 +385,35 @@ Phase A/B0の決定論エンジン・Canonical Model・Source Adapter・RBAC・E
   静的寄りの落ち着いた挙動・blinkHz 0。常時派手に動かさない）。
 - **自律実行レベル（§11）**: 初期本番はLEVEL 1（観測・提案のみ）。引き上げは社長の明示承認のみ。
 
+## LIVE BETA ACTIVATION（実データ・実LLM・実運用への接続準備）の状態
+
+- **Beta Gate（§1-§2・§20）**: `src/command/livebeta/betaGate.ts` + `npm run command:beta` —
+  最小起動条件（Sheets Service Account + 実LLM 1つ）と§20の14条件を決定論判定。
+  PENDING_USER（認証・キー設定）には具体手順、PENDING_RUNTIME（接続後検証）には実行コマンドを表示。
+  SA設定済みならsanityを自動実行（§2）。**未解決Gap（銀行・会計・日報紐付け）はGate条件に含めない**（§1）。
+  全条件PASSで「LCC COMMAND LIVE READ-ONLY BETA READY」を宣言する。
+- **実戦質問セット（§4-§5）**: `livebeta/battleSet.ts` — 必須19問（連続会話）+ 30ターン連続会話
+  （Context Retention）+ 実データ100問超の評価セット（`buildRealEval100`。カテゴリ×スコープ +
+  Hallucination Probes）。`npm run command:real-eval` が100問評価と30ターン試験の両方を実行する。
+- **Constitution最終確定支援（§6-§7）**: `constitution/reviewSummary.ts` — 10項目を
+  原文/意味/Source/現在状態/AI推奨/経営への影響で構造化（`GET /command/constitution/review-summary`）。
+  一括承認は「この内容で確定」の明示必須（`POST /command/constitution/approve-bulk`）。
+  **Conflict解消項目（第13期目標値 const-007/020）は一括から除外し個別確認**（会話:「不動産課15.0で確定」）。
+  会話導線: 「承認事項を見せて」→「全部この内容で確定」→「不動産課15.0で確定」。履歴（承認者・日時）保持。
+- **Target Review（§8）**: 会話「目標を確認したい」でACTIVE/CANDIDATE一覧と最小承認導線を提示。
+- **Incident Log（§19）**: `livebeta/incidentLog.ts` — 誤回答/誤検索/誤Memory/誤Routing/UI/遅延/
+  Provider障害を記録（`POST /command/incidents`）。削除せず状態遷移（OPEN→ANALYZED→RESOLVED）。
+  **同種3件以上で自動的にGrowth Backlog候補化**（再発防止をGrowth Pipelineへ接続）。
+- **Autonomy Review（§10-§11）**: `growth/autonomyReview.ts` — LEVEL 1（観測・分析・提案のみ）を維持。
+  50会話・7日以上の運用データが揃うまで昇格を提案しない。揃っても**提案まで**（昇格は社長の明示承認のみ）。
+  `GET /command/growth/autonomy-review`。
+- **President Decision Load（§18・追跡候補KPI）**: `GET /command/growth/decision-load` —
+  承認要求件数・判断記録件数・エスカレーションなし会話数を決定論集計（「社長へ上げる必要がない問題を減らす」の測定基盤）。
+- **Learning Audit（§14）**: 会話「何を訂正した？」（訂正履歴・削除なし）/「AI自身は何が苦手？」
+  （未接続Gap・測定値・禁止事項の正直な自己申告）を追加。
+- **Weekly Review 3分離（§15）**: Company Growth / AI Growth / Data Growth を必ず分離表示。
+  Incident集計も含む（未計測時は「未計測」と明示）。
+
 ## フェーズ計画
 
 - **Phase A（本実装）**: 会話コア＋決定論エンジン＋承認フロー＋Brief＋UI＋RBAC/セキュリティ。読み取り正本はDemo Fixture（demoモード限定）。実行は全てdry-run。

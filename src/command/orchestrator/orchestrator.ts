@@ -98,6 +98,9 @@ import {
 import { analyzeCorrectionImpact, formatImpactReport } from '../agents/correctionImpact.js';
 import { GrowthService } from '../growth/growthBacklog.js';
 import { computeSelfEvaluation, type AiSelfEvaluation } from '../growth/selfEvaluation.js';
+import { buildReviewSummary, bulkApprove } from '../constitution/reviewSummary.js';
+import { openGaps } from '../domain/dataGaps.js';
+import { TargetRegistryService } from '../targets/targetRegistry.js';
 
 /** 無制限ループ禁止のための上限。1リクエストで超えたら打ち切る */
 export const ORCHESTRATOR_LIMITS = {
@@ -393,7 +396,7 @@ export class CommandOrchestrator {
     if (plan) return this.handlePlan(ctx, message, plan, principal, dataStatus);
 
     // --- Phase N 会話（記憶操作・検証・影響） ---
-    if (/覚えておいて|覚えといて/.test(message)) {
+    if (/覚えておいて|覚えといて|覚えて$/.test(message)) {
       return this.handleRememberThis(ctx, message, context, principal, dataStatus);
     }
     if (/今の(は)?なし|取り消し|やっぱりなし/.test(message) && context.lastMemoryIds.length > 0) {
@@ -446,6 +449,20 @@ export class CommandOrchestrator {
     ) {
       return this.handleWhereIs(ctx, message, principal, dataStatus);
     }
+    // --- LIVE BETA: Constitution最終確定支援（§6-§7）。一覧より先に判定 ---
+    if (/(憲法|会社原則|原則).{0,8}(レビュー|承認)|承認事項|原則.{0,6}確定したい/.test(message)) {
+      return this.handleConstitutionReview(ctx, dataStatus);
+    }
+    if (/(全部|すべて)?この内容で確定/.test(message)) {
+      return this.handleConstitutionBulkApprove(ctx, principal, dataStatus);
+    }
+    if (/不動産(課)?\s?15\.?0で確定/.test(message)) {
+      return this.handleConstitutionTargetItemApprove(ctx, principal, dataStatus);
+    }
+    // --- LIVE BETA: Target Review（§8） ---
+    if (/目標.{0,6}(確認|レビュー|一覧|承認したい)/.test(message)) {
+      return this.handleTargetReview(ctx, dataStatus);
+    }
     // --- Phase X: Company Constitution（§47） ---
     if (/会社の原則|経営の原則|会社原則/.test(message)) {
       return this.handleConstitution(ctx, dataStatus);
@@ -457,6 +474,13 @@ export class CommandOrchestrator {
     }
     if (/(今日|最近).{0,6}(何を|なに)?(覚えた|学んだ)/.test(message)) {
       return this.handleLearnedToday(ctx, principal, dataStatus);
+    }
+    // --- LIVE BETA §14: Learning Audit（何を訂正した / AI自身は何が苦手） ---
+    if (/何を訂正した|訂正した(こと|の)(は|ある)?/.test(message)) {
+      return this.handleCorrectionAudit(ctx, principal, dataStatus);
+    }
+    if (/(AI|あなた).{0,8}苦手|苦手な(こと|もの|の)は/.test(message)) {
+      return this.handleWeaknessAudit(ctx, dataStatus);
     }
     if (/(私|会社)について何を覚えて|何を記憶して/.test(message)) {
       return this.handleMemoryAudit(ctx, principal, dataStatus);
@@ -496,7 +520,7 @@ export class CommandOrchestrator {
       return this.handleEstimateDraft(ctx, message, dataStatus);
     }
     // --- Phase X: Software Build（§23-§24。重複チェック→Constitution照合→比較） ---
-    if (/アプリ(にして|化|作って)|システム(にして|化して)|自動化して|ツール作って/.test(message)) {
+    if (/アプリ(にして|化|作って|にできる)|システム(にして|化して)|自動化して|ツール作って/.test(message)) {
       return this.handleBuildRequest(ctx, message, dataStatus);
     }
     // --- Phase X: Artifact Creation（§18-§19。生成Provider未接続時は正直に伝える） ---
@@ -525,7 +549,7 @@ export class CommandOrchestrator {
       return this.handleAdvice(ctx, message, context, dataStatus);
 
     // --- Read系 ---
-    if (/おはよう|ブリーフ|朝の報告|今日の報告/i.test(message))
+    if (/おはよう|ブリーフ|朝の報告|今日の報告|今日.{0,4}会社.{0,4}どう/i.test(message))
       return this.runIntent('brief', ctx, dataStatus);
     if (/今日の現場|今日.{0,4}(どこ|配置)/.test(message))
       return this.handleTodaySites(ctx, dataStatus);
@@ -3368,6 +3392,266 @@ export class CommandOrchestrator {
         confidence: 'MEDIUM',
         evidence: proposals.flatMap((p) => p.evidence.slice(0, 2)),
         toolsUsed: ['growth_backlog']
+      },
+      intent: 'general'
+    };
+  }
+
+  // ------------------------------------------------------------------
+  // LIVE BETA（§6-§8・§14）: Constitution最終確定・Target Review・Learning Audit
+  // ------------------------------------------------------------------
+
+  /** 承認事項サマリー（§6）。5〜10分で確認できる10項目 + 一括承認導線 */
+  private async handleConstitutionReview(
+    ctx: ToolContext,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const summary = await buildReviewSummary(this.constitutionService);
+    const lines = [
+      '【会社憲法 承認事項サマリー】（詳細はCONSTITUTION_REVIEW.md / GET /command/constitution/review-summary）',
+      ...summary.items.map((item) => {
+        const state =
+          item.currentStatus === 'ALL_CURRENT'
+            ? '承認済み'
+            : item.currentStatus === 'PARTIALLY_CURRENT'
+              ? '一部承認済み'
+              : '承認待ち';
+        return [
+          `${item.itemNo}. ${item.title} [${state}]${item.requiresIndividualConfirm ? '（個別確認）' : ''}`,
+          `   意味: ${item.meaning}`,
+          `   原文: ${item.originals[0]?.statement.split('。')[0] ?? '—'}${item.originals.length > 1 ? ` ほか${item.originals.length - 1}件` : ''}`,
+          `   出典: ${item.originals[0]?.source ?? '—'} / AI推奨: ${item.aiRecommendation.split('（')[0]}`,
+          `   影響: ${item.impact}`
+        ].join('\n');
+      }),
+      '',
+      `一括承認: 「全部この内容で確定」で項目${summary.bulkApprovable.join('・')}を正式化します。`,
+      `項目${summary.individualConfirm.join('・')}はConflict解消項目のため個別確認です（「不動産課15.0で確定」）。`,
+      '承認は履歴（承認者・日時）付きで保存され、後から変更できます（旧版はSUPERSEDEDで保持）。'
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: { summary },
+        confidence: 'HIGH',
+        evidence: summary.items
+          .slice(0, 3)
+          .map((item) => ({
+            label: item.title,
+            value: item.originals[0]?.statement.slice(0, 60) ?? '',
+            source: item.originals[0]?.source ?? 'Constitution Registry',
+            asOf: jstDate(ctx.dataset.asOf)
+          })),
+        toolsUsed: ['constitution_registry']
+      },
+      intent: 'general'
+    };
+  }
+
+  /** 一括承認（§7）。PRESIDENTの「この内容で確定」明示のみ。Conflict項目は個別確認へ */
+  private async handleConstitutionBulkApprove(
+    ctx: ToolContext,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    try {
+      const now = ctx.dataset.asOf;
+      const result = await bulkApprove(this.constitutionService, principal, now);
+      const lines = [
+        '【会社憲法 正式化】',
+        `${result.approvedPrincipleIds.length}件の原則をCURRENT（正式）にしました（承認者: ${principal.label} / 履歴保存済み）。`,
+        ...(result.alreadyCurrent.length > 0
+          ? [`既に承認済み: ${result.alreadyCurrent.length}件`]
+          : []),
+        ...(result.skippedForIndividualConfirm.length > 0
+          ? [
+              '',
+              `個別確認が必要な項目（Conflict解消済み・第13期目標値）: ${result.skippedForIndividualConfirm.join(', ')}`,
+              '不動産課15.0（v7+印刷版PDFの2源一致）でよければ「不動産課15.0で確定」と言ってください。'
+            ]
+          : []),
+        '',
+        '変更したい場合はいつでも「○○の原則を変更」で旧版を履歴に残したまま更新できます。'
+      ];
+      return {
+        response: {
+          text: lines.join('\n'),
+          dataStatus,
+          uiHint: 'text',
+          data: { result },
+          confidence: 'HIGH',
+          evidence: [],
+          toolsUsed: ['constitution_registry']
+        },
+        intent: 'general'
+      };
+    } catch (error) {
+      return this.simpleText(
+        error instanceof Error ? error.message : '承認処理に失敗しました。',
+        'general',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+  }
+
+  /** Conflict項目（第13期目標値）の個別確定（§6: Conflictは個別確認） */
+  private async handleConstitutionTargetItemApprove(
+    ctx: ToolContext,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    try {
+      const now = ctx.dataset.asOf;
+      const approved: string[] = [];
+      for (const principleId of ['const-007', 'const-020']) {
+        const principle = (await this.constitutionService.list()).find(
+          (p) => p.principleId === principleId
+        );
+        if (principle && principle.status !== 'CURRENT') {
+          await this.constitutionService.approve(principleId, principal, now);
+          approved.push(principleId);
+        }
+      }
+      return this.simpleText(
+        approved.length > 0
+          ? [
+              '【第13期目標値・長期目標を正式化しました】',
+              '不動産課15.0（百万円/月）を含む第13期目標値と5年後長期目標をCURRENTにしました。',
+              `承認者: ${principal.label}（履歴保存済み）。これでTarget Registryの候補登録・目標比評価の正本として使えます。`
+            ].join('\n')
+          : '第13期目標値は既に承認済みです。',
+        'general',
+        'HIGH',
+        dataStatus
+      );
+    } catch (error) {
+      return this.simpleText(
+        error instanceof Error ? error.message : '承認処理に失敗しました。',
+        'general',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+  }
+
+  /** Target Review（§8）。最小質問で確定できる導線 */
+  private async handleTargetReview(ctx: ToolContext, dataStatus: DataStatus): Promise<HandlerResult> {
+    const targets = new TargetRegistryService(this.repository);
+    const all = await targets.list();
+    const candidates = all.filter((t) => t.status === 'CANDIDATE');
+    const active = all.filter((t) => t.status === 'ACTIVE');
+    const lines = [
+      '【経営目標レビュー】',
+      active.length > 0
+        ? `正式目標（ACTIVE）: ${active.length}件`
+        : '正式承認済みの目標はまだありません。',
+      ...active.slice(0, 5).map((t) => `・${t.companyId}/${t.departmentId} ${t.metric}: ${t.value.toLocaleString()}${t.unit === 'JPY' ? '円' : t.unit === 'PERCENT' ? '%' : '件'}（${t.periodStart}〜${t.periodEnd}）`),
+      '',
+      candidates.length > 0
+        ? `承認待ち候補（CANDIDATE）: ${candidates.length}件 — POST /command/targets/:id/approve で確定できます:`
+        : '承認待ち候補はありません。',
+      ...candidates.slice(0, 8).map((t) => `・[${t.targetId}] ${t.companyId}/${t.departmentId} ${t.metric}: ${t.value.toLocaleString()}（出典: ${t.source}）`),
+      ...(candidates.length === 0 && active.length === 0
+        ? [
+            '',
+            '第13期目標値（売上463.8百万円・粗利327.9百万円・不動産課15.0等）は会社憲法の承認事項10に含まれています。',
+            '「承認事項を見せて」→「全部この内容で確定」+「不動産課15.0で確定」の後、部門別Targetの候補登録に進めます。',
+            '年間売上・月間売上・粗利・部門目標は POST /command/targets でCANDIDATE登録 → 承認でACTIVE化します。'
+          ]
+        : [])
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: { active: active.length, candidates: candidates.length },
+        confidence: 'HIGH',
+        evidence: [],
+        toolsUsed: ['target_registry']
+      },
+      intent: 'general'
+    };
+  }
+
+  /** 「何を訂正した？」（§14）。訂正履歴は削除せず保持している */
+  private async handleCorrectionAudit(
+    ctx: ToolContext,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const all = await this.memoryService.search({ includeInactive: true, limit: 300 }, principal);
+    const corrected = all.filter((m) => m.status === 'CORRECTED' || m.correctionNote);
+    if (corrected.length === 0) {
+      return this.simpleText(
+        'まだ訂正された記憶はありません。「それ違う」と言っていただければ、履歴を残したまま訂正します。',
+        'memory_audit',
+        'HIGH',
+        dataStatus
+      );
+    }
+    const lines = [
+      `【訂正履歴】${corrected.length}件（削除せず履歴として保持しています）`,
+      ...corrected
+        .slice(-8)
+        .map(
+          (m) =>
+            `・「${m.statement.slice(0, 50)}」→ ${m.status}${m.correctionNote ? `（${m.correctionNote.slice(0, 50)}）` : ''}`
+        )
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        confidence: 'HIGH',
+        evidence: [],
+        toolsUsed: ['memory_search']
+      },
+      intent: 'memory_audit',
+      memoryIds: corrected.slice(-3).map((m) => m.memoryId)
+    };
+  }
+
+  /** 「AI自身は何が苦手？」（§14）。未接続Gap・測定値・Incidentから正直に答える */
+  private async handleWeaknessAudit(ctx: ToolContext, dataStatus: DataStatus): Promise<HandlerResult> {
+    const gaps = openGaps();
+    const evaluation = this.getSelfEvaluation();
+    const incidents = await this.repository.getIncidents();
+    const openIncidents = incidents.filter((i) => i.status === 'OPEN');
+    const lines = [
+      '【AI自身の苦手（正直な自己申告）】',
+      '',
+      '1) データ未接続による不得意（推測で補完しません）:',
+      ...gaps
+        .filter((g) => g.severity === 'HIGH' || g.severity === 'MEDIUM')
+        .slice(0, 4)
+        .map((g) => `・${g.description} → ${g.capabilityImpact}`),
+      '',
+      '2) 測定上の弱点:',
+      evaluation.sampleSize > 0
+        ? `・UNKNOWN率${Math.round(evaluation.metrics.unknownRate * 100)}% / 訂正率${Math.round(evaluation.metrics.correctionRate * 100)}%（会話${evaluation.sampleSize}件の実測）`
+        : '・会話サンプルがまだなく、精度の弱点は測定できていません（効果測定できていません）',
+      ...(openIncidents.length > 0
+        ? [`・未解決Incident: ${openIncidents.length}件`]
+        : []),
+      '',
+      '3) 構造上できないこと（禁止事項）:',
+      '・外部への自動送信・金額や契約の自動確定・給与実値の一般会話への複製・本番データの直接修正',
+      '',
+      '未接続の解消（Service Account・銀行明細の取得方法）が進むと1)は減っていきます。'
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        confidence: 'HIGH',
+        evidence: [],
+        toolsUsed: ['data_gaps', 'self_evaluation']
       },
       intent: 'general'
     };

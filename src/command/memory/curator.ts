@@ -156,7 +156,7 @@ export function detectCorrection(message: string): {
   newContent: string | null;
 } {
   if (
-    !/(それ違う|それは違う|間違って|今は|情報.{0,3}古い|それやめた|方針変えた|もう違う)/.test(
+    !/(それ違う|それは違う|間違って|今のは違う|今は|情報.{0,3}古い|それやめた|方針変えた|もう違う)/.test(
       message
     )
   ) {

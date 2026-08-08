@@ -129,6 +129,14 @@ HTTPリクエスト (src/server.ts, Hono)
 - 過去のFAILURE Lessonは削除せず保持し、同種の案は確信度を下げて提示する（§17）。
 - 日次観測 `npm run command:growth` はREAD ONLY（履歴は `data/growth-snapshots.jsonl`・Git管理外）。自律実行レベルは初期LEVEL 1（観測・提案のみ）で、引き上げはユーザー承認のみ。
 
+### LIVE BETA層（src/command/livebeta/ — 実運用接続）
+
+- Beta Gate（`livebeta/betaGate.ts`・`npm run command:beta`）は未解決Gap（銀行・会計・日報紐付け）をGate条件にしない（最小起動=Sheets SA+実LLM1つ）。宣言「LIVE READ-ONLY BETA READY」は全14条件PASSのみ。
+- Constitution一括承認（`constitution/reviewSummary.ts`）は「この内容で確定」の明示必須。Conflict解消項目（const-007/020）は一括から除外し個別確認。この分離を壊さない。
+- Incident（`livebeta/incidentLog.ts`）は削除せず状態遷移のみ。会話本文・機微情報をIncidentに書かない。同種3件でGrowth候補化する接続を維持する。
+- Autonomy ReviewはLEVEL昇格を「提案」までに留める（50会話・7日未満は提案もしない）。AIが自分でLEVELを上げるコードを書かない。
+- Weekly ReviewのCompany/AI/Data Growth 3分離を崩さない。
+
 ### Phase VUI（docs/lcc-command-vui.html — Visual Intelligence UI）
 
 - 粒子AI COREの視覚仕様の正本は `src/command/vui/visualSpec.ts`。UI側（HTML内のCORE_VISUALS）と同期させ、変更時は両方更新する（`tests/command/vui/` が検査）。

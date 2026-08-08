@@ -31,7 +31,9 @@ function readOnlyView(repository: CommandRepository): CommandRepository {
     getArtifacts: () => repository.getArtifacts(),
     saveArtifact: async (a) => a,
     getGrowthItems: () => repository.getGrowthItems(),
-    saveGrowthItem: async (g) => g
+    saveGrowthItem: async (g) => g,
+    getIncidents: () => repository.getIncidents(),
+    saveIncident: async (i) => i
   };
 }
 

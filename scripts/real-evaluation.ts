@@ -10,22 +10,11 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { createCommandRepository } from '../src/command/repositories/CommandRepository.js';
 import { CommandOrchestrator } from '../src/command/orchestrator/orchestrator.js';
 import { datasetAvailability } from '../src/command/sources/SourceAdapter.js';
-import {
-  HALLUCINATION_PROBES,
-  runRealEvaluation,
-  type RealEvalQuestion
-} from '../src/command/evaluation/realEval.js';
+import { runRealEvaluation } from '../src/command/evaluation/realEval.js';
+import { CONTINUOUS_30, buildRealEval100 } from '../src/command/livebeta/battleSet.js';
 
-/** 実データ用の質問セット（カテゴリ別）。実在エンティティ依存の質問は接続後に追記する */
-const QUESTIONS: RealEvalQuestion[] = [
-  { id: 'r-sales-1', category: 'sales', question: '今月どう？', scope: 'lcc', expectAnswerable: true },
-  { id: 'r-cash-1', category: 'cash', question: '現金大丈夫？', scope: 'lcc', expectAnswerable: false },
-  { id: 'r-risk-1', category: 'risk', question: '一番危ない案件は？', scope: 'lcc', expectAnswerable: true },
-  { id: 'r-inv-1', category: 'invoice', question: '請求漏れてない？', scope: 'lcc', expectAnswerable: true },
-  { id: 'r-ops-1', category: 'operations', question: '今日の現場は？', scope: 'lcc', expectAnswerable: false },
-  { id: 'r-ops-2', category: 'operations', question: '昨日誰がどこ行った？', scope: 'lcc', expectAnswerable: false },
-  ...HALLUCINATION_PROBES
-];
+/** 実データ100問+評価セット（LIVE BETA §4。カテゴリ×スコープ + Hallucination Probes） */
+const QUESTIONS = buildRealEval100();
 
 async function main(): Promise<void> {
   const repository = createCommandRepository();
@@ -46,12 +35,36 @@ async function main(): Promise<void> {
   const report = await runRealEvaluation(QUESTIONS, (question, scope) =>
     orchestrator.chat({ message: question, scope, asOf, sessionId: 'real-eval' })
   );
+
+  // 30ターン連続会話試験（LIVE BETA §4: Context Retention）
+  let retained = 0;
+  const continuousFailures: string[] = [];
+  for (const message of CONTINUOUS_30) {
+    try {
+      const response = await orchestrator.chat({
+        message,
+        scope: 'group',
+        asOf,
+        sessionId: 'real-eval-continuous'
+      });
+      if (response.text.trim().length > 0) retained += 1;
+      else continuousFailures.push(message);
+    } catch (error) {
+      continuousFailures.push(`${message}（${error instanceof Error ? error.message : 'error'}）`);
+    }
+  }
+
   await mkdir('data', { recursive: true });
-  await writeFile('data/real-eval-report.json', JSON.stringify(report, null, 2), 'utf8');
+  await writeFile(
+    'data/real-eval-report.json',
+    JSON.stringify({ ...report, continuous30: { total: CONTINUOUS_30.length, answered: retained, failures: continuousFailures } }, null, 2),
+    'utf8'
+  );
   console.log(
     `[real-eval] ${report.passed}/${report.total} 合格 / Hallucination ${report.hallucinationFailures}/${report.hallucinationProbes} 失敗`
   );
-  if (report.hallucinationFailures > 0) process.exitCode = 1;
+  console.log(`[real-eval] 連続会話30ターン: ${retained}/${CONTINUOUS_30.length} 応答（Context Retention）`);
+  if (report.hallucinationFailures > 0 || continuousFailures.length > 0) process.exitCode = 1;
 }
 
 main().catch((error) => {

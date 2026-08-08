@@ -18,6 +18,8 @@ export interface GrowthReviewInput {
   experiments: ExperimentRecord[];
   lessons: MemoryRecord[];
   selfEvaluation: AiSelfEvaluation;
+  /** Beta Incident Log の種類別集計（LIVE BETA §19。未指定は未計測扱い） */
+  incidents?: Array<{ kind: string; total: number; open: number }>;
 }
 
 function topProposalLines(backlog: GrowthCandidate[], limit: number): string[] {
@@ -54,15 +56,20 @@ export function buildDailyGrowthReview(input: GrowthReviewInput): string {
   ].join('\n');
 }
 
-/** 週次（§36） */
+/** 週次（§36・LIVE BETA §15: Company/AI/Dataの3分離を必ず維持する） */
 export function buildWeeklyGrowthReview(input: GrowthReviewInput): string {
   const completed = input.experiments.filter((e) => e.status === 'COMPLETED');
+  const companySignals = input.signals.filter((s) => s.negative && s.domain === 'COMPANY');
+  const dataSignals = input.signals.filter((s) => s.negative && s.domain === 'DATA');
+  const aiCandidates = input.backlog.filter((c) => c.domain === 'AI');
+  const dataCandidates = input.backlog.filter((c) => c.domain === 'DATA');
+  const eva = input.selfEvaluation;
   return [
     '【Weekly Growth Review】',
     '',
+    '■ Company Growth（会社の成長）',
     '〈今週発見した問題〉',
-    ...(input.signals.filter((s) => s.negative).slice(0, 5).map((s) => `・${s.statement}`) ?? []),
-    ...(input.signals.filter((s) => s.negative).length === 0 ? ['・なし'] : []),
+    ...(companySignals.length > 0 ? companySignals.slice(0, 5).map((s) => `・${s.statement}`) : ['・なし']),
     '',
     '〈改善候補（上位のみ）〉',
     ...topProposalLines(input.backlog, 2),
@@ -77,8 +84,24 @@ export function buildWeeklyGrowthReview(input: GrowthReviewInput): string {
       ? input.lessons.slice(-3).map((m) => `・${m.statement.slice(0, 60)}`)
       : ['・なし']),
     '',
-    '〈AI自身の状態〉',
-    `・${input.selfEvaluation.note}`
+    '■ AI Growth（AI自身の成長）',
+    `・${eva.note}`,
+    ...(eva.sampleSize > 0
+      ? [
+          `・回答${eva.metrics.answerCount}件 / HIGH確信度率${Math.round(eva.metrics.highConfidenceRate * 100)}% / UNKNOWN率${Math.round(eva.metrics.unknownRate * 100)}%`
+        ]
+      : []),
+    ...(aiCandidates.length > 0 ? [`・AI改善候補: ${aiCandidates.length}件`] : []),
+    ...(input.incidents !== undefined
+      ? input.incidents.length > 0
+        ? input.incidents.map((i) => `・Incident ${i.kind}: ${i.total}件（未解決${i.open}件）`)
+        : ['・Incident: なし']
+      : ['・Incident: 未計測（LIVE BETA開始後に記録されます）']),
+    '',
+    '■ Data Growth（データの成長）',
+    `・修正候補（人間確認待ち）: ${input.repairs.filter((r) => r.status === 'PROPOSED').length}件 / 確定済み: ${input.repairs.filter((r) => r.status === 'CONFIRMED').length}件`,
+    ...(dataSignals.length > 0 ? dataSignals.slice(0, 3).map((s) => `・${s.statement}`) : ['・データ品質の新しい悪化: なし']),
+    ...(dataCandidates.length > 0 ? [`・データ改善候補: ${dataCandidates.length}件`] : [])
   ].join('\n');
 }
 

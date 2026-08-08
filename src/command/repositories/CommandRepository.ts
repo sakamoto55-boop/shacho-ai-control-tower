@@ -14,6 +14,7 @@ import type { TargetRecord } from '../targets/targetRegistry.js';
 import type { ConstitutionPrinciple } from '../constitution/constitutionRegistry.js';
 import type { ArtifactRecord } from '../artifacts/artifactRegistry.js';
 import type { GrowthItem } from '../growth/growthBacklog.js';
+import type { IncidentRecord } from '../livebeta/incidentLog.js';
 import { buildSeedDataset, type CommandDataset } from '../data/seed.js';
 import {
   DemoSourceRegistry,
@@ -38,6 +39,8 @@ export interface CommandStore {
   artifacts: ArtifactRecord[];
   /** Growth Registry（Phase GROWTH）。改善候補・自己改善・修正候補・Mapping学習 */
   growthItems: GrowthItem[];
+  /** Beta Incident Log（LIVE BETA）。誤回答・障害等の記録。削除せず状態遷移 */
+  incidents: IncidentRecord[];
 }
 
 export interface CommandRepository {
@@ -66,6 +69,8 @@ export interface CommandRepository {
   saveArtifact(record: ArtifactRecord): Promise<ArtifactRecord>;
   getGrowthItems(): Promise<GrowthItem[]>;
   saveGrowthItem(record: GrowthItem): Promise<GrowthItem>;
+  getIncidents(): Promise<IncidentRecord[]>;
+  saveIncident(record: IncidentRecord): Promise<IncidentRecord>;
 }
 
 function defaultStore(): CommandStore {
@@ -79,7 +84,8 @@ function defaultStore(): CommandStore {
     targets: [],
     principles: [],
     artifacts: [],
-    growthItems: []
+    growthItems: [],
+    incidents: []
   };
 }
 
@@ -249,6 +255,20 @@ export class LocalCommandRepository implements CommandRepository {
     await this.writeStore(store);
     return record;
   }
+
+  async getIncidents(): Promise<IncidentRecord[]> {
+    return (await this.readStore()).incidents;
+  }
+
+  async saveIncident(record: IncidentRecord): Promise<IncidentRecord> {
+    const store = await this.readStore();
+    store.incidents = [
+      ...store.incidents.filter((item) => item.incidentId !== record.incidentId),
+      record
+    ];
+    await this.writeStore(store);
+    return record;
+  }
 }
 
 function growthItemId(item: GrowthItem): string {
@@ -398,6 +418,18 @@ export class InMemoryCommandRepository implements CommandRepository {
   async saveGrowthItem(record: GrowthItem): Promise<GrowthItem> {
     this.store.growthItems = [
       ...this.store.growthItems.filter((item) => growthItemId(item) !== growthItemId(record)),
+      record
+    ];
+    return record;
+  }
+
+  async getIncidents(): Promise<IncidentRecord[]> {
+    return this.store.incidents;
+  }
+
+  async saveIncident(record: IncidentRecord): Promise<IncidentRecord> {
+    this.store.incidents = [
+      ...this.store.incidents.filter((item) => item.incidentId !== record.incidentId),
       record
     ];
     return record;

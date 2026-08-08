@@ -74,6 +74,11 @@ import {
   buildWeeklyGrowthReview,
   type GrowthReviewInput
 } from '../growth/growthReview.js';
+import { IncidentService, type IncidentKind, type IncidentStatus } from '../livebeta/incidentLog.js';
+import { evaluateBetaGate } from '../livebeta/betaGate.js';
+import { computeAutonomyReview, computePresidentDecisionLoad } from '../growth/autonomyReview.js';
+import { buildReviewSummary, bulkApprove } from '../constitution/reviewSummary.js';
+import { existsSync } from 'node:fs';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -128,6 +133,7 @@ export function createCommandApp(
   const artifactService = new ArtifactService(repository);
   const growthService = new GrowthService(repository);
   const promotionPipeline = new PromotionPipeline(repository);
+  const incidentService = new IncidentService(repository);
 
   // --- Principal解決 + Rate Limit（全ルート共通） ---
   app.use('*', async (c, next) => {
@@ -983,7 +989,8 @@ export function createCommandApp(
         repairs: items.filter((i) => i.kind === 'REPAIR'),
         experiments: await repository.getExperiments(),
         lessons: memories.filter((m) => m.type === 'LESSON' && m.status === 'ACTIVE'),
-        selfEvaluation: orchestrator.getSelfEvaluation()
+        selfEvaluation: orchestrator.getSelfEvaluation(),
+        incidents: await incidentService.summarize()
       };
       const text =
         period === 'weekly'
@@ -1045,6 +1052,165 @@ export function createCommandApp(
         outcome: 'ok'
       });
       return c.json({ improvement });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // --- LIVE BETA: Beta Gate / Incident Log / Autonomy Review / Constitution Review ---
+
+  app.get('/beta-gate', (c) => {
+    // §20の全条件を決定論判定（未接続Gap＝銀行・会計・日報紐付けはGate条件に含めない §1）
+    const gate = evaluateBetaGate({
+      growthBaselineStarted: existsSync('data/growth-snapshots.jsonl')
+    });
+    return c.json(gate);
+  });
+
+  app.get('/incidents', async (c) => {
+    const principal = c.get('principal');
+    try {
+      if (!canDecideApproval(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}はIncident Logを参照できません`);
+      }
+      return c.json({
+        incidents: await incidentService.list(),
+        summary: await incidentService.summarize()
+      });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  app.post('/incidents', async (c) => {
+    const principal = c.get('principal');
+    try {
+      const body = (await c.req.json()) as Record<string, unknown>;
+      const kinds: IncidentKind[] = [
+        'WRONG_ANSWER',
+        'WRONG_SEARCH',
+        'WRONG_MEMORY',
+        'WRONG_ROUTING',
+        'UI',
+        'LATENCY',
+        'PROVIDER_OUTAGE'
+      ];
+      if (!kinds.includes(body.kind as IncidentKind)) {
+        throw new ValidationError(`kind は ${kinds.join(' / ')} のいずれかです`);
+      }
+      if (typeof body.description !== 'string' || body.description.trim().length === 0) {
+        throw new ValidationError('description は必須です（会話本文・機微情報は書かない）');
+      }
+      const severity = body.severity === 'HIGH' || body.severity === 'MEDIUM' ? body.severity : 'LOW';
+      const result = await incidentService.report(
+        {
+          kind: body.kind as IncidentKind,
+          description: body.description,
+          severity,
+          sessionId: typeof body.sessionId === 'string' ? body.sessionId.slice(0, 64) : undefined
+        },
+        principal,
+        nowIso()
+      );
+      await audit.record({
+        actor: principal.label,
+        role: principal.role,
+        action: 'incident_report',
+        scope: 'group',
+        detail: `${result.incident.incidentId} ${result.incident.kind}`,
+        outcome: 'ok'
+      });
+      return c.json(result);
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  app.post('/incidents/:id/transition', async (c) => {
+    const principal = c.get('principal');
+    try {
+      if (!canDecideApproval(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}はIncidentの状態を変更できません`);
+      }
+      const body = (await c.req.json()) as Record<string, unknown>;
+      const statuses: IncidentStatus[] = ['OPEN', 'ANALYZED', 'RESOLVED'];
+      if (!statuses.includes(body.status as IncidentStatus)) {
+        throw new ValidationError('status は OPEN / ANALYZED / RESOLVED のいずれかです');
+      }
+      const incident = await incidentService.transition(
+        c.req.param('id'),
+        body.status as IncidentStatus,
+        nowIso(),
+        typeof body.resolutionNote === 'string' ? body.resolutionNote : undefined
+      );
+      if (!incident) return c.json({ error: '対象のIncidentが見つかりません' }, 404);
+      return c.json({ incident });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // Autonomy Review（§11）。LEVEL昇格は提案まで（勝手に昇格しない）
+  app.get('/growth/autonomy-review', async (c) => {
+    const principal = c.get('principal');
+    try {
+      if (!canDecideApproval(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}はAutonomy Reviewを参照できません`);
+      }
+      const review = computeAutonomyReview(
+        observability.recent(2000),
+        await incidentService.list(),
+        await growthService.backlog()
+      );
+      return c.json({ review });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // President Decision Load（§18・追跡候補KPI）
+  app.get('/growth/decision-load', async (c) => {
+    const principal = c.get('principal');
+    try {
+      if (!canDecideApproval(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}はDecision Loadを参照できません`);
+      }
+      const store = await repository.getStore();
+      return c.json({ decisionLoad: computePresidentDecisionLoad(store, observability.recent(2000)) });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // Constitution最終確定支援（§6-§7）
+  app.get('/constitution/review-summary', async (c) => {
+    try {
+      return c.json(await buildReviewSummary(constitutionService));
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  app.post('/constitution/approve-bulk', async (c) => {
+    const principal = c.get('principal');
+    try {
+      const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+      // §7: 「この内容で確定」の明示のみ正式化する
+      if (body.confirm !== 'この内容で確定') {
+        throw new ValidationError('一括承認には confirm: "この内容で確定" の明示が必要です');
+      }
+      const result = await bulkApprove(constitutionService, principal, nowIso(), {
+        includeIndividualConfirm: body.includeIndividualConfirm === true
+      });
+      await audit.record({
+        actor: principal.label,
+        role: principal.role,
+        action: 'constitution_approve_bulk',
+        scope: 'group',
+        detail: `approved=${result.approvedPrincipleIds.length} skipped=${result.skippedForIndividualConfirm.length}`,
+        outcome: 'ok'
+      });
+      return c.json(result);
     } catch (error) {
       return handleError(c, error);
     }

@@ -30,7 +30,7 @@ export interface GrowthCandidate {
   domain: GrowthDomain;
   title: string;
   problem: string;
-  source: 'OBSERVATION' | 'PATTERN' | 'CONVERSATION' | 'FUTURE' | 'ARTIFACT_FEEDBACK' | 'SELF_EVAL';
+  source: 'OBSERVATION' | 'PATTERN' | 'CONVERSATION' | 'FUTURE' | 'ARTIFACT_FEEDBACK' | 'SELF_EVAL' | 'INCIDENT';
   status: GrowthStatus;
   risk: GrowthRisk;
   /** 優先度スコアの内訳（§32。総合点だけで判断しない） */
