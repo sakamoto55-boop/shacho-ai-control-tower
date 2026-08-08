@@ -57,6 +57,18 @@ HTTPリクエスト (src/server.ts, Hono)
 - B：担当者へ振れば進む（見積作成、日程調整、資料送付、通常問い合わせなど）
 - C：記録のみ（完了報告、相槌、情報共有）
 
+### LCC COMMAND（src/command/ — 会話型AI経営管制OS）
+
+`/command` 配下にマウントされる上位レイヤー。設計全文は `LCC_COMMAND.md` を参照。
+
+- `src/command/engines/`：資金繰り予測・売上着地・営業漏れ検知・粗利分析・請求チェック・アラート・KPIの**決定論エンジン**（純関数）。数値計算をAIにさせない。
+- `src/command/orchestrator/orchestrator.ts`：日本語の意図判定→Read Tool実行→【確認できた事実】/【AIの推測】を分離した根拠付き回答。データがなければ推測せず `UNKNOWN` を返す。
+- `src/command/data/seed.ts`：Phase A用デモ正本。全日付が基準日 `asOf` からの相対で、テストは `asOf` 固定で決定論的に検証する。数値を変えるとテストの期待値（着地▲7.1%、A案件粗利24.8%等）が壊れるため必ず両方更新する。
+- `src/command/tools/registry.ts`：Read/Write Tool分離。LEVEL 4以上のWriteは `ApprovalRequest`（承認待ち）必須で、承認後も Phase A は dry-run 固定。この挙動を壊さない。
+- 法人スコープ（`group`/法人ID）の絞り込みは必ず `filterDatasetByScope` を通す。法人間データを混在させない。
+- Decision（経営判断Memory）は `suppressAlertKinds` と `validUntil` で同種アラートを抑制し、期限後に再評価する。
+- `docs/lcc-command.html`：Mobile First の会話中心UI（Vue3+Tailwind CDN、API接続不可時はシードと同数値のデモモード）。
+
 ### docs/ のLCC業務アプリ（APIとは独立）
 
 `docs/` にはGitHub Pages公開用の単一HTML完結アプリ（LCC統合見積システム `lcc.html`、原価管理 `lcc-cost.html`、ポータル `index.html`）がある。Vue3 + Tailwind をCDN読み込みし、ビルドツール不使用。ルートの `lcc-redesigned.html` はその開発版。これらは `src/` のAPIとは独立しており、npmビルド・テストの対象外。

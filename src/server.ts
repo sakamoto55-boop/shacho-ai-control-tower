@@ -7,9 +7,13 @@ import { analyzeAndSaveMessage } from './jobs/analyzeIncomingMessages.js';
 import { generateAndSendReport } from './jobs/generateReports.js';
 import { createRepository } from './repositories/createRepository.js';
 import { createLineworksConnector, type LineworksWebhookPayload } from './connectors/lineworks.js';
+import { createCommandApp } from './command/server/routes.js';
 import { nowIso } from './utils/date.js';
 
 export const app = new Hono();
+
+// LCC COMMAND（会話型AI経営管制OS）を /command 配下へマウント
+app.route('/command', createCommandApp());
 
 const devEnabled = () => process.env.ENABLE_DEV_ENDPOINTS !== 'false' && process.env.NODE_ENV !== 'production';
 const repository = createRepository();

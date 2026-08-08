@@ -2,6 +2,8 @@
 
 会社メール、LINE WORKS、手入力された外部連絡をAI分析し、要約、タスク抽出、返信下書き、リスク判定、朝昼晩レポートを作るローカルMVPです。
 
+> **LCC COMMAND（会話型AI経営管制OS）**: 経営者が自然言語で「今月どう？」「現金大丈夫？」と質問すると、決定論エンジンが社内データを計算し根拠付きで回答する上位レイヤーを `/command` 配下に実装しています。詳細・エンドポイント一覧は [LCC_COMMAND.md](./LCC_COMMAND.md)、UIは `docs/lcc-command.html` を参照してください。
+
 このリポジトリは、最初からGmail、LINE WORKS、kintone、AI APIへ本番接続しません。Phase 1では、外部APIキーなしで動くローカルMVPを優先します。
 
 ## MVPの範囲

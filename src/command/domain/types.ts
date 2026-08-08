@@ -1,0 +1,478 @@
+/**
+ * LCC COMMAND 経営データモデル。
+ *
+ * LCC COMMANDは「新しい正本」ではなく、既存の正本を横断して読み、
+ * 経営判断へ変換する上位レイヤーである。ここで定義する型は
+ * 既存システムのデータを共通IDで読み取るための正規化ビューであり、
+ * 既存IDがある場合は externalIds（Mapping Layer）に保持して振り直さない。
+ */
+
+/** データ確信度。推測で埋めず、不明は UNKNOWN を返す。 */
+export type DataConfidence = 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+
+/** アラート重要度。CRITICALのみ即時通知、他は朝Brief等へまとめる。 */
+export type AlertSeverity = 'INFO' | 'WATCH' | 'WARNING' | 'CRITICAL';
+
+/**
+ * 承認レベル。
+ * LEVEL 0: 検索・閲覧（自動） / LEVEL 1: 社内要約・分析（自動）
+ * LEVEL 2: 下書き作成（自動） / LEVEL 3: 社内通知（ルール設定）
+ * LEVEL 4: 外部送信・データ変更（承認） / LEVEL 5: 支払・契約・人事等（強い承認）
+ */
+export type ActionRiskLevel = 0 | 1 | 2 | 3 | 4 | 5;
+
+/** 法人スコープ。'group' はグループ全体（AIが勝手に法人間データを混在させない）。 */
+export type CompanyScope = 'group' | string;
+
+/** 主要データの鮮度。古いデータを現在値として断定しないために全KPIへ付与する。 */
+export interface Freshness {
+  lastUpdatedAt: string;
+  /** 取得元（例: '会計システム' '銀行API' '手入力'）。AI生成値をソースにしてはならない。 */
+  source: string;
+  /** 最新でない場合 true（回答時に「最新ではありません」と明示する） */
+  stale: boolean;
+}
+
+/** 回答・数値の根拠。AIが生成した数字を根拠として扱ってはならない。 */
+export interface Evidence {
+  label: string;
+  value: string;
+  /** 参照した正本レコードのID（project_id など） */
+  refId?: string;
+  source: string;
+  asOf: string;
+}
+
+// ---------------------------------------------------------------------------
+// マスタ
+// ---------------------------------------------------------------------------
+
+export interface Company {
+  companyId: string;
+  name: string;
+  /** 既存システムのIDを振り直さないためのMapping Layer */
+  externalIds?: Record<string, string>;
+}
+
+export interface Customer {
+  customerId: string;
+  companyId: string;
+  name: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  externalIds?: Record<string, string>;
+}
+
+export interface Employee {
+  employeeId: string;
+  companyId: string;
+  name: string;
+  role: string;
+  externalIds?: Record<string, string>;
+}
+
+export interface Vendor {
+  vendorId: string;
+  companyId: string;
+  name: string;
+  category: string;
+}
+
+// ---------------------------------------------------------------------------
+// 案件・営業
+// ---------------------------------------------------------------------------
+
+/** 案件のライフサイクル: 問い合わせ→現調→見積→追客→受注→施工→完工→請求→入金 */
+export type ProjectStage =
+  | 'inquiry'
+  | 'survey'
+  | 'estimating'
+  | 'following'
+  | 'ordered'
+  | 'in_progress'
+  | 'completed'
+  | 'invoiced'
+  | 'paid'
+  | 'lost';
+
+export interface Project {
+  projectId: string;
+  companyId: string;
+  customerId: string;
+  name: string;
+  stage: ProjectStage;
+  /** 受注額（未受注時は見積額） */
+  orderAmount: number;
+  /** 見積時の予定粗利率（0-1） */
+  plannedMarginRate: number;
+  startDate?: string;
+  dueDate?: string;
+  completedDate?: string;
+  ownerEmployeeId?: string;
+  updatedAt: string;
+  externalIds?: Record<string, string>;
+}
+
+export interface Estimate {
+  estimateId: string;
+  companyId: string;
+  projectId: string;
+  amount: number;
+  submittedAt?: string;
+  /** 受注可能性 0-1（営業入力。AI推測値を入れない） */
+  probability?: number;
+  status: 'draft' | 'submitted' | 'ordered' | 'lost';
+}
+
+/** 営業接点。取得不能チャネルは簡易入力で残す。 */
+export interface Interaction {
+  interactionId: string;
+  companyId: string;
+  customerId: string;
+  projectId?: string;
+  employeeId?: string;
+  channel: 'gmail' | 'lineworks' | 'phone' | 'visit' | 'manual' | 'other';
+  datetime: string;
+  summary: string;
+  nextAction?: string;
+  nextActionDate?: string;
+}
+
+/** 月次売上目標（経営者・幹部が設定する確定値。AIが生成しない） */
+export interface SalesTarget {
+  companyId: string;
+  /** 'YYYY-MM' */
+  month: string;
+  amount: number;
+}
+
+// ---------------------------------------------------------------------------
+// 原価・粗利
+// ---------------------------------------------------------------------------
+
+/** 原価カテゴリー（既存分類に合わせる） */
+export type CostCategory =
+  | 'labor' // 人工
+  | 'subcontract' // 外注
+  | 'disposal' // 処分
+  | 'material' // 材料
+  | 'vehicle' // 車両
+  | 'machine' // 重機
+  | 'transport' // 運搬
+  | 'other'; // その他
+
+export const COST_CATEGORY_LABELS: Record<CostCategory, string> = {
+  labor: '人工',
+  subcontract: '外注',
+  disposal: '処分',
+  material: '材料',
+  vehicle: '車両',
+  machine: '重機',
+  transport: '運搬',
+  other: 'その他'
+};
+
+export interface CostEntry {
+  costId: string;
+  companyId: string;
+  projectId: string;
+  category: CostCategory;
+  amount: number;
+  date: string;
+  /** 見積時の予定原価か、発生済み実績か、今後の予測か */
+  kind: 'planned' | 'actual' | 'forecast';
+  note?: string;
+}
+
+/** 案件粗利。予定・予測・実績を分離する。 */
+export interface ProjectMargin {
+  projectId: string;
+  projectName: string;
+  companyId: string;
+  orderAmount: number;
+  plannedMarginRate: number;
+  forecastMarginRate: number | null;
+  actualMarginRate: number | null;
+  plannedCost: number;
+  forecastCost: number;
+  actualCost: number;
+  costByCategory: Record<CostCategory, { planned: number; forecastAndActual: number }>;
+  /** 見積比で悪化している主因カテゴリ（差額降順） */
+  varianceDrivers: Array<{ category: CostCategory; label: string; diff: number }>;
+  freshness: Freshness;
+  evidence: Evidence[];
+}
+
+// ---------------------------------------------------------------------------
+// 請求・入金
+// ---------------------------------------------------------------------------
+
+export interface Invoice {
+  invoiceId: string;
+  companyId: string;
+  projectId: string;
+  customerId: string;
+  amount: number;
+  issuedAt?: string;
+  dueDate?: string;
+  paidAt?: string;
+  status: 'draft' | 'issued' | 'paid' | 'overdue';
+  externalIds?: Record<string, string>;
+}
+
+export interface Payment {
+  paymentId: string;
+  companyId: string;
+  invoiceId?: string;
+  amount: number;
+  date: string;
+  direction: 'in' | 'out';
+  note?: string;
+}
+
+// ---------------------------------------------------------------------------
+// 資金繰り
+// ---------------------------------------------------------------------------
+
+export interface CashAccount {
+  accountId: string;
+  companyId: string;
+  bankName: string;
+  balance: number;
+  /** 残高の最終更新（銀行残高は前営業日など。古い場合は明示する） */
+  freshness: Freshness;
+}
+
+export type CashPlanCategory =
+  | 'salary' // 給与
+  | 'subcontract' // 外注
+  | 'purchase' // 仕入
+  | 'fixed' // 固定費
+  | 'loan' // 借入返済
+  | 'tax' // 税金
+  | 'social_insurance' // 社会保険
+  | 'card' // カード
+  | 'lease' // リース
+  | 'receipt' // 入金
+  | 'other';
+
+export const CASH_PLAN_CATEGORY_LABELS: Record<CashPlanCategory, string> = {
+  salary: '給与',
+  subcontract: '外注',
+  purchase: '仕入',
+  fixed: '固定費',
+  loan: '借入返済',
+  tax: '税金',
+  social_insurance: '社会保険',
+  card: 'カード',
+  lease: 'リース',
+  receipt: '入金',
+  other: 'その他'
+};
+
+/** 入金予定・支払予定。確定と予測を区別する。 */
+export interface CashPlanEntry {
+  planId: string;
+  companyId: string;
+  direction: 'in' | 'out';
+  category: CashPlanCategory;
+  amount: number;
+  date: string;
+  certainty: 'confirmed' | 'forecast';
+  label: string;
+  /** 紐づく請求など */
+  refId?: string;
+}
+
+/** シナリオ分析の調整。「A社の入金が10日遅れたら？」「来月500万円の車両を買ったら？」 */
+export type CashScenarioAdjustment =
+  | { kind: 'delay_entry'; planId: string; days: number }
+  | { kind: 'add_payment'; amount: number; date: string; label: string }
+  | { kind: 'add_receipt'; amount: number; date: string; label: string }
+  | { kind: 'remove_entry'; planId: string };
+
+export interface CashForecastPoint {
+  date: string;
+  daysAhead: number;
+  balance: number;
+  /** 予測分（certainty='forecast'）を除いた確定ベース残高 */
+  confirmedOnlyBalance: number;
+}
+
+export interface CashForecastResult {
+  scope: CompanyScope;
+  asOf: string;
+  currentBalance: number;
+  points: CashForecastPoint[];
+  /** 期間中の最低残高（資金ショート検知用） */
+  minBalance: { date: string; balance: number };
+  entries: CashPlanEntry[];
+  freshness: Freshness;
+  evidence: Evidence[];
+}
+
+// ---------------------------------------------------------------------------
+// 経営判断Memory・タスク・承認・アラート
+// ---------------------------------------------------------------------------
+
+/**
+ * 経営判断の構造化記録。会話全部ではなく、経営上意味のあるDecisionのみ保存する。
+ * 有効期間中はAIが同じ警告を繰り返さず、期限切れ後に再評価する。
+ */
+export interface Decision {
+  decisionId: string;
+  companyId: string;
+  projectId?: string;
+  date: string;
+  decision: string;
+  reason: string;
+  decisionMaker: string;
+  validUntil?: string;
+  status: 'active' | 'expired' | 'revoked';
+  /** 抑制対象のアラート種別（例: 'margin_drop'） */
+  suppressAlertKinds?: string[];
+}
+
+export interface CommandTask {
+  taskId: string;
+  source: 'conversation' | 'system' | 'manual';
+  companyId: string;
+  projectId?: string;
+  owner?: string;
+  title: string;
+  dueDate?: string;
+  priority: 'high' | 'medium' | 'low';
+  status: 'candidate' | 'confirmed' | 'done' | 'rejected';
+  evidence: Evidence[];
+  createdAt: string;
+}
+
+/** 承認リクエスト。LEVEL 4以上のWrite Toolは必ずこれを経由する。 */
+export interface ApprovalRequest {
+  approvalId: string;
+  companyId: string;
+  riskLevel: ActionRiskLevel;
+  action: string;
+  target: string;
+  amount?: number;
+  before?: string;
+  after?: string;
+  aiReason: string;
+  evidence: Evidence[];
+  status: 'waiting' | 'approved' | 'rejected' | 'executed_dry_run';
+  createdAt: string;
+  decidedAt?: string;
+  /** 実行結果（Phase A は全て dry-run） */
+  executionResult?: string;
+}
+
+export type AlertKind =
+  | 'cash_low' // 将来現金残高の低下
+  | 'sales_landing_gap' // 売上着地の目標比不足
+  | 'margin_drop' // 予測粗利の悪化
+  | 'inquiry_unanswered' // 問い合わせ24時間未対応
+  | 'estimate_not_submitted' // 現調後見積未提出
+  | 'no_follow_up' // 見積提出後追客なし
+  | 'stalled' // 30日以上停滞
+  | 'no_next_step' // 受注後次工程未設定
+  | 'uninvoiced_completed' // 完工未請求
+  | 'invoice_overdue' // 請求期限超過
+  | 'payment_overdue' // 請求済未入金・入金予定超過
+  | 'amount_mismatch'; // 金額不一致
+
+export interface CommandAlert {
+  alertId: string;
+  kind: AlertKind;
+  severity: AlertSeverity;
+  companyId: string;
+  projectId?: string;
+  title: string;
+  detail: string;
+  evidence: Evidence[];
+  /** Decision Memory により抑制されている場合、その decisionId */
+  suppressedByDecisionId?: string;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// 外部Research
+// ---------------------------------------------------------------------------
+
+/** 外部調査タスク。社内の確定数値計算には使用しない。非同期で状態管理する。 */
+export interface ResearchTask {
+  researchId: string;
+  companyId: string;
+  question: string;
+  provider: 'manus' | 'web_search' | 'other';
+  status: 'queued' | 'running' | 'waiting' | 'completed' | 'failed';
+  requestedAt: string;
+  completedAt?: string;
+  /** 出典URL・取得日時付きの結果。社内事実と明確に分離して表示する。 */
+  result?: { summary: string; sources: Array<{ url: string; fetchedAt: string }> };
+}
+
+// ---------------------------------------------------------------------------
+// KPI・Brief・会話
+// ---------------------------------------------------------------------------
+
+export interface KpiValue {
+  key: string;
+  label: string;
+  value: number;
+  unit: 'yen' | 'percent' | 'count';
+  freshness: Freshness;
+  confidence: DataConfidence;
+}
+
+export interface KpiSnapshot {
+  scope: CompanyScope;
+  asOf: string;
+  kpis: KpiValue[];
+}
+
+export interface ExecutiveBrief {
+  scope: CompanyScope;
+  generatedAt: string;
+  headline: string;
+  /** 昨日から何が変わったか（単なる数字羅列より優先） */
+  changes: string[];
+  decisionsNeeded: string[];
+  recommendedActions: string[];
+  kpiSnapshot: KpiSnapshot;
+  alerts: CommandAlert[];
+  text: string;
+}
+
+/** Generative UI のヒント。AI回答を文章だけにしない。 */
+export type UiHint =
+  | 'text'
+  | 'chart'
+  | 'cash_table'
+  | 'ranking'
+  | 'project_card'
+  | 'pipeline'
+  | 'tasks'
+  | 'brief'
+  | 'approval';
+
+export interface CommandChatRequest {
+  scope?: CompanyScope;
+  message: string;
+  /** テストや再現用に基準日時を注入できる（省略時は現在時刻） */
+  asOf?: string;
+}
+
+export interface CommandChatResponse {
+  /** 事実と推測を分離した日本語回答 */
+  text: string;
+  uiHint: UiHint;
+  /** UI描画用の構造化データ（uiHintに応じた形） */
+  data?: unknown;
+  confidence: DataConfidence;
+  evidence: Evidence[];
+  /** 実行したRead Tool名 */
+  toolsUsed: string[];
+  /** 生成された承認リクエスト（Write Tool経由時のみ） */
+  approvalRequest?: ApprovalRequest;
+}

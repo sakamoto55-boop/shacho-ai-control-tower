@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a2a5e">
+<meta name="description" content="LCC COMMAND — 会話型AI経営管制OS。経営者がスマホから会社について質問すると、社内データを調査・計算し根拠付きで回答する。">
+<title>LCC COMMAND</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' rx='12' fill='%230a2a5e'/%3E%3Ctext x='32' y='44' font-size='30' font-weight='900' text-anchor='middle' fill='%23ff7a18' font-family='sans-serif'%3E司%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{
+    --lcc-navy:#0a2a5e; --lcc-navy-deep:#06183a; --lcc-blue:#1d6fe0;
+    --lcc-orange:#ff7a18; --lcc-green:#16a34a; --lcc-red:#dc2626;
+  }
+  body{background:linear-gradient(180deg,var(--lcc-navy) 0%,var(--lcc-navy-deep) 100%);min-height:100dvh;}
+  .kpi-scroll::-webkit-scrollbar{display:none}
+  .chat-scroll::-webkit-scrollbar{width:4px}
+  .chat-scroll::-webkit-scrollbar-thumb{background:#ffffff33;border-radius:2px}
+  .bubble-ai{white-space:pre-wrap;word-break:break-word}
+  .fade-enter-active{transition:opacity .25s ease, transform .25s ease}
+  .fade-enter-from{opacity:0;transform:translateY(6px)}
+</style>
+</head>
+<body>
+<div id="app" class="max-w-lg mx-auto flex flex-col" style="height:100dvh">
+
+  <!-- ヘッダー: ロゴ + 法人スコープ切替 -->
+  <header class="flex items-center justify-between px-4 pt-3 pb-2">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center font-black text-orange-400">司</div>
+      <div>
+        <h1 class="text-white font-bold leading-tight">LCC COMMAND</h1>
+        <p class="text-[10px] text-blue-200/70 leading-tight">会話型AI経営管制OS {{ demoMode ? '（デモモード）' : '' }}</p>
+      </div>
+    </div>
+    <select v-model="scope" @change="loadKpi" class="bg-white/10 text-white text-xs rounded-lg px-2 py-1.5 border border-white/20">
+      <option value="group" class="text-slate-900">グループ全体</option>
+      <option value="lcc" class="text-slate-900">LCCのみ</option>
+      <option value="wel" class="text-slate-900">福祉のみ</option>
+    </select>
+  </header>
+
+  <!-- 上部: 最低限の経営KPI（横スクロール・最終更新付き） -->
+  <section class="px-4 pb-2">
+    <div class="kpi-scroll flex gap-2 overflow-x-auto" style="scrollbar-width:none">
+      <div v-for="kpi in kpis" :key="kpi.key"
+           class="shrink-0 rounded-xl bg-white/10 border border-white/10 px-3 py-2 min-w-[118px]">
+        <p class="text-[10px] text-blue-200/80 leading-tight">{{ kpi.label }}</p>
+        <p class="text-sm font-bold" :class="kpi.alert ? 'text-orange-300' : 'text-white'">{{ kpi.display }}</p>
+        <p class="text-[9px] text-blue-200/50">{{ kpi.freshnessLabel }}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 中央: AI会話（画面の中心） -->
+  <main ref="chatArea" class="chat-scroll flex-1 overflow-y-auto px-4 space-y-3 pb-2">
+    <transition-group name="fade">
+      <div v-for="(m, i) in messages" :key="i" :class="m.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
+        <div v-if="m.role === 'user'" class="max-w-[85%] rounded-2xl rounded-br-md bg-orange-500 text-white px-4 py-2.5 text-sm">{{ m.text }}</div>
+        <div v-else class="max-w-[92%] rounded-2xl rounded-bl-md bg-white/95 shadow px-4 py-3 text-sm text-slate-800">
+          <p class="bubble-ai">{{ m.text }}</p>
+
+          <!-- 承認カード（Human-in-the-Loop） -->
+          <div v-if="m.approval" class="mt-3 rounded-xl border border-orange-300 bg-orange-50 p-3">
+            <p class="text-xs font-bold text-orange-700">承認リクエスト（LEVEL {{ m.approval.riskLevel }}）</p>
+            <p class="text-xs mt-1">対象: {{ m.approval.target }}</p>
+            <p class="text-xs">操作: {{ m.approval.action }}</p>
+            <p class="text-[11px] text-slate-500 mt-1">{{ m.approval.aiReason }}</p>
+            <div v-if="m.approval.status === 'waiting'" class="flex gap-2 mt-2">
+              <button @click="decideApproval(m, true)" class="flex-1 rounded-lg bg-green-600 text-white text-xs font-bold py-2">承認する</button>
+              <button @click="decideApproval(m, false)" class="flex-1 rounded-lg bg-slate-200 text-slate-700 text-xs font-bold py-2">却下</button>
+            </div>
+            <p v-else class="text-xs font-bold mt-2" :class="m.approval.status === 'rejected' ? 'text-slate-500' : 'text-green-700'">
+              {{ m.approval.status === 'rejected' ? '却下しました' : '承認済み（dry-run実行。実送信は行っていません）' }}
+            </p>
+          </div>
+
+          <!-- 根拠表示（Evidence） -->
+          <div v-if="m.evidence && m.evidence.length" class="mt-2">
+            <button @click="m.showEvidence = !m.showEvidence" class="text-[11px] font-bold text-blue-700">
+              {{ m.showEvidence ? '根拠を閉じる ▲' : '根拠を見る ▼' }}
+            </button>
+            <div v-if="m.showEvidence" class="mt-1.5 rounded-lg bg-slate-100 p-2 space-y-1.5">
+              <div v-for="(ev, j) in m.evidence" :key="j" class="text-[11px] leading-snug">
+                <span class="font-bold">{{ ev.label }}</span>: {{ ev.value }}
+                <span class="text-slate-500">（{{ ev.source }} / {{ (ev.asOf || '').slice(0, 10) }}）</span>
+              </div>
+            </div>
+          </div>
+
+          <p v-if="m.confidence" class="mt-1.5 text-[10px]"
+             :class="{'text-green-600': m.confidence === 'HIGH', 'text-amber-600': m.confidence === 'MEDIUM', 'text-orange-600': m.confidence === 'LOW', 'text-slate-400': m.confidence === 'UNKNOWN'}">
+            Data Confidence: {{ m.confidence }}
+          </p>
+        </div>
+      </div>
+    </transition-group>
+    <div v-if="thinking" class="flex justify-start">
+      <div class="rounded-2xl bg-white/80 px-4 py-2.5 text-sm text-slate-500">社内データを確認しています…</div>
+    </div>
+  </main>
+
+  <!-- 下部: クイック質問 + 入力欄 -->
+  <footer class="px-4 pb-4 pt-1">
+    <div class="kpi-scroll flex gap-2 overflow-x-auto pb-2" style="scrollbar-width:none">
+      <button v-for="q in quickQuestions" :key="q" @click="send(q)"
+              class="shrink-0 rounded-full bg-white/10 border border-white/20 text-blue-100 text-xs px-3 py-1.5">{{ q }}</button>
+    </div>
+    <div class="flex items-center gap-2">
+      <input v-model="draft" @keydown.enter="send(draft)" type="text" placeholder="会社について何でも質問…"
+             class="flex-1 rounded-full bg-white/95 px-4 py-3 text-sm outline-none">
+      <button @click="send(draft)" class="w-11 h-11 rounded-full bg-orange-500 text-white font-bold flex items-center justify-center">↑</button>
+      <button title="音声入力はPhase Bで対応予定" class="w-11 h-11 rounded-full bg-white/10 border border-white/20 text-blue-200/50 flex items-center justify-center" disabled>🎙</button>
+    </div>
+  </footer>
+</div>
+
+<script>
+const { createApp } = Vue;
+
+/* ============================================================
+   デモモード用の応答データ。
+   APIサーバー（/command/chat）へ接続できない場合（GitHub Pages等）に
+   src/command のシードデータと同じ数値で応答を再現する。
+   数字はAI生成ではなく、決定論エンジンの計算結果の写し。
+   ============================================================ */
+const DEMO = [
+  {
+    match: /おはよう|ブリーフ/,
+    confidence: 'HIGH',
+    text: 'おはようございます。株式会社LCCの朝Briefです。\n\n本日は経営上3件確認が必要です。\n①当月売上着地が目標比-7.1%\n②A案件（出雲市 旧社屋解体工事）の予測粗利が35.0%→24.8%へ低下\n③月末の外注支払集中により30日後現金残高が通常より低下します。\n\n最優先は①です。詳しく説明しますか？'
+  },
+  {
+    match: /売上|今月どう|着地/,
+    confidence: 'HIGH',
+    text: '【確認できた事実】\n2026-08の確定売上は18,000,000円、着地予測は23,225,000円です。\n目標25,000,000円に対し-7.1%（不足額1,775,000円）です。\n\n見積提出済みで受注可能性のある案件が6件、総額10,700,000円あります。\n上位3件:\n1. 山田工務店 母屋解体 3,200,000円 / 受注確度70.0%\n2. 出雲不動産 駐車場外構 2,400,000円 / 受注確度60.0%\n3. 松江ハウジング ブロック塀改修 1,500,000円 / 受注確度60.0%',
+    evidence: [
+      { label: '売上目標', value: '25,000,000円', source: '経営計画（設定値）', asOf: '2026-08-08' },
+      { label: '確定売上 D案件+E案件', value: '18,000,000円', source: '案件台帳', asOf: '2026-08-08' },
+      { label: '当月完工予定 C案件', value: '5,225,000円', source: '案件台帳', asOf: '2026-08-08' }
+    ]
+  },
+  {
+    match: /現金|資金|キャッシュ/,
+    confidence: 'MEDIUM',
+    text: '【確認できた事実】\n現預金は15,500,000円です（注意: 残高は銀行明細（前営業日）のもので最新ではありません）。\n予測残高: 7日後15,500,000円 / 30日後12,400,000円 / 60日後13,125,000円 / 90日後8,125,000円\n期間中の最低残高は53日後の8,125,000円です。\n\n計算は「現在現預金＋入金予定－支払予定」の決定論ロジックで、確定と予測を区別しています。\n「大野建設の入金が15日遅れたら？」のようなシナリオも再計算できます。',
+    evidence: [
+      { label: '山陰合同銀行 残高', value: '12,400,000円', source: '銀行明細（前営業日）', asOf: '2026-08-07' },
+      { label: '島根銀行 残高', value: '3,100,000円', source: '銀行明細（前営業日）', asOf: '2026-08-07' },
+      { label: '支払予定（外注・確定）外注支払（月末集中）', value: '2026-08-31 6,800,000円', source: '資金繰り予定表', asOf: '2026-08-08' }
+    ]
+  },
+  {
+    match: /遅れたら|買ったら|購入したら/,
+    confidence: 'MEDIUM',
+    text: '【計算結果】「D案件 入金（大野建設）」10,000,000円の入金を15日遅らせた場合:\n30日後残高 12,400,000円 → 2,400,000円\n60日後残高 13,125,000円 → 13,125,000円\n期間中最低残高 8,125,000円 → 2,400,000円\n\n【AIの推測】この条件でも残高はプラス圏ですが、他の支払遅延が重なる場合は再確認が必要です。'
+  },
+  {
+    match: /なぜ|利益|粗利|原価/,
+    confidence: 'HIGH',
+    text: '【確認できた事実】\nA案件（出雲市 旧社屋解体工事）の予測粗利率は24.8%（予定35.0%）です。\n\n【主因】\n外注費が見積比＋800,000円\n処分費が見積比＋424,000円\n\n【AIの推測】\n追加作業が原価増加の一因である可能性があります。\n\n【推奨】\n追加請求可能性を確認してください。',
+    evidence: [
+      { label: '受注額', value: '12,000,000円', source: '案件台帳', asOf: '2026-08-07' },
+      { label: '予定原価（見積時）', value: '7,800,000円', source: '見積内訳', asOf: '2026-08-07' },
+      { label: '発生済み原価', value: '6,624,000円', source: '原価管理', asOf: '2026-08-07' },
+      { label: '残り予測原価', value: '2,400,000円', source: '原価管理', asOf: '2026-08-07' },
+      { label: '計算式', value: '予測粗利率 =（受注額 −（発生済み原価＋残り予測原価））÷ 受注額', source: 'LCC COMMAND 決定論ロジック', asOf: '2026-08-08' }
+    ]
+  },
+  {
+    match: /危ない|やばい|リスク/,
+    confidence: 'HIGH',
+    text: '【確認できた事実】粗利が予定から悪化している案件:\n1. A案件（出雲市 旧社屋解体工事）: 予定35.0% → 予測24.8%（主因: 外注費+800,000円、処分費+424,000円）'
+  },
+  {
+    match: /請求|未入金|入金/,
+    confidence: 'HIGH',
+    text: '【確認できた事実】請求・入金の要確認が3件あります。\n1. 完工未請求: B案件（松江市 外構工事） — 完工済みですが請求書が発行されていません（6,000,000円）。\n2. 入金期日6日超過: 山陰開発 — 請求3,300,000円が期日を6日超過しています。\n3. 金額不一致: 松江ハウジング — 請求2,200,000円に対し入金2,000,000円。差額200,000円の確認が必要です。'
+  },
+  {
+    match: /今日|やること|要対応/,
+    confidence: 'HIGH',
+    text: '【本日の要対応（優先順）】\n1. 当月売上着地が目標比-7.1%\n2. A案件（出雲市 旧社屋解体工事）の予測粗利が35.0%→24.8%へ低下\n3. 問い合わせ48時間未対応（大社商事）\n4. 見積提出後9日追客なし（山田工務店）\n5. 完工未請求: B案件（松江市 外構工事）'
+  },
+  {
+    match: /送って|送信して/,
+    confidence: 'HIGH',
+    text: '外部送信はそのまま実行せず、承認リクエストを作成しました。\n承認された場合のみ送信します（デモのため実送信は行いません）。',
+    approval: { approvalId: 'demo-appr-1', riskLevel: 4, action: '外部メッセージ送信（dry-run）', target: '宛先未特定', aiReason: '経営者の送信指示に基づく承認依頼。内容・宛先・根拠を確認してください。', status: 'waiting' }
+  },
+  {
+    match: /調べて|調査/,
+    confidence: 'HIGH',
+    text: '外部調査タスクを受け付けました（非同期で実行します）。\n状態: queued / Provider: web_search\n\n※外部調査の結果は出典URL・取得日時付きで返し、社内データとは明確に分けて表示します。'
+  },
+  {
+    match: /最終接点|最後/,
+    confidence: 'LOW',
+    text: '全チャネルを含む山田工務店との最終接点日は、現在のデータでは確定できません。\n\n確認できる範囲では、\nGmail：2026-07-30\n案件記録：2026-05-18\n\n電話および一部チャット履歴が構造化されていないため、2026-07-30を最終接点とは断定できません。'
+  }
+];
+
+const DEMO_KPIS = [
+  { key: 'cash_balance', label: '現預金', value: 15500000, unit: 'yen', freshness: { lastUpdatedAt: '2026-08-07T07:42:00Z', source: '銀行明細（前営業日）', stale: true } },
+  { key: 'cash_30d', label: '30日後現金予測', value: 12400000, unit: 'yen', freshness: { lastUpdatedAt: '2026-08-08T07:42:00Z', source: '決定論ロジック', stale: false } },
+  { key: 'sales_month', label: '当月売上', value: 18000000, unit: 'yen', freshness: { lastUpdatedAt: '2026-08-08T07:42:00Z', source: '案件台帳', stale: false } },
+  { key: 'sales_landing', label: '売上着地予測', value: 23225000, unit: 'yen', freshness: { lastUpdatedAt: '2026-08-08T07:42:00Z', source: '決定論ロジック', stale: false } },
+  { key: 'order_backlog', label: '受注残', value: 19025000, unit: 'yen', freshness: { lastUpdatedAt: '2026-08-08T07:42:00Z', source: '案件台帳', stale: false } },
+  { key: 'margin_forecast', label: '全社予測粗利率', value: 27.3, unit: 'percent', freshness: { lastUpdatedAt: '2026-08-08T07:42:00Z', source: '原価管理', stale: false } },
+  { key: 'uninvoiced', label: '完工未請求額', value: 6000000, unit: 'yen', freshness: { lastUpdatedAt: '2026-08-08T07:42:00Z', source: '請求台帳', stale: false } },
+  { key: 'sales_actions', label: '営業要対応件数', value: 5, unit: 'count', freshness: { lastUpdatedAt: '2026-08-08T07:42:00Z', source: '営業接点記録', stale: false } },
+  { key: 'alerts_today', label: '本日の重大アラート', value: 6, unit: 'count', freshness: { lastUpdatedAt: '2026-08-08T07:42:00Z', source: '決定論ロジック', stale: false } }
+];
+
+createApp({
+  data() {
+    return {
+      // APIベースURL: ?api=http://localhost:8787 で指定、未指定時は同一オリジンを試す
+      apiBase: new URLSearchParams(location.search).get('api') || '',
+      demoMode: false,
+      scope: 'lcc',
+      kpisRaw: [],
+      messages: [],
+      draft: '',
+      thinking: false,
+      quickQuestions: ['今月どう？', '現金大丈夫？', '危ない現場は？', '請求漏れてない？', '今日何をすべき？', 'A案件なぜ利益悪い？', 'それで送って']
+    };
+  },
+  computed: {
+    kpis() {
+      return this.kpisRaw.map((kpi) => ({
+        ...kpi,
+        display: kpi.unit === 'yen' ? this.compactYen(kpi.value) : kpi.unit === 'percent' ? `${kpi.value}%` : `${kpi.value}件`,
+        freshnessLabel: (kpi.freshness.stale ? '⚠ ' : '') + '更新 ' + kpi.freshness.lastUpdatedAt.slice(5, 10).replace('-', '/'),
+        alert: (kpi.key === 'alerts_today' && kpi.value > 0) || kpi.freshness.stale
+      }));
+    }
+  },
+  methods: {
+    compactYen(value) {
+      if (Math.abs(value) >= 10000) return `${(value / 10000).toLocaleString('ja-JP', { maximumFractionDigits: 1 })}万円`;
+      return `${value.toLocaleString('ja-JP')}円`;
+    },
+    async loadKpi() {
+      try {
+        const res = await fetch(`${this.apiBase}/command/kpi?scope=${this.scope}`);
+        if (!res.ok) throw new Error('kpi fetch failed');
+        const body = await res.json();
+        this.kpisRaw = body.kpis;
+        this.demoMode = false;
+      } catch {
+        this.kpisRaw = DEMO_KPIS;
+        this.demoMode = true;
+      }
+    },
+    async send(text) {
+      const message = (text || '').trim();
+      if (!message || this.thinking) return;
+      this.draft = '';
+      this.messages.push({ role: 'user', text: message });
+      this.thinking = true;
+      this.scrollDown();
+      try {
+        const reply = this.demoMode ? await this.demoReply(message) : await this.apiReply(message);
+        this.messages.push(reply);
+      } catch {
+        // API障害時はデモ応答へフォールバック（音声・API失敗でもチャットは使えること）
+        this.demoMode = true;
+        this.messages.push(await this.demoReply(message));
+      }
+      this.thinking = false;
+      this.scrollDown();
+    },
+    async apiReply(message) {
+      const res = await fetch(`${this.apiBase}/command/chat`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message, scope: this.scope })
+      });
+      if (!res.ok) throw new Error('chat failed');
+      const body = await res.json();
+      return { role: 'ai', text: body.text, confidence: body.confidence, evidence: body.evidence || [], approval: body.approvalRequest || null, showEvidence: false };
+    },
+    async demoReply(message) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const hit = DEMO.find((item) => item.match.test(message));
+      if (!hit) {
+        return {
+          role: 'ai',
+          confidence: 'UNKNOWN',
+          text: `「${message}」に確定データで答えられる情報が見つかりませんでした。推測では回答しません。\n\n次のような質問に答えられます:\n・今月どう？ / 現金大丈夫？ / 危ない現場は？\n・請求漏れてない？ / 今日何をすべき？ / A案件なぜ利益悪い？`,
+          evidence: [], approval: null, showEvidence: false
+        };
+      }
+      return { role: 'ai', text: hit.text, confidence: hit.confidence, evidence: hit.evidence || [], approval: hit.approval ? { ...hit.approval } : null, showEvidence: false };
+    },
+    async decideApproval(message, approve) {
+      const approval = message.approval;
+      if (!this.demoMode && approval.approvalId && !approval.approvalId.startsWith('demo-')) {
+        try {
+          await fetch(`${this.apiBase}/command/approvals/${approval.approvalId}/${approve ? 'approve' : 'reject'}`, { method: 'POST' });
+        } catch { /* 通信失敗時もUI上は状態を反映する */ }
+      }
+      approval.status = approve ? 'executed_dry_run' : 'rejected';
+    },
+    scrollDown() {
+      this.$nextTick(() => {
+        const area = this.$refs.chatArea;
+        if (area) area.scrollTop = area.scrollHeight;
+      });
+    }
+  },
+  async mounted() {
+    await this.loadKpi();
+    this.messages.push({
+      role: 'ai',
+      confidence: 'HIGH',
+      evidence: [], approval: null, showEvidence: false,
+      text: 'おはようございます。\n本日は経営上3件確認が必要です。\n\n①今月売上着地が目標比-7.1%\n②A案件の予測粗利が35%→24.8%へ低下\n③月末の外注支払集中により30日後現金残高が通常より低下します。\n\n最優先は①です。詳しく説明しますか？'
+    });
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
