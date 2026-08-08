@@ -6,6 +6,7 @@ import type { CompanyScope, Evidence } from '../domain/types.js';
 import type { CommandDataset } from '../data/seed.js';
 import { shiftDate } from '../data/seed.js';
 import { filterDatasetByScope } from '../domain/scope.js';
+import { jstMonth } from '../utils/jst.js';
 
 export interface PipelineItem {
   projectId: string;
@@ -38,7 +39,7 @@ export interface SalesSummary {
 
 export function computeSalesSummary(dataset: CommandDataset, scope: CompanyScope): SalesSummary {
   const scoped = filterDatasetByScope(dataset, scope);
-  const month = dataset.asOf.slice(0, 7);
+  const month = jstMonth(dataset.asOf); // 月次締めはJST基準
   const monthEnd = `${month}-31`;
 
   const target =
@@ -135,7 +136,7 @@ export function computeSalesSummary(dataset: CommandDataset, scope: CompanyScope
 /** 来月以降の完工予定＋パイプラインから「来月仕事が足りるか」の材料を返す */
 export function computeNextMonthOutlook(dataset: CommandDataset, scope: CompanyScope) {
   const scoped = filterDatasetByScope(dataset, scope);
-  const monthEnd = `${dataset.asOf.slice(0, 7)}-31`;
+  const monthEnd = `${jstMonth(dataset.asOf)}-31`;
   const nextMonthStart = shiftDate(`${monthEnd}T00:00:00.000Z`, 1);
   const scheduled = scoped.projects.filter(
     (project) =>

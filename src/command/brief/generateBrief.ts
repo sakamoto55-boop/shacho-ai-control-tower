@@ -4,7 +4,7 @@
  */
 import type { CommandAlert, CompanyScope, Decision, ExecutiveBrief } from '../domain/types.js';
 import type { CommandDataset } from '../data/seed.js';
-import { shiftDate } from '../data/seed.js';
+import { addDaysJst, jstDate } from '../utils/jst.js';
 import { buildAlerts, activeAlerts } from '../engines/alerts.js';
 import { computeCashForecast, horizonBalance } from '../engines/cashForecast.js';
 import { computeKpiSnapshot } from '../engines/kpi.js';
@@ -19,7 +19,7 @@ export function yen(amount: number): string {
 /** 昨日以降に動いた事実（原価計上・入金・請求・接点）を変化点として列挙する */
 function collectChangesSinceYesterday(dataset: CommandDataset, scope: CompanyScope): string[] {
   const scoped = filterDatasetByScope(dataset, scope);
-  const yesterday = shiftDate(dataset.asOf, -1);
+  const yesterday = addDaysJst(jstDate(dataset.asOf), -1);
   const changes: string[] = [];
 
   for (const cost of scoped.costs.filter((c) => c.kind === 'actual' && c.date >= yesterday)) {

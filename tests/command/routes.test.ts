@@ -77,6 +77,8 @@ describe('/command API', () => {
         companyId: 'lcc',
         projectId: 'prj-a',
         decision: 'A案件は粗利より完工を優先',
+        reason: '顧客との完工約束を優先する',
+        decisionMaker: '社長',
         validUntil: '2026-08-20',
         suppressAlertKinds: ['margin_drop']
       })

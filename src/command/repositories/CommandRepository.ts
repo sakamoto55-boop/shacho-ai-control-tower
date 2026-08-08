@@ -10,6 +10,11 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import type { ApprovalRequest, CommandTask, Decision, ResearchTask } from '../domain/types.js';
 import { buildSeedDataset, type CommandDataset } from '../data/seed.js';
+import {
+  DemoSourceRegistry,
+  ProductionSourceRegistry,
+  type SourceRegistry
+} from '../sources/SourceAdapter.js';
 
 export interface CommandStore {
   decisions: Decision[];
@@ -19,6 +24,8 @@ export interface CommandStore {
 }
 
 export interface CommandRepository {
+  /** demo: Demo Fixture由来 / production: 実ソース由来（未接続ならデータ空＋errorState） */
+  readonly mode: 'demo' | 'production';
   /** 基準日時点の読み取りデータセット（正本の横断ビュー）を返す */
   getDataset(asOf: string): Promise<CommandDataset>;
   getStore(): Promise<CommandStore>;
@@ -38,9 +45,18 @@ function defaultStore(): CommandStore {
 
 export class LocalCommandRepository implements CommandRepository {
   private readonly dbPath: string;
+  private readonly registry: SourceRegistry;
 
-  constructor(dbPath = process.env.LCC_COMMAND_DB_PATH ?? './data/lcc-command-local.json') {
+  constructor(
+    dbPath = process.env.LCC_COMMAND_DB_PATH ?? './data/lcc-command-local.json',
+    registry: SourceRegistry = new DemoSourceRegistry()
+  ) {
     this.dbPath = resolve(dbPath);
+    this.registry = registry;
+  }
+
+  get mode(): 'demo' | 'production' {
+    return this.registry.mode;
   }
 
   private async readStore(): Promise<CommandStore> {
@@ -59,7 +75,8 @@ export class LocalCommandRepository implements CommandRepository {
   }
 
   async getDataset(asOf: string): Promise<CommandDataset> {
-    return buildSeedDataset(asOf);
+    // Demo Fixture隔離: productionモードのRegistryはデモデータへフォールバックしない
+    return this.registry.compose(asOf);
   }
 
   async getStore(): Promise<CommandStore> {
@@ -117,11 +134,25 @@ export class LocalCommandRepository implements CommandRepository {
 }
 
 /** テスト用: メモリ上のみで動くリポジトリ */
+/**
+ * モードに応じたリポジトリを生成する。
+ * LCC_COMMAND_MODE=production では ProductionSourceRegistry（実Adapter未設定なら
+ * DATA UNAVAILABLE）を使い、デモデータへは決してフォールバックしない。
+ */
+export function createCommandRepository(
+  mode: 'demo' | 'production' = (process.env.LCC_COMMAND_MODE as 'demo' | 'production') ?? 'demo'
+): CommandRepository {
+  const registry =
+    mode === 'production' ? new ProductionSourceRegistry() : new DemoSourceRegistry();
+  return new LocalCommandRepository(undefined, registry);
+}
+
 export class InMemoryCommandRepository implements CommandRepository {
   private store: CommandStore = defaultStore();
 
   constructor(
-    private readonly datasetFactory: (asOf: string) => CommandDataset = buildSeedDataset
+    private readonly datasetFactory: (asOf: string) => CommandDataset = buildSeedDataset,
+    readonly mode: 'demo' | 'production' = 'demo'
   ) {}
 
   async getDataset(asOf: string): Promise<CommandDataset> {

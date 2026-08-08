@@ -12,6 +12,7 @@
  * - 月末の外注支払集中により30日後現金残高が通常より低下
  */
 import type {
+  DatasetMeta,
   CashAccount,
   CashPlanEntry,
   Company,
@@ -26,9 +27,12 @@ import type {
   SalesTarget,
   Vendor
 } from '../domain/types.js';
+import { jstMonth } from '../utils/jst.js';
 
 export interface CommandDataset {
   asOf: string;
+  /** データ由来（demo/production）とSource別状態。Demo Fixture隔離の判定に使う */
+  meta: DatasetMeta;
   companies: Company[];
   customers: Customer[];
   employees: Employee[];
@@ -52,7 +56,8 @@ export function shiftDate(asOf: string, days: number): string {
 }
 
 function monthOf(asOf: string): string {
-  return asOf.slice(0, 7);
+  // 月次目標の帰属もJST基準（売上サマリの月判定と揃える）
+  return jstMonth(asOf);
 }
 
 export function buildSeedDataset(asOf: string): CommandDataset {
@@ -64,7 +69,7 @@ export function buildSeedDataset(asOf: string): CommandDataset {
   });
 
   const companies: Company[] = [
-    { companyId: 'lcc', name: '株式会社LCC', externalIds: { kintone: 'ORG-001' } },
+    { companyId: 'lcc', name: '株式会社LCC', externalIds: { estimateSystem: 'ORG-001' } },
     { companyId: 'wel', name: 'LCC福祉サービス', externalIds: {} }
   ];
 
@@ -718,7 +723,7 @@ export function buildSeedDataset(asOf: string): CommandDataset {
       category: 'receipt',
       amount: 10_000_000,
       date: d(20),
-      certainty: 'confirmed',
+      status: 'CONFIRMED',
       label: 'D案件 入金（大野建設）',
       refId: 'inv-d'
     },
@@ -729,7 +734,7 @@ export function buildSeedDataset(asOf: string): CommandDataset {
       category: 'receipt',
       amount: 3_300_000,
       date: d(10),
-      certainty: 'forecast',
+      status: 'EXPECTED',
       label: '期日超過分の入金見込み（山陰開発）',
       refId: 'inv-old'
     },
@@ -740,7 +745,7 @@ export function buildSeedDataset(asOf: string): CommandDataset {
       category: 'receipt',
       amount: 5_225_000,
       date: d(45),
-      certainty: 'forecast',
+      status: 'EXPECTED',
       label: 'C案件 完工後入金',
       refId: 'prj-c'
     },
@@ -752,7 +757,7 @@ export function buildSeedDataset(asOf: string): CommandDataset {
       category: 'salary',
       amount: 4_500_000,
       date: d(17),
-      certainty: 'confirmed',
+      status: 'CONFIRMED',
       label: '給与'
     },
     {
@@ -762,7 +767,7 @@ export function buildSeedDataset(asOf: string): CommandDataset {
       category: 'subcontract',
       amount: 6_800_000,
       date: d(23),
-      certainty: 'confirmed',
+      status: 'CONFIRMED',
       label: '外注支払（月末集中）'
     },
     {
@@ -772,7 +777,7 @@ export function buildSeedDataset(asOf: string): CommandDataset {
       category: 'purchase',
       amount: 1_200_000,
       date: d(23),
-      certainty: 'confirmed',
+      status: 'CONFIRMED',
       label: '仕入'
     },
     {
@@ -782,7 +787,7 @@ export function buildSeedDataset(asOf: string): CommandDataset {
       category: 'fixed',
       amount: 1_500_000,
       date: d(23),
-      certainty: 'confirmed',
+      status: 'CONFIRMED',
       label: '固定費（家賃・光熱ほか)'
     },
     {
@@ -792,7 +797,7 @@ export function buildSeedDataset(asOf: string): CommandDataset {
       category: 'loan',
       amount: 800_000,
       date: d(23),
-      certainty: 'confirmed',
+      status: 'CONFIRMED',
       label: '借入返済'
     },
     {
@@ -802,7 +807,7 @@ export function buildSeedDataset(asOf: string): CommandDataset {
       category: 'social_insurance',
       amount: 1_300_000,
       date: d(23),
-      certainty: 'confirmed',
+      status: 'CONFIRMED',
       label: '社会保険料'
     },
     {
@@ -812,7 +817,7 @@ export function buildSeedDataset(asOf: string): CommandDataset {
       category: 'lease',
       amount: 300_000,
       date: d(23),
-      certainty: 'confirmed',
+      status: 'CONFIRMED',
       label: '重機リース'
     },
     // 60日圏の支払（給与・外注の翌月分は予測）
@@ -823,7 +828,7 @@ export function buildSeedDataset(asOf: string): CommandDataset {
       category: 'salary',
       amount: 4_500_000,
       date: d(47),
-      certainty: 'forecast',
+      status: 'EXPECTED',
       label: '給与（翌月）'
     },
     {
@@ -833,7 +838,7 @@ export function buildSeedDataset(asOf: string): CommandDataset {
       category: 'subcontract',
       amount: 5_000_000,
       date: d(53),
-      certainty: 'forecast',
+      status: 'EXPECTED',
       label: '外注支払（翌月見込み）'
     },
     // 福祉法人
@@ -844,7 +849,7 @@ export function buildSeedDataset(asOf: string): CommandDataset {
       category: 'receipt',
       amount: 1_650_000,
       date: d(25),
-      certainty: 'confirmed',
+      status: 'CONFIRMED',
       label: '委託料入金'
     },
     {
@@ -854,7 +859,7 @@ export function buildSeedDataset(asOf: string): CommandDataset {
       category: 'salary',
       amount: 1_100_000,
       date: d(17),
-      certainty: 'confirmed',
+      status: 'CONFIRMED',
       label: '給与・工賃'
     }
   ];
@@ -864,8 +869,32 @@ export function buildSeedDataset(asOf: string): CommandDataset {
     { companyId: 'wel', month: monthOf(asOf), amount: 1_800_000 }
   ];
 
+  const meta: DatasetMeta = {
+    mode: 'demo',
+    sources: [
+      'CashSource',
+      'ProjectSource',
+      'EstimateSource',
+      'CostSource',
+      'InvoiceSource',
+      'PaymentSource',
+      'CustomerSource',
+      'InteractionSource'
+    ].map((sourceName) => ({
+      sourceName,
+      sourceType: 'demo_fixture' as const,
+      lastSuccessfulSync: asOf,
+      freshness: { lastUpdatedAt: asOf, source: 'Demo Fixture', stale: false },
+      confidence: 'HIGH' as const,
+      readOnly: true,
+      scope: 'all' as const,
+      errorState: null
+    }))
+  };
+
   return {
     asOf,
+    meta,
     companies,
     customers,
     employees,

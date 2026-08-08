@@ -10,6 +10,44 @@
 /** データ確信度。推測で埋めず、不明は UNKNOWN を返す。 */
 export type DataConfidence = 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
 
+/** データ鮮度ステータス。古いデータで「正常」と断定しないための表示区分。 */
+export type FreshnessStatus = 'FRESH' | 'STALE' | 'VERY_STALE' | 'UNKNOWN';
+
+/** RBACロール。UIで隠すだけの制御は禁止し、API側で強制する。 */
+export type Role = 'PRESIDENT' | 'EXECUTIVE' | 'MANAGER' | 'STAFF' | 'SYSTEM';
+
+/** APIリクエストの主体。Phase Aはヘッダ/設定由来、Phase Bで実認証（Google Identity等）に置換する。 */
+export interface Principal {
+  role: Role;
+  /** アクセス可能な法人ID。PRESIDENT/SYSTEMは全法人＋グループ横断 */
+  companyIds: string[];
+  label: string;
+}
+
+/** データソースの状態。Canonical Model（CommandDataset）とSource Adapterを分離するためのメタ情報。 */
+export interface SourceStatus {
+  sourceName: string;
+  sourceType:
+    | 'demo_fixture'
+    | 'google_sheets'
+    | 'gas'
+    | 'internal_api'
+    | 'manual'
+    | 'not_configured';
+  lastSuccessfulSync: string | null;
+  freshness: Freshness | null;
+  confidence: DataConfidence;
+  readOnly: boolean;
+  scope: CompanyScope | 'all';
+  errorState: string | null;
+}
+
+export interface DatasetMeta {
+  /** demo: Demo Fixture由来（明示時のみ）。production: 実ソース由来（未接続なら空データ＋errorState） */
+  mode: 'demo' | 'production';
+  sources: SourceStatus[];
+}
+
 /** アラート重要度。CRITICALのみ即時通知、他は朝Brief等へまとめる。 */
 export type AlertSeverity = 'INFO' | 'WATCH' | 'WARNING' | 'CRITICAL';
 
@@ -254,6 +292,8 @@ export type CashPlanCategory =
   | 'social_insurance' // 社会保険
   | 'card' // カード
   | 'lease' // リース
+  | 'intercompany' // 法人間資金移動
+  | 'one_time' // 一時支出
   | 'receipt' // 入金
   | 'other';
 
@@ -267,11 +307,18 @@ export const CASH_PLAN_CATEGORY_LABELS: Record<CashPlanCategory, string> = {
   social_insurance: '社会保険',
   card: 'カード',
   lease: 'リース',
+  intercompany: '法人間資金移動',
+  one_time: '一時支出',
   receipt: '入金',
   other: 'その他'
 };
 
-/** 入金予定・支払予定。確定と予測を区別する。 */
+/**
+ * 入金予定・支払予定。確定と予測を混ぜないため必ずstatusを持つ。
+ * CONFIRMED=確定 / EXPECTED=予定（相手合意済み等） / ESTIMATED=推計（シナリオ・概算）
+ */
+export type CashPlanStatus = 'CONFIRMED' | 'EXPECTED' | 'ESTIMATED';
+
 export interface CashPlanEntry {
   planId: string;
   companyId: string;
@@ -279,7 +326,7 @@ export interface CashPlanEntry {
   category: CashPlanCategory;
   amount: number;
   date: string;
-  certainty: 'confirmed' | 'forecast';
+  status: CashPlanStatus;
   label: string;
   /** 紐づく請求など */
   refId?: string;
@@ -303,13 +350,27 @@ export interface CashForecastPoint {
 export interface CashForecastResult {
   scope: CompanyScope;
   asOf: string;
+  /** 口座データが1件もない場合は false（残高0と混同しない） */
+  balanceKnown: boolean;
   currentBalance: number;
   points: CashForecastPoint[];
+  /** 90日分の日次残高推移 */
+  dailyBalances: Array<{ date: string; balance: number; confirmedOnlyBalance: number }>;
   /** 期間中の最低残高（資金ショート検知用） */
   minBalance: { date: string; balance: number };
   entries: CashPlanEntry[];
+  /** 重複排除で除外したエントリ（同一planId／同一内容） */
+  duplicatesRemoved: CashPlanEntry[];
   freshness: Freshness;
+  freshnessStatus: FreshnessStatus;
   evidence: Evidence[];
+}
+
+/** シナリオ前後の差分表示用 */
+export interface CashForecastDiff {
+  horizonDiffs: Array<{ daysAhead: number; base: number; scenario: number; diff: number }>;
+  minBalanceBase: { date: string; balance: number };
+  minBalanceScenario: { date: string; balance: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -326,9 +387,12 @@ export interface Decision {
   projectId?: string;
   date: string;
   decision: string;
+  /** 必須。理由のないDecisionは保存しない */
   reason: string;
+  /** 必須。誰の判断かを常に残す */
   decisionMaker: string;
-  validUntil?: string;
+  /** 必須。永久に警告を消す事故を防ぐため期限のないDecisionは作れない */
+  validUntil: string;
   status: 'active' | 'expired' | 'revoked';
   /** 抑制対象のアラート種別（例: 'margin_drop'） */
   suppressAlertKinds?: string[];
@@ -422,12 +486,16 @@ export interface KpiValue {
   value: number;
   unit: 'yen' | 'percent' | 'count';
   freshness: Freshness;
+  freshnessStatus: FreshnessStatus;
   confidence: DataConfidence;
 }
+
+export type DataStatus = 'OK' | 'PARTIAL' | 'DATA_UNAVAILABLE';
 
 export interface KpiSnapshot {
   scope: CompanyScope;
   asOf: string;
+  dataStatus: DataStatus;
   kpis: KpiValue[];
 }
 
@@ -459,6 +527,8 @@ export type UiHint =
 export interface CommandChatRequest {
   scope?: CompanyScope;
   message: string;
+  /** 会話コンテキスト（代名詞解決・追い質問）を維持するセッションID */
+  sessionId?: string;
   /** テストや再現用に基準日時を注入できる（省略時は現在時刻） */
   asOf?: string;
 }
@@ -466,6 +536,8 @@ export interface CommandChatRequest {
 export interface CommandChatResponse {
   /** 事実と推測を分離した日本語回答 */
   text: string;
+  /** データ取得状態。DATA_UNAVAILABLE時は数値を一切断定しない */
+  dataStatus: DataStatus;
   uiHint: UiHint;
   /** UI描画用の構造化データ（uiHintに応じた形） */
   data?: unknown;

@@ -5,6 +5,7 @@
 import type { AlertKind, CompanyScope, Evidence } from '../domain/types.js';
 import type { CommandDataset } from '../data/seed.js';
 import { filterDatasetByScope } from '../domain/scope.js';
+import { jstDate } from '../utils/jst.js';
 
 export interface InvoiceIssue {
   kind: AlertKind;
@@ -27,7 +28,7 @@ export interface InvoiceCheckResult {
 
 export function checkInvoices(dataset: CommandDataset, scope: CompanyScope): InvoiceCheckResult {
   const scoped = filterDatasetByScope(dataset, scope);
-  const today = dataset.asOf.slice(0, 10);
+  const today = jstDate(dataset.asOf); // 期日判定はJST基準
   const issues: InvoiceIssue[] = [];
 
   // 完工未請求: 完工済みで請求が1件も発行されていない案件

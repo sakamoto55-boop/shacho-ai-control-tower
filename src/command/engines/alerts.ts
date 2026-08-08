@@ -6,6 +6,7 @@
  */
 import type { AlertSeverity, CommandAlert, CompanyScope, Decision } from '../domain/types.js';
 import type { CommandDataset } from '../data/seed.js';
+import { jstDate } from '../utils/jst.js';
 import { computeCashForecast, horizonBalance } from './cashForecast.js';
 import { checkInvoices } from './invoiceChecks.js';
 import { findMarginDeteriorations } from './margin.js';
@@ -38,7 +39,9 @@ export const DEFAULT_ALERT_THRESHOLDS: AlertThresholds = {
 
 function isDecisionActive(decision: Decision, today: string): boolean {
   if (decision.status !== 'active') return false;
-  if (decision.validUntil && decision.validUntil < today) return false;
+  // validUntilのないDecisionは「永久抑制事故」を防ぐため無効として扱う
+  if (!decision.validUntil) return false;
+  if (decision.validUntil < today) return false;
   return true;
 }
 
@@ -64,7 +67,7 @@ export function buildAlerts(
   decisions: Decision[] = [],
   thresholds: AlertThresholds = DEFAULT_ALERT_THRESHOLDS
 ): CommandAlert[] {
-  const today = dataset.asOf.slice(0, 10);
+  const today = jstDate(dataset.asOf);
   const alerts: CommandAlert[] = [];
   let seq = 0;
   const push = (
@@ -96,7 +99,17 @@ export function buildAlerts(
   const day30 = horizonBalance(cash, 30);
   const companyIdForScope =
     scope === 'group' ? (dataset.companies[0]?.companyId ?? 'group') : scope;
-  if (cash.minBalance.balance < 0) {
+  if (!cash.balanceKnown) {
+    // 残高不明はエラーであり「問題なし」ではない
+    push(
+      'cash_low',
+      'WARNING',
+      companyIdForScope,
+      '銀行残高データが取得できていません',
+      '現預金の現在値が不明のため、資金繰りを「問題なし」と判断できません。データ接続を確認してください。',
+      []
+    );
+  } else if (cash.minBalance.balance < 0) {
     push(
       'cash_low',
       'CRITICAL',

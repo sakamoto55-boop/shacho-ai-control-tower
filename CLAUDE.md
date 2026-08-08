@@ -67,7 +67,10 @@ HTTPリクエスト (src/server.ts, Hono)
 - `src/command/tools/registry.ts`：Read/Write Tool分離。LEVEL 4以上のWriteは `ApprovalRequest`（承認待ち）必須で、承認後も Phase A は dry-run 固定。この挙動を壊さない。
 - 法人スコープ（`group`/法人ID）の絞り込みは必ず `filterDatasetByScope` を通す。法人間データを混在させない。
 - Decision（経営判断Memory）は `suppressAlertKinds` と `validUntil` で同種アラートを抑制し、期限後に再評価する。
-- `docs/lcc-command.html`：Mobile First の会話中心UI（Vue3+Tailwind CDN、API接続不可時はシードと同数値のデモモード）。
+- `docs/lcc-command.html`：Mobile First の会話中心UI（Vue3+Tailwind CDN）。デモ表示は `?demo=1` 明示時のみ。API障害時はデモ数値を出さずCONNECTION ERRORを表示する。
+- Demo Fixture隔離：`LCC_COMMAND_MODE=production` ではソース未接続時にデモデータへフォールバックせず `DATA_UNAVAILABLE` を返す。この挙動と `tests/command/gate/` の隔離テストを壊さない。
+- RBAC（`src/command/domain/rbac.ts`）はAPI側とOrchestrator（Tool実行前）の両方で強制。UIで隠すだけの権限制御を追加しない。
+- 日付判定（今日・当月・期日）は `src/command/utils/jst.ts` を通しAsia/Tokyo基準。ISO文字列の `slice` で直接判定しない。
 
 ### docs/ のLCC業務アプリ（APIとは独立）
 

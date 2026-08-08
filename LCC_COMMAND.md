@@ -35,7 +35,7 @@ curl -X POST http://localhost:8787/command/cash/scenario \
 # 経営判断Memory（有効期間中は同種アラートを抑制）
 curl -X POST http://localhost:8787/command/decisions \
   -H 'content-type: application/json' \
-  -d '{"companyId":"lcc","projectId":"prj-a","decision":"A案件は粗利より完工を優先","validUntil":"2026-08-20","suppressAlertKinds":["margin_drop"]}'
+  -d '{"companyId":"lcc","projectId":"prj-a","decision":"A案件は粗利より完工を優先","reason":"顧客との完工約束を優先","decisionMaker":"社長","validUntil":"2026-08-20","suppressAlertKinds":["margin_drop"]}'
 
 # 承認（Human-in-the-Loop。Phase Aは承認後もdry-run）
 curl http://localhost:8787/command/approvals
@@ -43,8 +43,8 @@ curl -X POST http://localhost:8787/command/approvals/<id>/approve
 ```
 
 UI（Mobile First・会話中心）: `docs/lcc-command.html`。
-`?api=http://localhost:8787` を付けるとローカルAPIへ接続し、接続できない場合は
-シードデータと同じ数値のデモモードで動作する（GitHub Pages公開可）。
+`?api=http://localhost:8787` でローカルAPIへ接続する。デモ表示は `?demo=1` を明示した場合のみで、
+API障害時はデモ数値を出さずCONNECTION ERRORを表示する（GitHub Pagesでは `?demo=1` 付きで公開する）。
 
 ## アーキテクチャ
 
@@ -91,14 +91,54 @@ docs/lcc-command.html（Mobile First UI: 上=KPI / 中央=AI会話 / 下=入力�
 - **アラート集約** `engines/alerts.ts` — 上記をSeverity付きに変換し、Decision Memoryで抑制。
 - **KPI** `engines/kpi.ts` — 現預金 / 30日後現金予測 / 当月売上 / 着地予測 / 受注残 / 全社予測粗利率 / 完工未請求額 / 営業要対応件数 / 重大アラート件数（全て鮮度・確信度付き）。
 
-### データモデル
+### データモデルとSource Adapter
 
 `src/command/domain/types.ts`。Company / Customer / Project / Estimate / Interaction / Cost / Invoice / Payment / CashAccount / CashPlanEntry / Decision / Task / Approval / ResearchTask / Alert ほか。既存IDは `externalIds`（Mapping Layer）に保持し振り直さない。
 
+`src/command/sources/SourceAdapter.ts` が Canonical Model と取得元を分離する。Source（CashSource / AccountingSource / ProjectSource / EstimateSource / CostSource / InvoiceSource / PaymentSource / DailyReportSource / ScheduleSource / CustomerSource / InteractionSource / DocumentSource）ごとに `sourceType / lastSuccessfulSync / freshness / confidence / readOnly / scope / errorState` を持ち、`GET /command/sources` で状態を確認できる。
+
+### モードとDemo Fixture隔離（最重要）
+
+- `LCC_COMMAND_MODE=demo | production`（既定 demo）。データセットは `meta.mode` を必ず持つ。
+- **productionでソース未接続/取得失敗時はデモデータへ決してフォールバックしない。** `/kpi` は `dataStatus: DATA_UNAVAILABLE`＋空KPI、`/chat` は「DATA UNAVAILABLE / CONNECTION ERROR」回答、`/brief` `/cash/*` は503。
+- UIのデモ表示は `?demo=1` の明示時のみ。API障害時は CONNECTION ERROR を表示しデモ数値を出さない。
+- 隔離はテストで自動検証する（`tests/command/gate/failure-demo-isolation.test.ts`）。
+
+### 認証・RBAC（`src/command/domain/rbac.ts`）
+
+ロール: PRESIDENT / EXECUTIVE / MANAGER / STAFF / SYSTEM。グループ横断・法人横断はPRESIDENT/SYSTEMのみ。制御はUIでなくAPI＋Orchestrator（Tool実行前）の両方で強制する。Phase Aの認証は `LCC_COMMAND_API_TOKENS`（token→role/companyIds）で、productionモードではトークン必須（フェイルクローズ）。Phase BでGoogle Identityへ置換する（認可判定はrbac.tsに残る）。
+
+- 承認の実行（approve/reject）: PRESIDENT / EXECUTIVE のみ。Idempotent（二重承認は再実行されない）。
+- Decision登録: PRESIDENT / EXECUTIVE のみ。`reason` `decisionMaker` `validUntil`（未来日・180日以内）必須。AIは登録できない。
+
+### セキュリティ（`src/command/security/`）
+
+Tool引数Validation / Prompt Injection検知（外部文書・入力内の命令をSystem Instruction化しない）/ Rate Limit / Audit Log（機微情報マスク付き）/ Secretスキャン（テストで自動検査）。
+
+### 会話コンテキストと複合質問
+
+`orchestrator/context.ts` がセッション別に直前の話題・対象案件・提示リスト・下書き・根拠を保持し（TTL30分）、「それ」「さっきの」「2番目」「もっと詳しく」「逆に」「根拠は？」「本当に？」「他にない？」「グループ全体では？」を解決する。複数ドメインにまたがる質問はPlanner（`tryCompound`）が分解して複数Toolを実行・統合する。`ORCHESTRATOR_LIMITS`（maxSteps=6 / maxToolCalls=10 / timeout=5s）で無制限ループを禁止する。
+
+### 日付・時刻
+
+システム標準TimezoneはAsia/Tokyo。内部保持はISO(UTC)のまま、「今日」「当月」等の判定は `utils/jst.ts` で必ずJST変換する（月跨ぎ・年度跨ぎはテスト済み）。支払日の休日調整（前営業日/翌営業日）は `computeCashForecast` のオプション。祝日リストはPhase Bでカレンダーソースから供給する。
+
+## 接続前提の分類（Phase A Gate Review §1）
+
+現時点のシステム接続前提。**UNKNOWNはヒアリング確認まで確定しない。**
+
+| 分類 | 対象 | 扱い |
+| --- | --- | --- |
+| CURRENT | Google Workspace（Gmail/Drive/Calendar）、Google Sheets + GAS（主要構造化データ基盤）、デジタル配置板系（配置・日報）、統合業務システム（見積・原価。`docs/lcc.html` 系）、LINE WORKS / Form（入力チャネル） | Phase BのSource Adapter実装対象 |
+| LEGACY | `src/repositories/KintoneRepository.ts`、`src/connectors/kintone.ts`、READMEのkintone節 | Phase 1時代のスタブ。LCC COMMANDからは参照しない。削除はPhase 1系の整理時に判断 |
+| UNKNOWN | 会計・給与の実サービスと接続方式、銀行明細の取得方法（API/明細CSV/手動）、配置板・統合業務システムのAPI可否 | 実運用を確認してから接続方式を決める。コード上は `SourceAdapter` の `not_configured` + `errorState: UNKNOWN` として明示 |
+
+LCC COMMANDのコード・シードからkintone前提の記述は除去済み（Mapping Layerのキーは `estimateSystem` 等の中立名）。
+
 ## フェーズ計画
 
-- **Phase A（本実装）**: 会話コア＋決定論エンジン＋承認フロー＋Brief＋UI。読み取り正本はシードデータが代替。実行は全てdry-run。
-- **Phase B（実データ接続）**: 既存正本へのRead接続（kintone案件台帳・原価管理・会計/銀行明細・Gmail/LINE WORKSの営業接点化）。`CommandRepository.getDataset` の実装差し替えのみで移行できる設計。音声Provider実装。承認済みLEVEL 3（社内通知）の実行。
+- **Phase A（本実装）**: 会話コア＋決定論エンジン＋承認フロー＋Brief＋UI＋RBAC/セキュリティ。読み取り正本はDemo Fixture（demoモード限定）。実行は全てdry-run。
+- **Phase B（実データ接続）**: `SourceRegistry` へ Google Sheets / GAS / 統合業務システム / 配置板 / LINE WORKS のSource Adapterを実装して差し込む（エンジン・Orchestratorは無変更）。認証をGoogle Identityへ置換。音声Provider実装。承認済みLEVEL 3（社内通知）の実行。会計・給与・銀行はヒアリング確定後に接続。
 - **Phase C（実行・拡張）**: 承認済みLEVEL 4の実実行（外部送信）、Manus等の外部Research実接続（Webhook検証込み）、Generative UIの拡充、Proactive通知（CRITICAL即時プッシュ）。
 
 ## 変わらない制約（Phase 1と共通）

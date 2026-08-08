@@ -32,7 +32,9 @@
       <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center font-black text-orange-400">司</div>
       <div>
         <h1 class="text-white font-bold leading-tight">LCC COMMAND</h1>
-        <p class="text-[10px] text-blue-200/70 leading-tight">会話型AI経営管制OS {{ demoMode ? '（デモモード）' : '' }}</p>
+        <p class="text-[10px] leading-tight" :class="connectionError || dataUnavailable ? 'text-red-300 font-bold' : 'text-blue-200/70'">
+          会話型AI経営管制OS {{ demoMode ? '（デモモード）' : connectionError ? '（CONNECTION ERROR）' : dataUnavailable ? '（DATA UNAVAILABLE）' : '' }}
+        </p>
       </div>
     </div>
     <select v-model="scope" @change="loadKpi" class="bg-white/10 text-white text-xs rounded-lg px-2 py-1.5 border border-white/20">
@@ -219,13 +221,18 @@ createApp({
     return {
       // APIベースURL: ?api=http://localhost:8787 で指定、未指定時は同一オリジンを試す
       apiBase: new URLSearchParams(location.search).get('api') || '',
+      // デモデータは ?demo=1 の明示時のみ使用する（本番のAPI障害時にデモ数値を出さない）
+      demoRequested: new URLSearchParams(location.search).get('demo') === '1',
       demoMode: false,
+      connectionError: false,
+      dataUnavailable: false,
+      sessionId: 'ui-' + Math.random().toString(36).slice(2, 10),
       scope: 'lcc',
       kpisRaw: [],
       messages: [],
       draft: '',
       thinking: false,
-      quickQuestions: ['今月どう？', '現金大丈夫？', '危ない現場は？', '請求漏れてない？', '今日何をすべき？', 'A案件なぜ利益悪い？', 'それで送って']
+      quickQuestions: ['今月どう？', '一番危ないのは？', 'その案件詳しく', 'なぜ利益落ちた？', 'どうすればいい？', '担当は？', '連絡文作って', 'それで送って', '根拠は？', '現金大丈夫？', '請求漏れてない？', '今日何をすべき？']
     };
   },
   computed: {
@@ -244,15 +251,26 @@ createApp({
       return `${value.toLocaleString('ja-JP')}円`;
     },
     async loadKpi() {
+      if (this.demoRequested) {
+        // 明示的なDemo Modeのみデモ数値を表示する
+        this.kpisRaw = DEMO_KPIS;
+        this.demoMode = true;
+        this.connectionError = false;
+        return;
+      }
       try {
         const res = await fetch(`${this.apiBase}/command/kpi?scope=${this.scope}`);
         if (!res.ok) throw new Error('kpi fetch failed');
         const body = await res.json();
-        this.kpisRaw = body.kpis;
+        this.dataUnavailable = body.dataStatus === 'DATA_UNAVAILABLE';
+        this.kpisRaw = body.kpis || [];
         this.demoMode = false;
+        this.connectionError = false;
       } catch {
-        this.kpisRaw = DEMO_KPIS;
-        this.demoMode = true;
+        // 本番モードではデモデータへフォールバックしない
+        this.kpisRaw = [];
+        this.demoMode = false;
+        this.connectionError = true;
       }
     },
     async send(text) {
@@ -266,9 +284,18 @@ createApp({
         const reply = this.demoMode ? await this.demoReply(message) : await this.apiReply(message);
         this.messages.push(reply);
       } catch {
-        // API障害時はデモ応答へフォールバック（音声・API失敗でもチャットは使えること）
-        this.demoMode = true;
-        this.messages.push(await this.demoReply(message));
+        if (this.demoRequested) {
+          // 明示的なDemo Modeのみデモ応答を返す
+          this.demoMode = true;
+          this.messages.push(await this.demoReply(message));
+        } else {
+          // 本番: 接続エラーを明示し、デモの経営数値は表示しない
+          this.connectionError = true;
+          this.messages.push({
+            role: 'ai', confidence: 'UNKNOWN', evidence: [], approval: null, showEvidence: false,
+            text: '【CONNECTION ERROR】\nAPIサーバーに接続できないため回答できません。\nデモ数値の表示は行いません。接続設定（?api=）を確認してください。'
+          });
+        }
       }
       this.thinking = false;
       this.scrollDown();
@@ -277,7 +304,7 @@ createApp({
       const res = await fetch(`${this.apiBase}/command/chat`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message, scope: this.scope })
+        body: JSON.stringify({ message, scope: this.scope, sessionId: this.sessionId })
       });
       if (!res.ok) throw new Error('chat failed');
       const body = await res.json();
@@ -314,6 +341,20 @@ createApp({
   },
   async mounted() {
     await this.loadKpi();
+    if (this.connectionError) {
+      this.messages.push({
+        role: 'ai', confidence: 'UNKNOWN', evidence: [], approval: null, showEvidence: false,
+        text: '【CONNECTION ERROR】\nAPIサーバーに接続できません。経営データは表示できません。\nデモを見る場合はURLに ?demo=1 を付けてください（デモ数値は本物の経営データではありません）。'
+      });
+      return;
+    }
+    if (this.dataUnavailable) {
+      this.messages.push({
+        role: 'ai', confidence: 'UNKNOWN', evidence: [], approval: null, showEvidence: false,
+        text: '【DATA UNAVAILABLE】\n実データソースが未接続のため、経営数値は表示できません（デモ値は表示しません）。'
+      });
+      return;
+    }
     this.messages.push({
       role: 'ai',
       confidence: 'HIGH',
