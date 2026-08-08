@@ -79,6 +79,14 @@ HTTPリクエスト (src/server.ts, Hono)
 - PRESIDENT層・SENSITIVE_REFのRBACは `MemoryService.search` が強制する。検索を経由せず全件を返すAPIを追加しない。
 - 汎用推論（`ai/generalReasoner.ts`）へ渡してよい社内事実はTool/Memory由来のみ。
 
+### Live Integration（Phase B1）
+
+- LLMフック（`ai/llmHooks.ts` の Curator v2 / Critic v2）は「提案・追加」のみ。保存可否はLearning Safety、検証の最終判定は決定論Critic（`reviewAnswerWithAdvisor`）が行う。この順序を逆にしない。
+- サニティチェック（`sources/sanity.ts`、`npm run command:sanity`）がNOT READYの間、実データを会話へ提示しない。`config/sanity.expected.json` はソース側実件数の正本。
+- Observability（`observability/observability.ts`）へ会話本文を保存しない（メタデータのみ）。フィードバックはモデルの自動学習に使わない。
+- 実データの正本分類は `REAL_DATA_SOURCE_MAP.md` が正。LCC_CASE_DBはDERIVEDのため金額系エンジンの入力にしない。経営管理第13期の目標値はユーザー確認まで採用しない。People OS（給与）は複製禁止。
+- 夜間メンテナンス（`npm run command:maintenance`）は既定DRY RUN。`LCC_MAINTENANCE_APPLY=true` なしで状態変更を保存しない。
+
 ### Multi-Agent層（src/command/agents/ — Phase N）
 
 - Role（13種）は責務でありモデル名ではない。Role→Capability→Providerの3層を崩さない（`agents/roles.ts`）。

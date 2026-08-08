@@ -195,6 +195,32 @@ Phase A/B0の決定論エンジン・Canonical Model・Source Adapter・RBAC・E
 - **Evaluation（§40）**: 100問データセット（17カテゴリ、`tests/command/nphase/evaluation.test.ts`）。
   Synthetic Fixture評価。B0完了後に実データ評価へ置換する。
 
+## Phase B1（Live Integration: 実データ発見完了 + LLMフック + 本番会話準備）の状態
+
+- **実データ発見完了（§1-2）**: B0でブロックされていたDrive READ ONLYアクセスが解除され、5候補全ての
+  実測を完了。分類は `REAL_DATA_SOURCE_MAP.md`（統合業務システムDB=CURRENT_SOURCE 顧客2,268/案件2,459、
+  配置板DB=マスタ正本・運用タブ空、LCC_CASE_DB=DERIVED、経営管理第13期=REFERENCE_ONLY仮値、
+  People OS v17=高機密・複製禁止）。実測の品質課題は `DATA_QUALITY_REPORT.md`。
+- **列マッピング定義（§3）**: `config/sheets.sources.example.json`（customers/projectsの実測スキーマ→Canonical、
+  status英語コードのstageMap込み）。全量同期は `spreadsheets.readonly` 資格情報の設定待ち（ユーザー作業）。
+- **サニティチェック（§4）**: `sources/sanity.ts` + `npm run command:sanity`。ソース実件数
+  （`config/sanity.expected.json`）とCanonical件数の乖離が5%を超える間はNOT READY＝実データを会話へ出さない。
+- **LLM Curator v2（§7）**: `ai/llmHooks.ts` + `memory/curator.ts` の `LlmCandidateExtractor`。
+  LLMは候補提案のみ。FACTはHYPOTHESIS+UNVERIFIEDへ格下げ、DECISION/PLAYBOOK/PRINCIPLEはPENDING_REVIEW固定、
+  保存可否は既存Learning Safetyが最終判定。`ANTHROPIC_API_KEY` 未設定時は従来のルール抽出のみ。
+- **Critic v2（§8）**: `agents/critic.ts` の `reviewAnswerWithAdvisor`。LLM指摘は「追加」だけ可能で、
+  決定論検査の指摘を削除・上書きできない。LLM障害時は決定論結果のみ返す。
+- **学習の可視化（§13-14）**: 「今日何を覚えた？」→Daily Learning Summary（覚えた/確認待ち/訂正の内訳）。
+  朝Briefに【今日AIが学んだこと】と【AIの気づき（上位のみ）】（Insight Rankingの上位2件まで）を掲載。
+- **夜間メンテナンス（§15）**: `npm run command:maintenance`（既定DRY RUN。適用は `LCC_MAINTENANCE_APPLY=true`）。
+- **Observability / Cost（§19-20）**: `observability/observability.ts`。会話メタデータ（intent・Tool・確信度・
+  所要時間）のみ記録し会話本文は保存しない。JSONL永続化は `LCC_COMMAND_OBS_FILE`。`GET /command/observability`。
+- **回答フィードバック（§21）**: `POST /command/feedback`（good/bad）。改善の参考として保存するのみで、
+  モデルの自動学習には使わない。UIの各AI回答に👍/👎、フッターにMemory Feedbackチップ
+  （覚えて/訂正/重要/仮説/正式決定/忘れて→既存の会話ハンドラへそのまま接続）。
+- **銀行・会計（§18）**: 実測でも該当ソース未特定のためUNKNOWN維持。資金繰り回答は
+  「銀行残高未接続のため完全な資金予測ではない」旨を明示し続ける。
+
 ## フェーズ計画
 
 - **Phase A（本実装）**: 会話コア＋決定論エンジン＋承認フロー＋Brief＋UI＋RBAC/セキュリティ。読み取り正本はDemo Fixture（demoモード限定）。実行は全てdry-run。

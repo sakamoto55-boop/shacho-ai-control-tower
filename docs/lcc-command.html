@@ -96,6 +96,12 @@
              :class="{'text-green-600': m.confidence === 'HIGH', 'text-amber-600': m.confidence === 'MEDIUM', 'text-orange-600': m.confidence === 'LOW', 'text-slate-400': m.confidence === 'UNKNOWN'}">
             Data Confidence: {{ m.confidence }}
           </p>
+          <!-- 回答フィードバック（改善の参考として保存。モデルの自動学習には使わない） -->
+          <div v-if="m.role === 'ai' && !demoMode" class="mt-1 flex gap-3">
+            <button @click="sendFeedback(m, 'good')" class="text-[13px]" :class="m.feedback === 'good' ? '' : 'opacity-40'">👍</button>
+            <button @click="sendFeedback(m, 'bad')" class="text-[13px]" :class="m.feedback === 'bad' ? '' : 'opacity-40'">👎</button>
+            <span v-if="m.feedback" class="text-[10px] text-slate-400">改善の参考として保存しました</span>
+          </div>
         </div>
       </div>
     </transition-group>
@@ -106,6 +112,11 @@
 
   <!-- 下部: クイック質問 + 入力欄 -->
   <footer class="px-4 pb-4 pt-1">
+    <!-- Memory Feedback: 会話をそのまま記憶操作に使う（覚えて/訂正/正式決定/忘れて等） -->
+    <div class="kpi-scroll flex gap-2 overflow-x-auto pb-1" style="scrollbar-width:none">
+      <button v-for="chip in memoryChips" :key="chip.label" @click="chip.prefill ? draft = chip.text : send(chip.text)"
+              class="shrink-0 rounded-full bg-emerald-500/15 border border-emerald-300/30 text-emerald-100 text-[11px] px-3 py-1">{{ chip.label }}</button>
+    </div>
     <div class="kpi-scroll flex gap-2 overflow-x-auto pb-2" style="scrollbar-width:none">
       <button v-for="q in quickQuestions" :key="q" @click="send(q)"
               class="shrink-0 rounded-full bg-white/10 border border-white/20 text-blue-100 text-xs px-3 py-1.5">{{ q }}</button>
@@ -232,7 +243,15 @@ createApp({
       messages: [],
       draft: '',
       thinking: false,
-      quickQuestions: ['今月どう？', '一番危ないのは？', 'その案件詳しく', 'なぜ利益落ちた？', 'どうすればいい？', '担当は？', '連絡文作って', 'それで送って', '根拠は？', '現金大丈夫？', '請求漏れてない？', '今日何をすべき？']
+      quickQuestions: ['今月どう？', '一番危ないのは？', 'その案件詳しく', 'なぜ利益落ちた？', 'どうすればいい？', '担当は？', '連絡文作って', 'それで送って', '根拠は？', '現金大丈夫？', '請求漏れてない？', '今日何をすべき？', '今日何を覚えた？'],
+      memoryChips: [
+        { label: '📌 覚えて', text: '今のを覚えておいて' },
+        { label: '✏️ 訂正', text: 'それ違う。今は', prefill: true },
+        { label: '⭐ 重要', text: 'これは重要。覚えておいて' },
+        { label: '🧪 仮説', text: 'これは仮説として覚えておいて' },
+        { label: '✅ 正式決定', text: 'さっきのを正式方針にする' },
+        { label: '🗑 忘れて', text: '今のなし' }
+      ]
     };
   },
   computed: {
@@ -299,6 +318,17 @@ createApp({
       }
       this.thinking = false;
       this.scrollDown();
+    },
+    async sendFeedback(message, rating) {
+      if (message.feedback) return;
+      message.feedback = rating;
+      try {
+        await fetch(`${this.apiBase}/command/feedback`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ rating, sessionId: this.sessionId })
+        });
+      } catch { /* フィードバック送信失敗で会話は止めない */ }
     },
     async apiReply(message) {
       const res = await fetch(`${this.apiBase}/command/chat`, {

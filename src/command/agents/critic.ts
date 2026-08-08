@@ -108,6 +108,33 @@ export function reviewAnswer(
   return { ran: true, issues };
 }
 
+/**
+ * Critic v2（Phase B1 §8）: LLMによる追加検証のフック。
+ * LLMは指摘を「追加」できるだけで、決定論検査（reviewAnswer）の指摘を
+ * 削除・上書きすることはできない（最終安全判定は決定論側）。
+ */
+export type LlmCriticAdvisor = (
+  draft: { text: string; confidence: CommandChatResponse['confidence'] },
+  originalMessage: string
+) => Promise<CriticIssue[]>;
+
+export async function reviewAnswerWithAdvisor(
+  draft: Pick<CommandChatResponse, 'text' | 'evidence' | 'confidence'>,
+  activeDecisions: MemoryRecord[],
+  advisor?: LlmCriticAdvisor,
+  originalMessage = ''
+): Promise<CriticResult> {
+  const base = reviewAnswer(draft, activeDecisions, false);
+  if (!advisor) return base;
+  try {
+    const extra = await advisor({ text: draft.text, confidence: draft.confidence }, originalMessage);
+    return { ran: true, issues: [...base.issues, ...extra.slice(0, 5)] };
+  } catch {
+    // LLM検証の失敗時は決定論検査の結果のみ返す（検証自体は止めない）
+    return base;
+  }
+}
+
 /** Devil's Advocate: 賛成案に対する反対論点を構造的に生成する（§11） */
 export function devilsAdvocate(topic: string, facts: string[]): string[] {
   const counters = [

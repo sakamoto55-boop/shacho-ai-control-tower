@@ -47,6 +47,8 @@ import {
   createGoogleAuthenticatorFromEnv,
   type GoogleIdentityAuthenticator
 } from '../auth/googleIdentity.js';
+import { ObservabilityLog } from '../observability/observability.js';
+import { createLlmHooksFromEnv, type LlmHooks } from '../ai/llmHooks.js';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -60,6 +62,10 @@ export interface CommandAppOptions {
   apiTokens?: string;
   /** Google Identity認証（設定時はIDトークン検証を優先。認可＝RBACは共通） */
   googleAuthenticator?: GoogleIdentityAuthenticator | null;
+  /** 会話メタデータ・フィードバックの記録先（未指定時は自動生成） */
+  observabilityLog?: ObservabilityLog;
+  /** Phase B1: LLMフックの注入（テスト用。未指定時はANTHROPIC_API_KEYから自動生成） */
+  llmHooks?: LlmHooks;
 }
 
 export type CommandApp = Hono<{ Variables: { principal: Principal } }>;
@@ -79,7 +85,13 @@ export function createCommandApp(
       ? options.googleAuthenticator
       : createGoogleAuthenticatorFromEnv();
   const app = new Hono<{ Variables: { principal: Principal } }>();
-  const orchestrator = new CommandOrchestrator(repository);
+  const observability = options.observabilityLog ?? new ObservabilityLog();
+  const llmHooks = options.llmHooks ?? createLlmHooksFromEnv();
+  const orchestrator = new CommandOrchestrator(repository, {
+    curatorExtractor: llmHooks.curatorExtractor,
+    criticAdvisor: llmHooks.criticAdvisor,
+    observability
+  });
   const memoryService = new MemoryService(repository);
 
   // --- Principal解決 + Rate Limit（全ルート共通） ---
@@ -575,6 +587,48 @@ export function createCommandApp(
       completed.lessonMemoryId = lesson.record.memoryId;
       await repository.saveExperiment(completed);
       return c.json({ experiment: completed, lesson: lesson.record });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // 回答フィードバック（§21）。改善の参考として保存するのみで、モデルの自動学習には使わない
+  app.post('/feedback', async (c) => {
+    const principal = c.get('principal');
+    try {
+      const body = (await c.req.json()) as Record<string, unknown>;
+      const rating = body.rating === 'good' || body.rating === 'bad' ? body.rating : null;
+      if (!rating) throw new ValidationError('ratingは good | bad を指定してください');
+      await observability.record({
+        kind: 'feedback',
+        actor: principal.label,
+        sessionId: typeof body.sessionId === 'string' ? body.sessionId.slice(0, 64) : undefined,
+        intent: typeof body.intent === 'string' ? body.intent.slice(0, 40) : undefined,
+        rating,
+        comment: typeof body.comment === 'string' ? body.comment.slice(0, 300) : undefined
+      });
+      return c.json({
+        ok: true,
+        note: 'フィードバックを保存しました（回答改善の参考に使います。モデルの自動学習には使いません）'
+      });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // Observability（§19-§20）。会話メタデータ・フィードバック・概算コストの参照
+  app.get('/observability', async (c) => {
+    const principal = c.get('principal');
+    try {
+      if (!canDecideApproval(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}はObservabilityを参照できません`);
+      }
+      const limitRaw = Number(c.req.query('limit') ?? 50);
+      const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 500) : 50;
+      return c.json({
+        entries: observability.recent(limit),
+        totalApproxTokens: observability.totalApproxTokens()
+      });
     } catch (error) {
       return handleError(c, error);
     }

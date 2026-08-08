@@ -46,10 +46,21 @@ function collectChangesSinceYesterday(dataset: CommandDataset, scope: CompanySco
   return changes;
 }
 
+/** Daily Learning Summary（Phase B1 §14/§16）。Memoryと気づきの上位のみをBriefへ載せる */
+export interface BriefLearning {
+  /** 今日Curatorが記憶したこと（statement） */
+  learnedToday: string[];
+  /** 確認待ち（PENDING_REVIEW）の判断候補 */
+  pendingReview: string[];
+  /** ランク付け済みの気づき（上位のみ渡すこと） */
+  topInsights: string[];
+}
+
 export function generateExecutiveBrief(
   dataset: CommandDataset,
   scope: CompanyScope,
-  decisions: Decision[] = []
+  decisions: Decision[] = [],
+  learning?: BriefLearning
 ): ExecutiveBrief {
   const alerts = buildAlerts(dataset, scope, decisions);
   const visible = activeAlerts(alerts);
@@ -110,6 +121,20 @@ export function generateExecutiveBrief(
       ? recommendedActions.map((action) => `・${action}`)
       : ['・特になし'])
   ];
+
+  if (learning) {
+    if (learning.learnedToday.length > 0 || learning.pendingReview.length > 0) {
+      lines.push('', '【今日AIが学んだこと】');
+      lines.push(...learning.learnedToday.slice(0, 5).map((item) => `・${item}`));
+      lines.push(
+        ...learning.pendingReview.slice(0, 3).map((item) => `・（確認待ち）${item} — 正式方針にするかご確認ください`)
+      );
+    }
+    if (learning.topInsights.length > 0) {
+      lines.push('', '【AIの気づき（上位のみ）】');
+      lines.push(...learning.topInsights.slice(0, 2).map((item) => `・${item}`));
+    }
+  }
 
   const suppressed = alerts.filter((alert) => alert.suppressedByDecisionId);
   if (suppressed.length > 0) {

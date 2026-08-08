@@ -9,8 +9,22 @@
  */
 import type { CommandDataset } from '../data/seed.js';
 import type { Principal } from '../domain/types.js';
-import type { MemoryEntity } from './types.js';
+import type { MemoryConfidence, MemoryEntity, MemoryLayer, MemoryType } from './types.js';
 import type { MemoryService, NewMemoryInput, SaveResult } from './store.js';
+
+/**
+ * LLM Curator v2（Phase B1 §7）: LLMによる候補抽出のフック。
+ * LLMは「候補を提案する」だけで、保存可否は既存のLearning Safety
+ * （MemoryService.validate）とここでの決定論ルールが最終判定する。
+ */
+export interface LlmMemoryCandidate {
+  type: MemoryType;
+  statement: string;
+  confidence?: MemoryConfidence;
+  layer?: MemoryLayer;
+}
+
+export type LlmCandidateExtractor = (message: string) => Promise<LlmMemoryCandidate[]>;
 
 export interface CuratorOutcome {
   saved: SaveResult[];
@@ -162,13 +176,42 @@ export async function curateConversationTurn(
   principal: Principal,
   companyId: string,
   now: string,
-  sessionId: string
+  sessionId: string,
+  llmExtractor?: LlmCandidateExtractor
 ): Promise<CuratorOutcome> {
   const outcome: CuratorOutcome = { saved: [], notices: [] };
   const entities = extractEntities(dataset, message);
   const projectEntity = entities.find((e) => e.entityType === 'Project');
 
-  for (const candidate of extractCandidates(message)) {
+  const candidates = extractCandidates(message);
+
+  // LLM抽出候補（任意）。決定論ルールで格下げしてから既存の保存経路へ流す。
+  if (llmExtractor) {
+    try {
+      for (const raw of (await llmExtractor(message)).slice(0, 5)) {
+        if (!raw.statement || raw.statement.length > 300) continue;
+        const needsReview =
+          raw.type === 'DECISION' || raw.type === 'PLAYBOOK' || raw.type === 'PRINCIPLE';
+        candidates.push({
+          input: {
+            // LLMの推測でFACT確定させない: FACTはHYPOTHESIS + UNVERIFIED に格下げ
+            type: raw.type === 'FACT' ? 'HYPOTHESIS' : raw.type,
+            statement:
+              raw.type === 'FACT'
+                ? `${raw.statement}（LLM抽出。FACT確定は根拠確認後）`
+                : raw.statement,
+            confidence: raw.type === 'FACT' ? 'UNVERIFIED' : (raw.confidence ?? 'UNVERIFIED'),
+            layer: raw.layer,
+            reviewStatus: needsReview ? 'PENDING_REVIEW' : 'AUTO'
+          }
+        });
+      }
+    } catch {
+      // LLM抽出の失敗はルールベース抽出のみで続行
+    }
+  }
+
+  for (const candidate of candidates) {
     try {
       const saved = await service.save(
         {

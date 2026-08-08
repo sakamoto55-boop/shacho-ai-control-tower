@@ -43,14 +43,25 @@ import {
 import { addDaysJst, jstDate } from '../utils/jst.js';
 import { ContextStore, type ConversationContext, type IntentKey } from './context.js';
 import { MemoryService } from '../memory/store.js';
-import { curateConversationTurn, detectCorrection, extractEntities } from '../memory/curator.js';
+import {
+  curateConversationTurn,
+  detectCorrection,
+  extractEntities,
+  type LlmCandidateExtractor
+} from '../memory/curator.js';
+import { discoverProblems, rankInsights } from '../memory/maintenance.js';
+import type { ObservabilityLog } from '../observability/observability.js';
 import { classifyConversation } from './universalRouter.js';
 import { buildInnovationProposal, formatInnovationProposal } from '../memory/innovation.js';
 import { GeneralReasoner, createGeneralRouter } from '../ai/generalReasoner.js';
 import { assessInput, buildPlan } from '../agents/rolePlanner.js';
 import { AgentTraceLog, PlanExecutor } from '../agents/executor.js';
 import { createDefaultRegistry } from '../agents/providerRegistry.js';
-import { devilsAdvocate, reviewAnswer } from '../agents/critic.js';
+import {
+  devilsAdvocate,
+  reviewAnswerWithAdvisor,
+  type LlmCriticAdvisor
+} from '../agents/critic.js';
 import { analyzeCorrectionImpact, formatImpactReport } from '../agents/correctionImpact.js';
 
 /** 無制限ループ禁止のための上限。1リクエストで超えたら打ち切る */
@@ -115,6 +126,16 @@ interface ExecutionState {
   startedAtMs: number;
 }
 
+/** Phase B1: LLMフック・Observabilityの注入点（未指定時は従来どおり決定論のみで動作） */
+export interface OrchestratorOptions {
+  /** LLM Curator v2: 候補提案のみ。保存可否はLearning Safetyが最終判定 */
+  curatorExtractor?: LlmCandidateExtractor;
+  /** Critic v2: 指摘の追加のみ。決定論検査が最終判定 */
+  criticAdvisor?: LlmCriticAdvisor;
+  /** 会話メタデータ・フィードバックの記録先 */
+  observability?: ObservabilityLog;
+}
+
 export class CommandOrchestrator {
   private readonly contexts = new ContextStore();
   private readonly memoryService: MemoryService;
@@ -123,7 +144,10 @@ export class CommandOrchestrator {
   private readonly traceLog = new AgentTraceLog();
   private readonly executor: PlanExecutor;
 
-  constructor(private readonly repository: CommandRepository) {
+  constructor(
+    private readonly repository: CommandRepository,
+    private readonly options: OrchestratorOptions = {}
+  ) {
     this.memoryService = new MemoryService(repository);
     this.reasoner = new GeneralReasoner(createGeneralRouter());
     this.executor = new PlanExecutor(
@@ -212,7 +236,8 @@ export class CommandOrchestrator {
           principal,
           companyId,
           asOf,
-          sessionId
+          sessionId,
+          this.options.curatorExtractor
         );
         if (curation.notices.length > 0) {
           result.response.text += `\n\n${curation.notices.join('\n')}`;
@@ -226,6 +251,20 @@ export class CommandOrchestrator {
     }
 
     this.remember(context, scope, result);
+
+    // Observability: 会話本文は保存せず、メタデータのみ記録（§19）
+    void this.options.observability?.record({
+      kind: 'chat',
+      sessionId,
+      scope,
+      actor: principal.label,
+      intent: result.intent,
+      toolsUsed: result.response.toolsUsed,
+      confidence: result.response.confidence,
+      dataStatus,
+      durationMs: Date.now() - state.startedAtMs
+    });
+
     return result.response;
   }
 
@@ -289,6 +328,9 @@ export class CommandOrchestrator {
     // --- Persistent Memory（訂正・想起・監査・判断レビュー） ---
     if (detectCorrection(message).isCorrection && context.lastMemoryIds.length > 0) {
       return this.handleCorrection(ctx, message, context, principal, dataStatus);
+    }
+    if (/今日.{0,4}(何を|なに)?(覚えた|学んだ)/.test(message)) {
+      return this.handleLearnedToday(ctx, principal, dataStatus);
     }
     if (/(私|会社)について何を覚えて|何を記憶して/.test(message)) {
       return this.handleMemoryAudit(ctx, principal, dataStatus);
@@ -805,7 +847,25 @@ export class CommandOrchestrator {
   }
 
   private async handleBrief(ctx: ToolContext, dataStatus: DataStatus): Promise<HandlerResult> {
-    const brief = generateExecutiveBrief(ctx.dataset, ctx.scope, ctx.store.decisions);
+    // Daily Learning Summary + ランク上位の気づきをBriefへ載せる（§14/§16。上位のみ）
+    const today = jstDate(ctx.dataset.asOf);
+    const briefPrincipal: Principal = { role: 'PRESIDENT', companyIds: [], label: 'brief' };
+    const memories = await this.memoryService.search({ limit: 300 }, briefPrincipal);
+    const todays = memories.filter((m) => jstDate(m.createdAt) === today);
+    const learning = {
+      learnedToday: todays
+        .filter((m) => m.reviewStatus !== 'PENDING_REVIEW')
+        .slice(0, 5)
+        .map((m) => `[${m.type}] ${m.statement}`),
+      pendingReview: todays
+        .filter((m) => m.reviewStatus === 'PENDING_REVIEW')
+        .slice(0, 3)
+        .map((m) => m.statement),
+      topInsights: rankInsights(discoverProblems(ctx.dataset, ctx.scope))
+        .slice(0, 2)
+        .map((insight) => insight.text)
+    };
+    const brief = generateExecutiveBrief(ctx.dataset, ctx.scope, ctx.store.decisions, learning);
     return {
       response: {
         text: brief.text,
@@ -2018,6 +2078,59 @@ export class CommandOrchestrator {
     };
   }
 
+  /** 「今日何を覚えた？」— Daily Learning Summary（Phase B1 §13-§14） */
+  private async handleLearnedToday(
+    ctx: ToolContext,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const today = jstDate(ctx.dataset.asOf);
+    const all = await this.memoryService.search({ includeInactive: true, limit: 300 }, principal);
+    const todays = all.filter((m) => jstDate(m.createdAt) === today);
+    if (todays.length === 0) {
+      return this.simpleText(
+        '今日はまだ新しく覚えたことはありません。会話の中の事実・判断・課題を記憶していきます。',
+        'memory_audit',
+        'HIGH',
+        dataStatus
+      );
+    }
+    const active = todays.filter((m) => m.status === 'ACTIVE' && m.reviewStatus !== 'PENDING_REVIEW');
+    const pending = todays.filter((m) => m.status === 'ACTIVE' && m.reviewStatus === 'PENDING_REVIEW');
+    const retired = todays.filter((m) => m.status !== 'ACTIVE');
+    const lines = [
+      `【今日の学習サマリー】（${today}）`,
+      `今日は${todays.length}件を記憶しました。`,
+      ...(active.length > 0
+        ? ['', '覚えたこと:', ...active.slice(0, 8).map((m) => `・[${m.type}] ${m.statement}`)]
+        : []),
+      ...(pending.length > 0
+        ? [
+            '',
+            '確認待ち（正式方針はAIが独断で確定しません）:',
+            ...pending.slice(0, 5).map((m) => `・${m.statement} — 「正式方針にする」で確定できます`)
+          ]
+        : []),
+      ...(retired.length > 0
+        ? ['', `訂正・取消: ${retired.length}件（履歴として保持しています）`]
+        : []),
+      '',
+      '「それ違う」で訂正、「今のなし」で取り消しできます。'
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        confidence: 'HIGH',
+        evidence: [],
+        toolsUsed: ['memory_search']
+      },
+      intent: 'memory_audit',
+      memoryIds: [...pending, ...active].slice(0, 5).map((m) => m.memoryId)
+    };
+  }
+
   private async handleMemoryAudit(
     ctx: ToolContext,
     principal: Principal,
@@ -2371,7 +2484,7 @@ export class CommandOrchestrator {
     context: ConversationContext,
     dataStatus: DataStatus
   ): Promise<HandlerResult> {
-    const review = reviewAnswer(
+    const review = await reviewAnswerWithAdvisor(
       {
         text: context.lastText,
         evidence: context.lastEvidence,
@@ -2381,7 +2494,7 @@ export class CommandOrchestrator {
         { type: 'DECISION', limit: 5 },
         { role: 'PRESIDENT', companyIds: [], label: 'critic' }
       ),
-      false
+      this.options.criticAdvisor
     );
     const lines = [
       '直前の案のリスク:',
@@ -2415,14 +2528,14 @@ export class CommandOrchestrator {
       return this.simpleText('検証する直前の回答がありません。', 'critic', 'UNKNOWN', dataStatus);
     }
     const decisions = await this.memoryService.search({ type: 'DECISION', limit: 5 }, principal);
-    const review = reviewAnswer(
+    const review = await reviewAnswerWithAdvisor(
       {
         text: context.lastText,
         evidence: context.lastEvidence,
         confidence: context.lastConfidence
       },
       decisions,
-      false
+      this.options.criticAdvisor
     );
     const counters = devilsAdvocate(context.lastText.slice(0, 60), context.lastText.split('\n'));
     const lines = [

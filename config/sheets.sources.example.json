@@ -1,0 +1,40 @@
+[
+  {
+    "_comment": "LCC統合業務システムDB customers タブ（実測スキーマ 2026-08-08）。LCC_SHEETS_SOURCESへこの配列をJSONで設定する",
+    "sourceName": "CustomerSource",
+    "spreadsheetId": "1jOU-Kq8vh7Meaa7auNQqVflseRAPCcGzksAsvG-16HY",
+    "tabName": "customers",
+    "companyId": "lcc",
+    "columns": {
+      "customerId": "id",
+      "name": "name",
+      "phone": "tel"
+    }
+  },
+  {
+    "_comment": "LCC統合業務システムDB projects タブ（53列のうちCanonicalが使う列のみ）。statusは英語コードのためstageMapで変換",
+    "sourceName": "ProjectSource",
+    "spreadsheetId": "1jOU-Kq8vh7Meaa7auNQqVflseRAPCcGzksAsvG-16HY",
+    "tabName": "projects",
+    "companyId": "lcc",
+    "columns": {
+      "projectId": "id",
+      "customerId": "customerId",
+      "name": "name",
+      "stage": "status",
+      "orderAmount": "estimateTotal",
+      "startDate": "workStart",
+      "dueDate": "deliveryDate",
+      "completedDate": "workEnd"
+    },
+    "stageMap": {
+      "lead": "inquiry",
+      "survey": "survey",
+      "quote": "following",
+      "contract": "ordered",
+      "working": "in_progress",
+      "done": "completed",
+      "lost": "lost"
+    }
+  }
+]
