@@ -550,15 +550,17 @@ createApp({
           ? body.ui.suggestedActions
           : [{ label: '覚えて', message: '今のを覚えておいて' }, { label: '訂正', message: 'それ違う。今は' }] };
       this.messages.push(msg);
+      // Vue3: push後はreactive proxy経由で書き換えないと2チャンク目以降が描画されない
+      const live = this.messages[this.messages.length - 1];
       const full = body.text || '';
       const chunk = this.reducedMotion ? full.length : Math.max(8, Math.round(full.length / 24));
       for (let i = 0; i < full.length; i += chunk) {
-        msg.text = full.slice(0, i + chunk);
+        live.text = full.slice(0, i + chunk);
         this.scrollDown();
         if (!this.reducedMotion) await new Promise(r => setTimeout(r, 24));
       }
-      msg.text = full;
-      msg.done = true;
+      live.text = full;
+      live.done = true;
       if (body.approvalRequest) this.setState('WAITING_APPROVAL');
     },
 

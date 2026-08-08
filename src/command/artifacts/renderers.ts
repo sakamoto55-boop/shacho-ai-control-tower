@@ -10,7 +10,8 @@ import { join, resolve } from 'node:path';
 import pptxgen from 'pptxgenjs';
 // pptxgenjsの型定義はdefault exportがコンストラクタとして解決されないためinterop
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const PptxGenJS = pptxgen as unknown as new () => any;
+// tsx実行時はCJS interopでdefaultが二重ラップされるため両形状に対応する
+const PptxGenJS = (((pptxgen as unknown as { default?: unknown }).default ?? pptxgen) as unknown) as new () => any;
 import ExcelJS from 'exceljs';
 import {
   AlignmentType,

@@ -396,6 +396,21 @@ export class CommandOrchestrator {
     const compound = await this.tryCompound(ctx, message, state, dataStatus);
     if (compound) return compound;
 
+    // --- 明示コマンドは文脈フォローアップより優先（直前の話題に飲み込まれない） ---
+    if (/覚えておいて|覚えといて|覚えて$/.test(message)) {
+      return this.handleRememberThis(ctx, message, context, principal, dataStatus);
+    }
+    if (/今の(は)?なし|取り消し|やっぱりなし/.test(message) && context.lastMemoryIds.length > 0) {
+      return this.handleUndoMemory(ctx, context, dataStatus);
+    }
+    if (/正式(方針|決定)に(する|して)/.test(message) && context.lastMemoryIds.length > 0) {
+      return this.handlePromoteDecision(ctx, context, principal, dataStatus);
+    }
+
+    if (detectCorrection(message).isCorrection && context.lastMemoryIds.length > 0) {
+      return this.handleCorrection(ctx, message, context, principal, dataStatus);
+    }
+
     // --- 文脈フォローアップ（直前の話題を参照する発話） ---
     const followUp = await this.tryFollowUp(ctx, message, context, principal, state, dataStatus);
     if (followUp) return followUp;
