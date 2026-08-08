@@ -81,9 +81,9 @@
           <button @click="detailOpen = !detailOpen" class="lg:hidden w-8 h-8 rounded-lg glass" aria-label="詳細モード">⚙️</button>
         </div>
       </div>
-      <div class="no-scrollbar flex gap-2 overflow-x-auto pt-2 pb-1" role="list" aria-label="重要KPI">
+      <div class="no-scrollbar flex gap-2 overflow-x-auto pt-2 pb-1 pr-4 snap-x snap-mandatory" role="list" aria-label="重要KPI">
         <div v-for="k in kpiBar" :key="k.label" role="listitem"
-             class="glass shrink-0 px-3 py-1.5 min-w-[104px]">
+             class="glass shrink-0 px-3 py-1.5 min-w-[104px] snap-start">
           <p class="text-[9px] text-[color:var(--text-low)]">{{ k.label }}</p>
           <p class="text-sm font-bold" :class="k.cls">{{ k.value }}</p>
           <p class="text-[8px] text-[color:var(--text-low)]">{{ k.sub }}</p>
@@ -123,7 +123,7 @@
     </transition>
 
     <!-- CENTER: Conversation（§8。画面の主役はチャット） -->
-    <main ref="chatArea" class="chat-scroll flex-1 overflow-y-auto px-4 space-y-3 pb-2" role="log" aria-label="会話">
+    <main ref="chatArea" class="chat-scroll flex-1 overflow-y-auto px-4 space-y-3 pb-2 relative z-10" role="log" aria-label="会話">
       <transition-group name="fade">
         <div v-for="(m, i) in messages" :key="i" class="flex" :class="m.role === 'user' ? 'justify-end' : 'justify-start'">
           <div :class="m.role === 'user' ? 'bg-[color:var(--accent-deep)]/85 text-white' : 'glass-strong'"
@@ -363,7 +363,14 @@ const ComponentRenderer = defineComponent({
         case 'RESEARCH_RESULT': case 'COMPARISON': case 'PIPELINE': case 'TIMELINE':
         case 'TABLE': case 'CHART': {
           if (!d || typeof d !== 'object') return null;
-          const entries = Object.entries(d).filter(([, v]) => ['string', 'number', 'boolean'].includes(typeof v)).slice(0, 8);
+          // §検収6: 内部ID（projectId/customerId等）は通常画面に出さない（詳細・Evidenceのみ）
+          const STAGE_JP = { inquiry: '問い合わせ', survey: '現地調査', estimating: '見積作成中', following: '追客中', ordered: '受注', in_progress: '施工中', completed: '完工', invoiced: '請求済', paid: '入金済', lost: '失注' };
+          const KEY_JP = { customer: '顧客', stage: 'ステージ', name: '案件', projects: '案件数', active: '進行中', candidates: '候補', current: '正式' };
+          const entries = Object.entries(d)
+            .filter(([k, v]) => ['string', 'number', 'boolean'].includes(typeof v))
+            .filter(([k, v]) => !/id$/i.test(k) && !/^(cus_|prj_|cust:|mem-|inc-)/.test(String(v)))
+            .map(([k, v]) => [KEY_JP[k] || k, STAGE_JP[v] || v])
+            .slice(0, 8);
           if (!entries.length) return null;
           return card([title || h('p', { class: 'text-[10px] font-bold text-[color:var(--text-low)] mb-1' }, c.type),
             ...entries.map(([k, v]) => h('div', { class: 'flex justify-between gap-3 text-[11px] py-0.5' }, [
@@ -448,7 +455,7 @@ createApp({
     roleLabel(role){ const hit = ROLE_RING.find(r => r.role === role); return hit ? hit.label : role; },
     ringPos(i){
       const angle = (i / ROLE_RING.length) * Math.PI * 2 - Math.PI / 2;
-      const x = 50 + Math.cos(angle) * 48, y = 50 + Math.sin(angle) * 46;
+      const x = 50 + Math.cos(angle) * 44, y = 50 + Math.sin(angle) * 40;
       return { left: `calc(${x}% - 18px)`, top: `calc(${y}% - 9px)` };
     },
     focusInput(){ this.$refs.inputBox && this.$refs.inputBox.focus(); },
@@ -634,6 +641,10 @@ createApp({
         const find = (key) => (body.kpis || []).find(k => k.key === key);
         const fmt = (k, unit) => {
           if (!k) return { v: '—', sub: '' };
+          // §検収6: 未接続の数値は0円ではなく「未接続」を優先する
+          if (k.confidence === 'UNKNOWN' || !(k.freshness && k.freshness.lastUpdatedAt)) {
+            return { v: '未接続', sub: '接続後に表示' };
+          }
           const stale = k.freshness && k.freshness.stale;
           const v = unit === 'percent' ? `${k.value}%` : unit === 'count' ? `${k.value}件` : yen(k.value);
           return { v, sub: (stale ? '⚠ ' : '') + '更新 ' + ((k.freshness && k.freshness.lastUpdatedAt) || '').slice(5, 16).replace('T', ' ') };
@@ -653,7 +664,15 @@ createApp({
         this.connectionError = false;
       } catch {
         if (this.demoRequested) { this.demoMode = true; }
-        else { this.connectionError = true; this.kpiLoaded = false; }
+        else {
+          this.connectionError = true;
+          if (this.kpiLoaded) {
+            // §検収6: 接続断で残す値には必ずSTALEを明示（現在値と誤認させない）
+            this.kpis = this.kpis.map(k => ({ ...k, sub: 'STALE（接続断・最終取得値）', cls: 'text-[color:var(--warn)]' }));
+          } else {
+            this.kpiLoaded = false;
+          }
+        }
       }
     },
 

@@ -26,8 +26,13 @@ import PDFDocument from 'pdfkit';
 
 export const ARTIFACT_DIR = process.env.LCC_ARTIFACT_DIR ?? './data/artifacts';
 
-async function ensureDir(): Promise<string> {
-  const dir = resolve(ARTIFACT_DIR);
+/**
+ * 出力先（§検収1: Demo Fixture隔離）。
+ * demoモードの生成物は demo/ サブディレクトリへ構造的に分離し、
+ * production納品物とテスト・デモ生成物が同じ場所に混在しないようにする。
+ */
+async function ensureDir(demo = false): Promise<string> {
+  const dir = resolve(ARTIFACT_DIR, demo ? 'demo' : '');
   await mkdir(dir, { recursive: true });
   return dir;
 }
@@ -47,7 +52,12 @@ export interface PresentationSpec {
 }
 
 /** PPTX生成（§16）。pptxgenjsによる決定論レンダリング */
-export async function renderPresentation(spec: PresentationSpec, fileBase: string): Promise<string> {
+export interface RenderOptions {
+  /** demoモード生成物はdemo/へ分離（§検収1） */
+  demo?: boolean;
+}
+
+export async function renderPresentation(spec: PresentationSpec, fileBase: string, options: RenderOptions = {}): Promise<string> {
   const pptx = new PptxGenJS();
   pptx.defineLayout({ name: 'WIDE', width: 13.33, height: 7.5 });
   pptx.layout = 'WIDE';
@@ -78,7 +88,7 @@ export async function renderPresentation(spec: PresentationSpec, fileBase: strin
     }
   }
 
-  const dir = await ensureDir();
+  const dir = await ensureDir(options.demo === true);
   const path = join(dir, `${fileBase}.pptx`);
   await pptx.writeFile({ fileName: path });
   return path;
@@ -98,7 +108,7 @@ export interface WorkbookSpec {
 }
 
 /** XLSX生成（§17）。数式・検証・書式・印刷設定・複数シート対応 */
-export async function renderWorkbook(spec: WorkbookSpec, fileBase: string): Promise<string> {
+export async function renderWorkbook(spec: WorkbookSpec, fileBase: string, options: RenderOptions = {}): Promise<string> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'LCC COMMAND';
   for (const sheetSpec of spec.sheets) {
@@ -129,7 +139,7 @@ export async function renderWorkbook(spec: WorkbookSpec, fileBase: string): Prom
     }
     sheet.views = [{ state: 'frozen', ySplit: 1 }];
   }
-  const dir = await ensureDir();
+  const dir = await ensureDir(options.demo === true);
   const path = join(dir, `${fileBase}.xlsx`);
   await workbook.xlsx.writeFile(path);
   return path;
@@ -147,7 +157,7 @@ export interface DocumentSpec {
 }
 
 /** DOCX生成（§18） */
-export async function renderDocument(spec: DocumentSpec, fileBase: string): Promise<string> {
+export async function renderDocument(spec: DocumentSpec, fileBase: string, options: RenderOptions = {}): Promise<string> {
   const children: Paragraph[] = [
     new Paragraph({
       heading: HeadingLevel.TITLE,
@@ -170,15 +180,15 @@ export async function renderDocument(spec: DocumentSpec, fileBase: string): Prom
   }
   const doc = new DocxDocument({ sections: [{ children }] });
   const buffer = await Packer.toBuffer(doc);
-  const dir = await ensureDir();
+  const dir = await ensureDir(options.demo === true);
   const path = join(dir, `${fileBase}.docx`);
   await writeFile(path, buffer);
   return path;
 }
 
 /** PDF生成（§19）。帳票・掲示物・説明資料 */
-export async function renderPdf(spec: DocumentSpec, fileBase: string): Promise<string> {
-  const dir = await ensureDir();
+export async function renderPdf(spec: DocumentSpec, fileBase: string, options: RenderOptions = {}): Promise<string> {
+  const dir = await ensureDir(options.demo === true);
   const path = join(dir, `${fileBase}.pdf`);
   const doc = new PDFDocument({ size: 'A4', margin: 48 });
   applyJapaneseFont(doc);
@@ -295,8 +305,8 @@ export function renderFlowDiagramSvg(spec: { title: string; steps: string[] }): 
 }
 
 /** SVGをファイルへ保存 */
-export async function writeSvg(svg: string, fileBase: string): Promise<string> {
-  const dir = await ensureDir();
+export async function writeSvg(svg: string, fileBase: string, options: RenderOptions = {}): Promise<string> {
+  const dir = await ensureDir(options.demo === true);
   const path = join(dir, `${fileBase}.svg`);
   await writeFile(path, svg, 'utf8');
   return path;

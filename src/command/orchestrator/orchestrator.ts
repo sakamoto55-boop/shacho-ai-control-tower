@@ -69,7 +69,10 @@ import { parsePreferredProvider } from '../ai/liveProviders.js';
 import {
   buildEstimateWorkbookSpec,
   buildManagementDeckSpec,
-  buildReportDocumentSpec
+  buildProjectLedgerWorkbookSpec,
+  buildReportDocumentSpec,
+  buildSnapshotStamp,
+  stageLabel
 } from '../artifacts/contentBuilders.js';
 import {
   renderDocument,
@@ -1421,7 +1424,7 @@ export class CommandOrchestrator {
     const owner = ctx.dataset.employees.find((e) => e.employeeId === project.ownerEmployeeId);
     const lines = [
       '【確認できた事実】',
-      `${project.name}（${customer?.name ?? '顧客不明'}）: ステージ ${project.stage}、受注額${yen(project.orderAmount)}。`,
+      `${project.name}（${customer?.name ?? '顧客不明'}）: ステージ ${stageLabel(project.stage)}、受注額${yen(project.orderAmount)}。`,
       margin.forecastMarginRate !== null
         ? `予測粗利率${pct(margin.forecastMarginRate)}（予定${pct(margin.plannedMarginRate)}）。`
         : '原価データ未登録のため粗利は算出できません。',
@@ -1468,7 +1471,7 @@ export class CommandOrchestrator {
         .slice(0, 6)
         .map(
           (p) =>
-            `・${p.name}（${p.stage}${p.orderAmount > 0 ? `、受注額${yen(p.orderAmount)}` : ''}${p.dueDate ? `、完工予定${p.dueDate}` : ''}）`
+            `・${p.name}（${stageLabel(p.stage)}${p.orderAmount > 0 ? `、受注額${yen(p.orderAmount)}` : ''}${p.dueDate ? `、完工予定${p.dueDate}` : ''}）`
         ),
       ...(projects.length > 6 ? [`（他${projects.length - 6}件）`] : [])
     ];
@@ -1524,7 +1527,7 @@ export class CommandOrchestrator {
       `${name}さんの担当案件は${projects.length}件です。`,
       ...projects.map(
         (project) =>
-          `・${project.name}（${project.stage}${project.dueDate ? `、完工予定${project.dueDate}` : ''}）`
+          `・${project.name}（${stageLabel(project.stage)}${project.dueDate ? `、完工予定${project.dueDate}` : ''}）`
       ),
       ...(interactions.length > 0
         ? [
@@ -2689,60 +2692,53 @@ export class CommandOrchestrator {
     const fileBase = `${artifactType.toLowerCase()}-${now.slice(0, 10)}-${Math.abs(this.hashText(message)) % 100000}`;
     const emit = (label: string) =>
       this.options.eventBus?.emit({ event: 'TOOL_STARTED', displayLabel: label });
+    // §検収1-2: demo生成物はdemo/へ構造分離。同一リクエストの成果物は同一Snapshotを共有
+    const renderOptions = { demo: ctx.dataset.meta.mode !== 'production' };
+    const stamp = buildSnapshotStamp(ctx.dataset, ctx.scope);
 
     let storageLocation = '';
     let steps: string[] = [];
     const sourceEvidence: Evidence[] = [];
+    sourceEvidence.push({
+      label: 'Snapshot',
+      value: `${stamp.snapshotId} / scope ${stamp.scope} / ${stamp.confidence}`,
+      source: stamp.sources.filter((src) => src.state === 'OK').map((src) => src.name).join(', ') || '接続済みソースなし',
+      asOf: now
+    });
 
     if (artifactType === 'PPTX') {
       emit('データを確認しています');
-      const spec = buildManagementDeckSpec(ctx.dataset, ctx.scope);
+      const spec = buildManagementDeckSpec(ctx.dataset, ctx.scope, stamp);
       emit('グラフを作成しています');
       emit(`${spec.slides.length + 1}枚のスライドを生成しています`);
-      storageLocation = await renderPresentation(spec, fileBase);
+      storageLocation = await renderPresentation(spec, fileBase, renderOptions);
       steps = ['社内データ確認', '決定論集計', `スライド${spec.slides.length + 1}枚生成`];
-      sourceEvidence.push({ label: '数値出典', value: '決定論エンジン（KPI/資金/アラート）', source: 'LCC COMMAND', asOf: now });
     } else if (artifactType === 'XLSX') {
       emit('既存正本を確認しています');
-      const draft = draftEstimate(ctx.dataset, message);
-      const isEstimate = /見積/.test(message);
-      const spec = isEstimate
-        ? buildEstimateWorkbookSpec(draft, now)
-        : {
-            title: '管理表',
-            sheets: [
-              {
-                name: 'データ',
-                columns: [
-                  { header: '案件', key: 'name', width: 40 },
-                  { header: 'ステージ', key: 'stage', width: 14 },
-                  { header: '受注額', key: 'amount', width: 16, numFmt: '#,##0' }
-                ],
-                rows: ctx.dataset.projects
-                  .filter((pr) => pr.orderAmount > 0)
-                  .slice(0, 50)
-                  .map((pr) => ({ name: pr.name, stage: pr.stage, amount: pr.orderAmount }))
-              }
-            ]
-          };
+      // 見積「案」= 草案Workbook / 見積管理・台帳・案件管理 = 実データ台帳（§検収4）
+      const isDraft = /見積(案|書).{0,4}(作|出し)|の見積/.test(message);
+      const spec = isDraft
+        ? buildEstimateWorkbookSpec(draftEstimate(ctx.dataset, message), now)
+        : buildProjectLedgerWorkbookSpec(ctx.dataset, ctx.scope, stamp);
       emit('ワークブックを生成しています');
-      storageLocation = await renderWorkbook(spec, fileBase);
+      storageLocation = await renderWorkbook(spec, fileBase, renderOptions);
       steps = ['既存正本確認', 'スキーマ・数式設計', 'ワークブック生成'];
-      sourceEvidence.push({ label: '数値出典', value: '案件台帳（決定論）', source: 'LCC COMMAND', asOf: now });
     } else if (artifactType === 'DOCX' || artifactType === 'PDF') {
       emit('本文を構成しています');
-      const spec = buildReportDocumentSpec(ctx.dataset, ctx.scope);
+      const spec = buildReportDocumentSpec(ctx.dataset, ctx.scope, stamp);
       emit('文書を生成しています');
-      storageLocation = artifactType === 'DOCX' ? await renderDocument(spec, fileBase) : await renderPdf(spec, fileBase);
+      storageLocation =
+        artifactType === 'DOCX'
+          ? await renderDocument(spec, fileBase, renderOptions)
+          : await renderPdf(spec, fileBase, renderOptions);
       steps = ['データ収集', '本文構成', `${artifactType}生成`];
-      sourceEvidence.push({ label: '数値出典', value: '決定論エンジン', source: 'LCC COMMAND', asOf: now });
     } else if (artifactType === 'DIAGRAM') {
       emit('構造を確認しています');
       const svg = renderFlowDiagramSvg({
         title: '業務フロー（概要）',
         steps: ['問い合わせ', '現調', '見積', '受注', '施工', '完工', '請求', '入金']
       });
-      storageLocation = await writeSvg(svg, fileBase);
+      storageLocation = await writeSvg(svg, fileBase, renderOptions);
       steps = ['構造確認', '図の生成'];
     } else {
       throw new Error(`${artifactType} は現在この経路では生成できません`);
@@ -2767,6 +2763,7 @@ export class CommandOrchestrator {
       `【${artifactType}を生成しました】`,
       ...(constitutionHits.length > 0 ? [...constitutionHits.map((h) => `⚠ ${h.warning}`), ''] : []),
       `保存先: ${storageLocation}`,
+      `Snapshot: ${stamp.snapshotId} / scope: ${stamp.scopeLabel}（${stamp.scope}） / ${stamp.confidence}`,
       `成果物ID: ${artifact.artifactId}（Artifact Registryに目的・出典付きで記録済み）`,
       '',
       '実行ステップ: ' + steps.join(' → '),
@@ -2894,7 +2891,7 @@ export class CommandOrchestrator {
         const project = ctx.dataset.projects.find((p) => p.projectId === entity.entityId);
         if (project) {
           facts.push(
-            `案件「${project.name}」: ステージ${project.stage}、受注額${yen(project.orderAmount)}`
+            `案件「${project.name}」: ステージ${stageLabel(project.stage)}、受注額${yen(project.orderAmount)}`
           );
         }
       }

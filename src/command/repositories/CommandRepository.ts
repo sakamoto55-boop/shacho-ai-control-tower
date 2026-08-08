@@ -126,10 +126,12 @@ export class LocalCommandRepository implements CommandRepository {
   async getDataset(asOf: string): Promise<CommandDataset> {
     // Demo Fixture隔離: productionモードのRegistryはデモデータへフォールバックしない
     const ttlMs = Number(process.env.LCC_DATASET_CACHE_MS ?? 60_000);
+    // 単一Snapshot原則（§検収2）: TTL内の連続リクエストは同一Canonical Snapshotを共有する
+    // （基準時刻の数十秒差で別Snapshotにならないよう、asOfの近接も同一視する）
     if (
       this.datasetCache &&
-      this.datasetCache.key === asOf &&
-      Date.now() - this.datasetCache.cachedAtMs < ttlMs
+      Date.now() - this.datasetCache.cachedAtMs < ttlMs &&
+      Math.abs(Date.parse(asOf) - Date.parse(this.datasetCache.key)) < ttlMs
     ) {
       return this.datasetCache.dataset;
     }
