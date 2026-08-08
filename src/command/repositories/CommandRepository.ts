@@ -10,6 +10,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import type { ApprovalRequest, CommandTask, Decision, ResearchTask } from '../domain/types.js';
 import type { ExperimentRecord, MemoryRecord } from '../memory/types.js';
+import type { TargetRecord } from '../targets/targetRegistry.js';
 import { buildSeedDataset, type CommandDataset } from '../data/seed.js';
 import {
   DemoSourceRegistry,
@@ -26,6 +27,8 @@ export interface CommandStore {
   /** Persistent Memory（Phase M）。物理削除しない */
   memories: MemoryRecord[];
   experiments: ExperimentRecord[];
+  /** Target Registry（Phase B1.5）。経営目標の正本。履歴を保持する */
+  targets: TargetRecord[];
 }
 
 export interface CommandRepository {
@@ -46,10 +49,20 @@ export interface CommandRepository {
   saveMemory(record: MemoryRecord): Promise<MemoryRecord>;
   getExperiments(): Promise<ExperimentRecord[]>;
   saveExperiment(record: ExperimentRecord): Promise<ExperimentRecord>;
+  getTargets(): Promise<TargetRecord[]>;
+  saveTarget(record: TargetRecord): Promise<TargetRecord>;
 }
 
 function defaultStore(): CommandStore {
-  return { decisions: [], tasks: [], approvals: [], research: [], memories: [], experiments: [] };
+  return {
+    decisions: [],
+    tasks: [],
+    approvals: [],
+    research: [],
+    memories: [],
+    experiments: [],
+    targets: []
+  };
 }
 
 export class LocalCommandRepository implements CommandRepository {
@@ -165,6 +178,17 @@ export class LocalCommandRepository implements CommandRepository {
     await this.writeStore(store);
     return record;
   }
+
+  async getTargets(): Promise<TargetRecord[]> {
+    return (await this.readStore()).targets;
+  }
+
+  async saveTarget(record: TargetRecord): Promise<TargetRecord> {
+    const store = await this.readStore();
+    store.targets = [...store.targets.filter((t) => t.targetId !== record.targetId), record];
+    await this.writeStore(store);
+    return record;
+  }
 }
 
 /** テスト用: メモリ上のみで動くリポジトリ */
@@ -259,6 +283,18 @@ export class InMemoryCommandRepository implements CommandRepository {
   async saveExperiment(record: ExperimentRecord): Promise<ExperimentRecord> {
     this.store.experiments = [
       ...this.store.experiments.filter((e) => e.experimentId !== record.experimentId),
+      record
+    ];
+    return record;
+  }
+
+  async getTargets(): Promise<TargetRecord[]> {
+    return this.store.targets;
+  }
+
+  async saveTarget(record: TargetRecord): Promise<TargetRecord> {
+    this.store.targets = [
+      ...this.store.targets.filter((t) => t.targetId !== record.targetId),
       record
     ];
     return record;

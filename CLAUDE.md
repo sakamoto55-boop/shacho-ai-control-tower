@@ -87,6 +87,14 @@ HTTPリクエスト (src/server.ts, Hono)
 - 実データの正本分類は `REAL_DATA_SOURCE_MAP.md` が正。LCC_CASE_DBはDERIVEDのため金額系エンジンの入力にしない。経営管理第13期の目標値はユーザー確認まで採用しない。People OS（給与）は複製禁止。
 - 夜間メンテナンス（`npm run command:maintenance`）は既定DRY RUN。`LCC_MAINTENANCE_APPLY=true` なしで状態変更を保存しない。
 
+### Live Beta準備（Phase B1.5）
+
+- Sheets本番認証はService Account + `spreadsheets.readonly`（`sources/googleSheets.ts`）。API Keyを非公開業務シートの本番認証にしない。資格情報はenvのみ（Git・ログ・フロント露出禁止）。
+- 経営目標はTarget Registry（`targets/targetRegistry.ts`）が正。コード直書き・Memoryのみでの保持を禁止。CANDIDATE→ユーザー承認→ACTIVE、変更はSUPERSEDEDで履歴保持。AIが独断でACTIVEにしない。
+- 不足データはData Gap Registry（`domain/dataGaps.ts`）で管理。銀行・会計は推測で接続しない。予定配置（Schedule）を実績人工（DailyReport）として原価に使わない。日報は「日報データ（AI読み取り）」の確定行のみ実績候補。
+- Visual Event Bus（`events/eventBus.ts`）へ機微情報・会話本文を流さない（Role/displayLabel/IDのみ。Provider名も非露出）。UI応答はGenerative UI Schema（`domain/uiSchema.ts`）を返し、AIに自由HTMLを生成させない。
+- Real Evaluation（`evaluation/realEval.ts`）のHallucination Gateを壊さない: 存在しない実体への質問に正直な「確認できません」を返す挙動が完了条件。
+
 ### Multi-Agent層（src/command/agents/ — Phase N）
 
 - Role（13種）は責務でありモデル名ではない。Role→Capability→Providerの3層を崩さない（`agents/roles.ts`）。

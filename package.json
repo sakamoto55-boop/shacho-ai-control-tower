@@ -13,7 +13,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "command:maintenance": "tsx scripts/nightly-maintenance.ts",
-    "command:sanity": "tsx scripts/sanity-check.ts"
+    "command:sanity": "tsx scripts/sanity-check.ts",
+    "command:real-eval": "tsx scripts/real-evaluation.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",

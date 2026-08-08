@@ -23,7 +23,9 @@ function readOnlyView(repository: CommandRepository): CommandRepository {
     getMemories: () => repository.getMemories(),
     saveMemory: async (m) => m,
     getExperiments: () => repository.getExperiments(),
-    saveExperiment: async (e) => e
+    saveExperiment: async (e) => e,
+    getTargets: () => repository.getTargets(),
+    saveTarget: async (t) => t
   };
 }
 

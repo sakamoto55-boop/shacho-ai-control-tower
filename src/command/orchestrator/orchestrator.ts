@@ -51,6 +51,11 @@ import {
 } from '../memory/curator.js';
 import { discoverProblems, rankInsights } from '../memory/maintenance.js';
 import type { ObservabilityLog } from '../observability/observability.js';
+import {
+  ROLE_DISPLAY_LABELS,
+  type CommandEventBus,
+  type CommandEventType
+} from '../events/eventBus.js';
 import { classifyConversation } from './universalRouter.js';
 import { buildInnovationProposal, formatInnovationProposal } from '../memory/innovation.js';
 import { GeneralReasoner, createGeneralRouter } from '../ai/generalReasoner.js';
@@ -134,6 +139,8 @@ export interface OrchestratorOptions {
   criticAdvisor?: LlmCriticAdvisor;
   /** 会話メタデータ・フィードバックの記録先 */
   observability?: ObservabilityLog;
+  /** Phase VUI用のVisual Event Bus（会話状態・Role活動をUIへ通知） */
+  eventBus?: CommandEventBus;
 }
 
 export class CommandOrchestrator {
@@ -163,6 +170,18 @@ export class CommandOrchestrator {
     return this.traceLog.recent(limit);
   }
 
+  /** Visual Event（§18-§19・§28）。displayLabelとIDのみ。本文・機微情報は流さない */
+  private emitEvent(
+    event: CommandEventType,
+    extra: { sessionId?: string; planId?: string; taskId?: string; role?: string } = {}
+  ): void {
+    this.options.eventBus?.emit({
+      event,
+      ...extra,
+      displayLabel: extra.role ? ROLE_DISPLAY_LABELS[extra.role] : undefined
+    });
+  }
+
   async chat(
     request: CommandChatRequest,
     principal: Principal = DEFAULT_PRINCIPAL
@@ -181,6 +200,7 @@ export class CommandOrchestrator {
     const message = request.message.trim();
     const dataStatus = datasetAvailability(dataset);
     const state: ExecutionState = { toolCalls: 0, steps: 0, startedAtMs: Date.now() };
+    this.emitEvent('AI_THINKING', { sessionId });
 
     // Demo Fixture隔離: productionで実データが無い場合、数値回答を一切行わない
     if (dataStatus === 'DATA_UNAVAILABLE') {
@@ -245,10 +265,15 @@ export class CommandOrchestrator {
         if (curation.saved.length > 0 && !result.memoryIds) {
           result.memoryIds = curation.saved.map((item) => item.record.memoryId);
         }
+        if (curation.saved.length > 0) this.emitEvent('MEMORY_UPDATED', { sessionId });
       } catch {
         // 記憶抽出の失敗で会話を止めない
       }
     }
+
+    if (result.response.approvalRequest) this.emitEvent('APPROVAL_REQUIRED', { sessionId });
+    if (result.response.dataStatus !== 'OK') this.emitEvent('WARNING', { sessionId });
+    this.emitEvent('ANSWER_COMPLETED', { sessionId });
 
     this.remember(context, scope, result);
 
@@ -1808,6 +1833,7 @@ export class CommandOrchestrator {
     principal: Principal,
     dataStatus: DataStatus
   ): Promise<HandlerResult> {
+    this.emitEvent('RESEARCH_STARTED', { role: 'RESEARCH' });
     // Research Router: 社内で答えられるか / 外部調査か / 両方か
     const internalFacts: string[] = [];
     const customer = findCustomer(ctx.dataset, message);
@@ -1951,6 +1977,7 @@ export class CommandOrchestrator {
     principal: Principal,
     dataStatus: DataStatus
   ): Promise<HandlerResult> {
+    this.emitEvent('MEMORY_RECALL', {});
     // 「いつ変更した？」「なぜ変えた？」→ 変遷履歴で答える
     if (/いつ変更|なぜ変えた|変更の経緯/.test(message) && context.lastMemoryIds[0]) {
       const chain = await this.memoryService.history(context.lastMemoryIds[0]);
@@ -2180,6 +2207,7 @@ export class CommandOrchestrator {
     dataStatus: DataStatus,
     mode: { bold?: boolean; firstPrinciples?: boolean } = {}
   ): Promise<HandlerResult> {
+    this.emitEvent('INNOVATION_STARTED', { role: 'INNOVATION' });
     const related = await this.memoryService.search(
       { q: message, includeInactive: false, limit: 5 },
       principal
@@ -2274,7 +2302,21 @@ export class CommandOrchestrator {
     );
     const concise =
       /簡潔|短く|要点だけ/.test(message) || preferences.some((m) => /簡潔|短く/.test(m.statement));
+    this.emitEvent('PLAN_CREATED', { planId: plan.planId });
     const outcome = await this.executor.execute(plan, ctx, principal, concise);
+    // AgentTrace → Visual Event（§19）: Role単位の活動をUIへ通知（Provider名は流さない）
+    for (const trace of this.traceLog.forPlan(plan.planId)) {
+      this.emitEvent('ROLE_STARTED', {
+        planId: trace.planId,
+        taskId: trace.taskId,
+        role: trace.role
+      });
+      this.emitEvent('ROLE_COMPLETED', {
+        planId: trace.planId,
+        taskId: trace.taskId,
+        role: trace.role
+      });
+    }
     const intro = '確認しました。社内データ・過去の判断・資金面を見ています。';
     return {
       response: {
@@ -2527,6 +2569,7 @@ export class CommandOrchestrator {
     if (!context.lastText) {
       return this.simpleText('検証する直前の回答がありません。', 'critic', 'UNKNOWN', dataStatus);
     }
+    this.emitEvent('CRITIC_STARTED', { role: 'CRITIC' });
     const decisions = await this.memoryService.search({ type: 'DECISION', limit: 5 }, principal);
     const review = await reviewAnswerWithAdvisor(
       {

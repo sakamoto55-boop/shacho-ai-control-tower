@@ -43,6 +43,29 @@ export interface ProviderSelection {
 interface Outcome {
   success: number;
   failure: number;
+  lastSuccess?: string;
+  lastFailure?: string;
+}
+
+/** Provider Configuration（Phase B1.5 §4）。未設定Providerはエラーではなく正常状態 */
+export interface ProviderStatusView {
+  providerId: string;
+  vendor: ProviderSpec['vendor'];
+  model: string;
+  enabled: boolean;
+  available: boolean;
+  /** NOT_CONFIGURED = API Key未設定（正常状態。全体をエラーにしない） */
+  status: 'READY' | 'NOT_CONFIGURED' | 'DEGRADED';
+  capabilities: Capability[];
+  dataPolicy: 'SENSITIVE_ALLOWED' | 'NO_SENSITIVE';
+  costClass: CostClass;
+  latencyClass: LatencyClass;
+  health: {
+    successRate: number;
+    samples: number;
+    lastSuccess?: string;
+    lastFailure?: string;
+  };
 }
 
 export class ProviderRegistry {
@@ -68,11 +91,48 @@ export class ProviderRegistry {
     return outcome.success / (outcome.success + outcome.failure);
   }
 
-  recordOutcome(providerId: string, success: boolean): void {
+  recordOutcome(providerId: string, success: boolean, at = new Date().toISOString()): void {
     const outcome = this.outcomes.get(providerId) ?? { success: 0, failure: 0 };
-    if (success) outcome.success += 1;
-    else outcome.failure += 1;
+    if (success) {
+      outcome.success += 1;
+      outcome.lastSuccess = at;
+    } else {
+      outcome.failure += 1;
+      outcome.lastFailure = at;
+    }
     this.outcomes.set(providerId, outcome);
+  }
+
+  /** Provider Configuration一覧（§4）。API Key未設定はNOT_CONFIGUREDとして正常扱い */
+  describe(): ProviderStatusView[] {
+    return this.list().map((spec) => {
+      const outcome = this.outcomes.get(spec.providerId);
+      const samples = (outcome?.success ?? 0) + (outcome?.failure ?? 0);
+      const successRate = this.successRate(spec.providerId);
+      const status: ProviderStatusView['status'] = !spec.available
+        ? 'NOT_CONFIGURED'
+        : samples >= 3 && successRate < 0.5
+          ? 'DEGRADED'
+          : 'READY';
+      return {
+        providerId: spec.providerId,
+        vendor: spec.vendor,
+        model: spec.model,
+        enabled: true,
+        available: spec.available,
+        status,
+        capabilities: spec.capabilities,
+        dataPolicy: spec.allowsSensitiveData ? 'SENSITIVE_ALLOWED' : 'NO_SENSITIVE',
+        costClass: spec.costClass,
+        latencyClass: spec.latencyClass,
+        health: {
+          successRate,
+          samples,
+          lastSuccess: outcome?.lastSuccess,
+          lastFailure: outcome?.lastFailure
+        }
+      };
+    });
   }
 
   /** Capability Scoreによる動的選択。preferred → fallback の順に評価する */

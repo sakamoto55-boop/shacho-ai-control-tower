@@ -221,6 +221,49 @@ Phase A/B0の決定論エンジン・Canonical Model・Source Adapter・RBAC・E
 - **銀行・会計（§18）**: 実測でも該当ソース未特定のためUNKNOWN維持。資金繰り回答は
   「銀行残高未接続のため完全な資金予測ではない」旨を明示し続ける。
 
+## Phase B1.5（Live Beta Activation Preparation）の状態
+
+- **Sheets認証（§1）**: 本番標準はService Account + `spreadsheets.readonly`（`sources/googleSheets.ts` の
+  `ServiceAccountTokenProvider`。RS256 JWT自前署名・トークンキャッシュ・スコープ固定）。対象シートのみ
+  閲覧者共有の最小権限方式。API Keyは非公開業務シートの本番認証に使わない。設定は
+  `GOOGLE_SERVICE_ACCOUNT_JSON` / `GOOGLE_SERVICE_ACCOUNT_FILE`（envのみ・Git/ログ露出禁止）。
+- **配置・日報の再調査完了（§5-§7）**: 実運用は物理ホワイトボード→毎日写真→AI読み取りで
+  「日報データ（AI読み取り）」シート（`19nu2Kzpr…`）へドラフト起票（工数・AI信頼度・確認ステータス・確定列）。
+  配置板DBの運用タブが空の原因は「デジタル配置板構築済み・未稼働」。詳細は `REAL_DATA_SOURCE_MAP.md` §6。
+  確定（✔）行のみを実績として扱い、予定配置を実績人工に使わない（§8）。未確定の間は LABOR_ACTUAL = UNKNOWN。
+- **Data Gap Registry（§9-§10）**: `domain/dataGaps.ts` + `GET /command/data-gaps`。DG-001（日報正本）〜
+  DG-007（目標未承認）をEvidence・capabilityImpact付きで管理。銀行・会計はUNKNOWNのまま登録
+  （Current Cash Confidence = UNKNOWN → 30/60/90予測 = INCOMPLETE を明示）。
+- **Target Registry（§11-§15）**: `targets/targetRegistry.ts` + `GET/POST /command/targets` +
+  `POST /command/targets/:id/approve`。目標のコード直書き禁止。発見値はCANDIDATEのみ、
+  ACTIVE化はPRESIDENT/EXECUTIVEの承認のみ。同一metric×期間の旧TargetはSUPERSEDEDで履歴保持。
+  数値の正はRegistry、Memory側には承認Decision（CONFIRMED_BY_USER）を残す。
+- **Capability Matrix（§16-§17）**: `domain/capability.ts` + `GET /command/capabilities` + `CAPABILITY_MATRIX.md`。
+  ANSWERABLE/PARTIAL/NOT_ANSWERABLEをデータ実態から判定し、不足データと接続後にできることを明示する。
+- **Provider Configuration（§3-§4）**: `agents/providerRegistry.ts` の `describe()`。API Key未設定は
+  NOT_CONFIGUREDの正常状態（全体をエラーにしない）。health（successRate/lastSuccess/lastFailure）付き。
+  AnthropicはProvider Registry上の最初の実Providerであり、Role→Capability→Providerの3層は不変。
+- **Visual Event Bus / AI CORE（§18-§21・§28）**: `events/eventBus.ts`（22イベント型・リングバッファ・subscribe）
+  + `GET /command/events` / `GET /command/core-state`。AgentTraceからROLE_STARTED/COMPLETEDを発行し、
+  UIにはRole（displayLabel日本語）のみ露出（Provider名・機微情報・本文はEventへ流さない）。
+  AI CORE状態（IDLE〜ERROR、primaryState + activeRoles[]）を導出。
+- **Generative UI Schema（§23-§25）**: `domain/uiSchema.ts`。17コンポーネント型 + Suggested Actions
+  （根拠を見る/反対意見/類似事例/覚えて/訂正…を文脈で動的生成）。`POST /command/chat` 応答へ `ui` を追加
+  （既存フィールドは互換維持）。AIの自由HTML生成はしない。
+- **Real Evaluation Harness（§29-§30）**: `evaluation/realEval.ts` + `npm run command:real-eval`。
+  Synthetic評価と分離し、answerable/correct/evidencePresent/freshness/confidence/hallucination/latencyを記録。
+  Hallucination Gate（存在しない案件・顧客・金額・Decisionを質問→「確認できません」を返すこと）は
+  デモFixture上でも常時テストされる（`tests/command/b1/phaseB15.test.ts`）。
+- **Beta Gate（§31-§32）**: Service Account接続・全量Sanity PASS・実LLM 1つ以上・100問Real Evaluationが
+  未達のため、LIVE READ-ONLY BETA READYは未宣言。ただし配置/日報・銀行/会計の未接続はBeta阻害条件にしない
+  （該当CapabilityのみPARTIAL/NOT_AVAILABLE明示で段階開放）。
+
+### 次Phase: Phase VUI（LCC COMMAND Visual Intelligence Interface）
+
+粒子AI CORE（Event Busの状態と同期）・Agent Activity可視化・Voice会話・Generative UI描画・
+レスポンシブ・Memory/Evidence/Approval UI・Proactive AIを実装する。
+本Phaseで用意したEvent Bus / AI CORE State / UI Schema / AgentTraceをそのまま利用できる。
+
 ## フェーズ計画
 
 - **Phase A（本実装）**: 会話コア＋決定論エンジン＋承認フロー＋Brief＋UI＋RBAC/セキュリティ。読み取り正本はDemo Fixture（demoモード限定）。実行は全てdry-run。

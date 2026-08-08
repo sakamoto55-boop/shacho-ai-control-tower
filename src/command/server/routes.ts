@@ -49,6 +49,12 @@ import {
 } from '../auth/googleIdentity.js';
 import { ObservabilityLog } from '../observability/observability.js';
 import { createLlmHooksFromEnv, type LlmHooks } from '../ai/llmHooks.js';
+import { CommandEventBus } from '../events/eventBus.js';
+import { buildUiResponse } from '../domain/uiSchema.js';
+import { DATA_GAPS } from '../domain/dataGaps.js';
+import { assessCapabilities } from '../domain/capability.js';
+import { createDefaultRegistry } from '../agents/providerRegistry.js';
+import { TargetRegistryService, type NewTargetInput } from '../targets/targetRegistry.js';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -66,6 +72,8 @@ export interface CommandAppOptions {
   observabilityLog?: ObservabilityLog;
   /** Phase B1: LLMフックの注入（テスト用。未指定時はANTHROPIC_API_KEYから自動生成） */
   llmHooks?: LlmHooks;
+  /** Phase VUI用Event Bus（未指定時は自動生成） */
+  eventBus?: CommandEventBus;
 }
 
 export type CommandApp = Hono<{ Variables: { principal: Principal } }>;
@@ -87,12 +95,16 @@ export function createCommandApp(
   const app = new Hono<{ Variables: { principal: Principal } }>();
   const observability = options.observabilityLog ?? new ObservabilityLog();
   const llmHooks = options.llmHooks ?? createLlmHooksFromEnv();
+  const eventBus = options.eventBus ?? new CommandEventBus();
   const orchestrator = new CommandOrchestrator(repository, {
     curatorExtractor: llmHooks.curatorExtractor,
     criticAdvisor: llmHooks.criticAdvisor,
-    observability
+    observability,
+    eventBus
   });
   const memoryService = new MemoryService(repository);
+  const targetService = new TargetRegistryService(repository);
+  const providerRegistry = createDefaultRegistry();
 
   // --- Principal解決 + Rate Limit（全ルート共通） ---
   app.use('*', async (c, next) => {
@@ -160,7 +172,8 @@ export function createCommandApp(
         detail: message,
         outcome: 'ok'
       });
-      return c.json(response);
+      // Generative UI Schema（§23-§24）。既存フィールドは互換のまま ui を追加
+      return c.json({ ...response, ui: buildUiResponse(response) });
     } catch (error) {
       await audit.record({
         actor: principal.label,
@@ -633,6 +646,141 @@ export function createCommandApp(
       return handleError(c, error);
     }
   });
+
+  // --- Phase B1.5: Data Gap / Capability / Provider / Target / Visual Event ---
+
+  app.get('/data-gaps', (c) => c.json({ gaps: DATA_GAPS }));
+
+  app.get('/capabilities', async (c) => {
+    try {
+      const { dataset } = await scopedDataset(c);
+      return c.json({ capabilities: assessCapabilities(dataset) });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  app.get('/providers', (c) => {
+    const principal = c.get('principal');
+    if (!canDecideApproval(principal)) {
+      return c.json({ error: `ロール${principal.role}はProvider設定を参照できません` }, 403);
+    }
+    return c.json({ providers: providerRegistry.describe() });
+  });
+
+  app.get('/targets', async (c) => {
+    try {
+      return c.json({ targets: await targetService.list() });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // 発見・提案された目標はCANDIDATEとしてのみ登録できる（§13）
+  app.post('/targets', async (c) => {
+    const principal = c.get('principal');
+    try {
+      const body = (await c.req.json()) as Partial<NewTargetInput>;
+      if (
+        !body.companyId ||
+        !body.metric ||
+        !body.periodStart ||
+        !body.periodEnd ||
+        typeof body.value !== 'number'
+      ) {
+        throw new ValidationError('companyId / metric / periodStart / periodEnd / value は必須です');
+      }
+      const now = nowIso();
+      const record = await targetService.registerCandidate(
+        {
+          companyId: body.companyId,
+          departmentId: body.departmentId ?? 'all',
+          metric: body.metric,
+          periodType: body.periodType ?? 'MONTH',
+          periodStart: body.periodStart,
+          periodEnd: body.periodEnd,
+          value: body.value,
+          unit: body.unit ?? 'JPY',
+          source: body.source ?? `API登録（${principal.label}）`,
+          validFrom: body.validFrom ?? now.slice(0, 10),
+          validUntil: body.validUntil,
+          notes: body.notes
+        },
+        now
+      );
+      await audit.record({
+        actor: principal.label,
+        role: principal.role,
+        action: 'target_candidate',
+        scope: body.companyId,
+        detail: `${body.metric} ${body.value}`,
+        outcome: 'ok'
+      });
+      return c.json(record, 201);
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // ユーザー承認でのみACTIVE化（§14）。旧TargetはSUPERSEDEDで履歴保持。Decision Memoryも残す（§15）
+  app.post('/targets/:id/approve', async (c) => {
+    const principal = c.get('principal');
+    try {
+      const now = nowIso();
+      const approved = await targetService.approve(c.req.param('id'), principal, now);
+      try {
+        await memoryService.save(
+          {
+            type: 'DECISION',
+            statement: `経営目標を承認: ${approved.metric} ${approved.value}${approved.unit === 'PERCENT' ? '%' : approved.unit === 'COUNT' ? '件' : '円'}（${approved.periodStart}〜${approved.periodEnd} / ${approved.departmentId}）`,
+            entities: [],
+            relations: [],
+            layer: 'PRESIDENT',
+            sensitivity: 'NORMAL',
+            companyId: approved.companyId,
+            source: 'SYSTEM',
+            sourceId: approved.targetId,
+            sourceTimestamp: now,
+            validFrom: approved.validFrom,
+            validUntil: approved.validUntil,
+            confidence: 'CONFIRMED',
+            createdBy: `user:${principal.label}`,
+            reviewStatus: 'CONFIRMED_BY_USER',
+            evidence: [
+              {
+                label: 'Target Registry',
+                value: approved.targetId,
+                source: 'Target Registry',
+                asOf: now
+              }
+            ]
+          },
+          now
+        );
+      } catch {
+        // Decision Memory保存失敗でもTarget承認自体は成立させる（Registryが正）
+      }
+      await audit.record({
+        actor: principal.label,
+        role: principal.role,
+        action: 'target_approve',
+        scope: approved.companyId,
+        detail: approved.targetId,
+        outcome: 'ok'
+      });
+      return c.json(approved);
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  app.get('/events', (c) => {
+    const limitRaw = Number(c.req.query('limit') ?? 100);
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 500) : 100;
+    return c.json({ events: eventBus.recent(limit) });
+  });
+
+  app.get('/core-state', (c) => c.json(eventBus.coreState()));
 
   app.get('/sources', async (c) => {
     // Source別の接続状態（lastSuccessfulSync / freshness / errorState）を公開する
