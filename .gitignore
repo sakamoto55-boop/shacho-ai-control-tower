@@ -10,3 +10,4 @@ data/*.jsonl
 *.log
 .DS_Store
 data/snapshots/
+data/artifacts/
