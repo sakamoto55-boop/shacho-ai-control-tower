@@ -163,6 +163,38 @@ Phase A/B0の決定論エンジン・Canonical Model・Source Adapter・RBAC・E
 - **Nightly Maintenance** `GET /command/memory/maintenance`: 期限切れDECISIONのEXPIRED遷移（機械的ルールのみ自動）、未検証仮説・確認待ち・重複・矛盾・Archive候補の報告、Proactive Problem Discovery（複数案件に共通する原価超過パターン等）。
 - **API**: `GET /command/memory`（検索・時間軸・RBAC）、`POST /command/memory/:id/confirm|archive`、`POST /command/memory/conflicts/resolve`、`GET/POST /command/experiments`、`POST /command/experiments/:id/result`。
 
+## Phase N（Multi-Agent Role Orchestration / Critic / Adaptive Intelligence）の状態
+
+- **Role抽象化（§1）**: `agents/roles.ts`。13 Role（STRATEGY〜SYNTHESIS）を責務として定義し、
+  Role→Required Capability→Provider/Model/Toolの3層。モデル名を業務Roleにしない。
+- **Provider Registry（§6-8）**: `agents/providerRegistry.ts`。Capability/Cost/Latency/Reliability/
+  実績成功率でスコアリングして動的選択。未設定Providerでも全体停止しない。障害時はFallbackするが、
+  Data Policy（機微データ）を満たせない切替は拒否して説明する。ManusはRoleでなくProvider候補（§39）。
+- **Role Router / Task Plan（§3-5）**: `agents/rolePlanner.ts`。入力をIntent/Complexity/Risk/
+  内外データ要否/推論深度/機密/緊急度で評価し、必要な場合のみ複数RoleのPlan
+  （並列: ANALYSIS・MEMORY・RESEARCH → STRATEGY/FINANCE → CRITIC → SYNTHESIS）を構成。
+  LLM同士の自由議論は禁止（構造化Task結果のみ）。Budget: LOW/NORMAL/DEEP（「徹底的に」で昇格・§34-35）。
+- **Critic（§9-11）**: `agents/critic.ts`。高リスク・検証要求・矛盾・複数Agent結論でのみ起動。
+  根拠なし数値・推測混在・Decision矛盾・リスク/別案欠落をissues[]で返し、答えは書き換えない。
+  Devil's Advocate（「別の見方は？」「反対意見は？」）対応。
+- **Synthesis（§12-13）**: 【結論】→【確認できた事実】→【分析】→【リスク】→【別案】→【推奨】→
+  【次にやること】へ統合。Preference Memory/「簡潔に」で圧縮。内部Role名・Provider名は非露出（§30）。
+- **Correction Impact（§14-17）**: `agents/correctionImpact.ts`。訂正時にEntity起点で影響案件・見積・
+  指標・関連記憶を探索し報告（数値は書き換えない）。単価変更等はActive Clarification構造
+  （確認できたこと/不明/なぜ重要/選択肢/推奨）で「正式決定ですか？」と確認質問する。
+- **Innovation v2（§18-21）**: 15アプローチ軸、First Principlesモード、制約のREAL/POLICY/HABIT/
+  ASSUMPTION分類（法令は無視しない）、他業界アナロジー（一般知識と明示）、「もっと大胆に」で10倍案。
+- **Insight Ranking / 問いの提案（§22-24）**: Impact/Urgency/Confidence/Actionabilityで採点し
+  低価値Insightは出さない。Strategic Question（比較しますか？）は提案のみでDecisionを変更しない。
+- **Playbook / Principle（§26-28）**: 複数LESSONの共通パターン→PLAYBOOK候補、確定Decisionの一貫
+  傾向→PRINCIPLE候補。いずれもPENDING_REVIEWで、AIは自動的に正式ルール化できない（store側で強制）。
+- **Observability（§33）**: AgentTraceLog（Plan/Role/Provider/latency/成否/Fallback/根拠数）。
+  Plan応答の`data.trace`に添付。
+- **会話（§41）**: 「それ覚えておいて」「いや、今のなし」「さっきのを正式方針にする」
+  「それで影響するところある？」「もっと大胆に」「その案のリスクは？」「間違いない？」等の連続会話が成立。
+- **Evaluation（§40）**: 100問データセット（17カテゴリ、`tests/command/nphase/evaluation.test.ts`）。
+  Synthetic Fixture評価。B0完了後に実データ評価へ置換する。
+
 ## フェーズ計画
 
 - **Phase A（本実装）**: 会話コア＋決定論エンジン＋承認フロー＋Brief＋UI＋RBAC/セキュリティ。読み取り正本はDemo Fixture（demoモード限定）。実行は全てdry-run。

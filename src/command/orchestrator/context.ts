@@ -30,6 +30,8 @@ export type IntentKey =
   | 'memory_audit'
   | 'decision_review'
   | 'ideation'
+  | 'plan'
+  | 'critic'
   | 'general'
   | 'unknown';
 
@@ -53,6 +55,10 @@ export interface ConversationContext {
   lastDraft: { text: string; customerName: string; customerId?: string; projectId?: string } | null;
   /** 直前に提示・参照したMemory（「それ違う」「それどこから？」の解決に使う） */
   lastMemoryIds: string[];
+  /** 直前の回答本文（Critic・反対意見の対象。600文字まで） */
+  lastText: string;
+  /** 直前のInnovation提案（「もっと大胆に」「その案のリスクは？」用） */
+  lastProposal: { problem: string } | null;
   lastEvidence: Evidence[];
   lastConfidence: DataConfidence;
   updatedAtMs: number;
@@ -72,6 +78,8 @@ export function emptyContext(sessionId: string, scope: CompanyScope): Conversati
     lastListShown: 0,
     lastDraft: null,
     lastMemoryIds: [],
+    lastText: '',
+    lastProposal: null,
     lastEvidence: [],
     lastConfidence: 'UNKNOWN',
     updatedAtMs: Date.now()

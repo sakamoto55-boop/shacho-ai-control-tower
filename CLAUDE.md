@@ -79,6 +79,14 @@ HTTPリクエスト (src/server.ts, Hono)
 - PRESIDENT層・SENSITIVE_REFのRBACは `MemoryService.search` が強制する。検索を経由せず全件を返すAPIを追加しない。
 - 汎用推論（`ai/generalReasoner.ts`）へ渡してよい社内事実はTool/Memory由来のみ。
 
+### Multi-Agent層（src/command/agents/ — Phase N）
+
+- Role（13種）は責務でありモデル名ではない。Role→Capability→Providerの3層を崩さない（`agents/roles.ts`）。
+- Providerの動的選択は `agents/providerRegistry.ts`。機微データを渡せないProviderへのFallbackは拒否される（Data Policy）。この判定を迂回しない。
+- 複数Role Planは外部調査要否・DEEP要求時のみ（Cost Guardrail）。通常会話を無闇にPlan化しない。
+- Criticは答えを書き換えずissuesを返す。SYNTHESISの回答構造（結論→事実→分析→リスク→別案→推奨→次）を維持する。
+- 内部Role名・Provider名をユーザー向け回答テキストへ露出しない。
+
 ### docs/ のLCC業務アプリ（APIとは独立）
 
 `docs/` にはGitHub Pages公開用の単一HTML完結アプリ（LCC統合見積システム `lcc.html`、原価管理 `lcc-cost.html`、ポータル `index.html`）がある。Vue3 + Tailwind をCDN読み込みし、ビルドツール不使用。ルートの `lcc-redesigned.html` はその開発版。これらは `src/` のAPIとは独立しており、npmビルド・テストの対象外。

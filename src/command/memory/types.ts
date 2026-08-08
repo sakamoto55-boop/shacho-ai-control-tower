@@ -23,6 +23,7 @@ export type MemoryType =
   | 'EXPERIMENT'
   | 'RESULT'
   | 'COMMITMENT'
+  | 'PLAYBOOK'
   | 'CONTEXT';
 
 /** 削除ではなく状態遷移で履歴を保持する */
@@ -155,6 +156,9 @@ export interface ExperimentRecord {
   startedAt: string;
   plannedEndAt?: string;
   status: 'PLANNED' | 'RUNNING' | 'AWAITING_RESULT' | 'COMPLETED' | 'ABORTED';
+  owner?: string;
+  /** 現在値（Portfolio表示用。任意更新） */
+  current?: string;
   result?: string;
   evaluation?: string;
   lessonMemoryId?: string;

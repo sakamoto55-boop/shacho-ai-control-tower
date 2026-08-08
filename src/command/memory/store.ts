@@ -103,6 +103,15 @@ export class MemoryService {
     if (input.type === 'DECISION' && aiCreated && input.reviewStatus !== 'PENDING_REVIEW') {
       throw new LearningSafetyError('AIは正式Decisionを独断で確定できません（PENDING_REVIEW必須）');
     }
+    if (
+      (input.type === 'PLAYBOOK' || input.type === 'PRINCIPLE') &&
+      aiCreated &&
+      input.reviewStatus !== 'PENDING_REVIEW'
+    ) {
+      throw new LearningSafetyError(
+        `AIは${input.type}を自動的に正式ルール化できません（候補=PENDING_REVIEWとして提示し、ユーザー承認で格上げ）`
+      );
+    }
     if (input.sensitivity === 'NORMAL' && containsSensitiveContent(input.statement)) {
       throw new LearningSafetyError(
         '高機密情報（給与・口座・個人情報等）は一般Memoryへ複製できません。SENSITIVE_REFとして参照のみ保存してください'

@@ -47,6 +47,11 @@ import { curateConversationTurn, detectCorrection, extractEntities } from '../me
 import { classifyConversation } from './universalRouter.js';
 import { buildInnovationProposal, formatInnovationProposal } from '../memory/innovation.js';
 import { GeneralReasoner, createGeneralRouter } from '../ai/generalReasoner.js';
+import { assessInput, buildPlan } from '../agents/rolePlanner.js';
+import { AgentTraceLog, PlanExecutor } from '../agents/executor.js';
+import { createDefaultRegistry } from '../agents/providerRegistry.js';
+import { devilsAdvocate, reviewAnswer } from '../agents/critic.js';
+import { analyzeCorrectionImpact, formatImpactReport } from '../agents/correctionImpact.js';
 
 /** 無制限ループ禁止のための上限。1リクエストで超えたら打ち切る */
 export const ORCHESTRATOR_LIMITS = {
@@ -101,6 +106,7 @@ interface HandlerResult {
   listShown?: number;
   draft?: ConversationContext['lastDraft'];
   memoryIds?: string[];
+  proposal?: { problem: string } | null;
 }
 
 interface ExecutionState {
@@ -114,9 +120,23 @@ export class CommandOrchestrator {
   private readonly memoryService: MemoryService;
   private readonly reasoner: GeneralReasoner;
 
+  private readonly traceLog = new AgentTraceLog();
+  private readonly executor: PlanExecutor;
+
   constructor(private readonly repository: CommandRepository) {
     this.memoryService = new MemoryService(repository);
     this.reasoner = new GeneralReasoner(createGeneralRouter());
+    this.executor = new PlanExecutor(
+      createDefaultRegistry(),
+      this.memoryService,
+      this.reasoner,
+      this.traceLog
+    );
+  }
+
+  /** Agent Observability: なぜこの回答になったかを追跡する記録 */
+  getAgentTraces(limit = 50) {
+    return this.traceLog.recent(limit);
   }
 
   async chat(
@@ -229,6 +249,43 @@ export class CommandOrchestrator {
     const followUp = await this.tryFollowUp(ctx, message, context, principal, state, dataStatus);
     if (followUp) return followUp;
 
+    // --- Multi-Agent Plan（戦略×調査×財務など。通常会話は単独処理 = Cost Guardrail） ---
+    const assessment = assessInput(message);
+    const plan = buildPlan(message, assessment);
+    if (plan) return this.handlePlan(ctx, message, plan, principal, dataStatus);
+
+    // --- Phase N 会話（記憶操作・検証・影響） ---
+    if (/覚えておいて|覚えといて/.test(message)) {
+      return this.handleRememberThis(ctx, message, context, principal, dataStatus);
+    }
+    if (/今の(は)?なし|取り消し|やっぱりなし/.test(message) && context.lastMemoryIds.length > 0) {
+      return this.handleUndoMemory(ctx, context, dataStatus);
+    }
+    if (/正式(方針|決定)に(する|して)/.test(message) && context.lastMemoryIds.length > 0) {
+      return this.handlePromoteDecision(ctx, context, principal, dataStatus);
+    }
+    if (/影響(する|ある)(ところ|の)|どこに影響/.test(message) && context.lastMemoryIds.length > 0) {
+      return this.handleImpactQuery(ctx, context, dataStatus);
+    }
+    if (/もっと大胆/.test(message)) {
+      return this.handleInnovation(
+        ctx,
+        context.lastProposal?.problem ?? message,
+        principal,
+        dataStatus,
+        { bold: true }
+      );
+    }
+    if (/その案.{0,6}リスク|案のリスク/.test(message) && context.lastProposal) {
+      return this.handleProposalRisk(ctx, context, dataStatus);
+    }
+    if (/別の見方|反対意見|間違いない/.test(message)) {
+      return this.handleDevilsAdvocate(ctx, context, principal, dataStatus);
+    }
+    if (/結果どうだった|実験.{0,4}結果/.test(message)) {
+      return this.handleExperimentStatus(ctx, dataStatus);
+    }
+
     // --- Persistent Memory（訂正・想起・監査・判断レビュー） ---
     if (detectCorrection(message).isCorrection && context.lastMemoryIds.length > 0) {
       return this.handleCorrection(ctx, message, context, principal, dataStatus);
@@ -239,7 +296,11 @@ export class CommandOrchestrator {
     if (/今も正しい|まだ有効/.test(message) && context.lastMemoryIds.length > 0) {
       return this.handleDecisionReview(ctx, context, dataStatus);
     }
-    if (/前に|以前|昨日の話|この間|何だっけ|言ってた|覚えて/.test(message)) {
+    if (
+      /(^|[、。\s])(前に|以前)|^前に|昨日の話|この間|何だっけ|言ってた|覚えてる|覚えている/.test(
+        message
+      )
+    ) {
       return this.handleMemoryRecall(ctx, message, context, principal, dataStatus);
     }
     if (
@@ -247,7 +308,9 @@ export class CommandOrchestrator {
         message
       )
     ) {
-      return this.handleInnovation(ctx, message, principal, dataStatus);
+      return this.handleInnovation(ctx, message, principal, dataStatus, {
+        firstPrinciples: /そもそも|根本から|ゼロから/.test(message)
+      });
     }
 
     // --- Write系（下書き→承認） ---
@@ -257,8 +320,9 @@ export class CommandOrchestrator {
       return this.handleDraft(ctx, message, context, principal, dataStatus);
     }
     if (
-      /(調べて|調査して|使える？|使えますか)/.test(message) &&
-      /(会社|制度|法律|法令|補助金|競合|市場|業界|相場|自治体)/.test(message)
+      (/(調べて|調査して|使える？|使えますか)/.test(message) &&
+        /(会社|制度|法律|法令|補助金|競合|市場|業界|相場|自治体)/.test(message)) ||
+      /調べて$/.test(message)
     ) {
       return this.handleResearch(ctx, message, principal, dataStatus);
     }
@@ -284,7 +348,8 @@ export class CommandOrchestrator {
       return this.runIntent('today', ctx, dataStatus);
     if (/来月|仕事.{0,4}足り|パイプライン|見込み案件/.test(message))
       return this.runIntent('pipeline', ctx, dataStatus);
-    if (/現金|資金|キャッシュ/.test(message)) return this.runIntent('cash', ctx, dataStatus);
+    if (/現金|資金|キャッシュ|銀行残高/.test(message))
+      return this.runIntent('cash', ctx, dataStatus);
 
     const project = findProject(ctx.dataset, message);
     if (project && /なぜ|why|利益|粗利|原価/.test(message))
@@ -414,7 +479,7 @@ export class CommandOrchestrator {
     }
 
     // 「なぜ利益落ちた？」「なぜ？」
-    if (/なぜ(利益|粗利|落ち|悪)|^なぜ？?$/.test(message) && contextProject) {
+    if (/なぜ(利益|粗利|落ち|悪)|^(なぜ|なんで)？?$/.test(message) && contextProject) {
       return this.handleMarginWhy(ctx, contextProject, dataStatus);
     }
 
@@ -435,7 +500,7 @@ export class CommandOrchestrator {
     }
 
     // 「どうすればいい？」「対策は？」
-    if (/どうすれば|対策(は|ある)|どうしたら/.test(message)) {
+    if (/どうすれば|対策(は|ある)|どうしたら|どうする？?$/.test(message)) {
       return this.handleAdvice(ctx, message, context, dataStatus);
     }
 
@@ -476,7 +541,7 @@ export class CommandOrchestrator {
     }
 
     // 「根拠は？」
-    if (/根拠(は|を|ある)/.test(message)) {
+    if (/根拠(は|を|ある|見せ|教え)/.test(message)) {
       if (context.lastEvidence.length === 0) {
         return this.simpleText(
           '直前の回答に紐づく根拠データがありません。',
@@ -1796,12 +1861,17 @@ export class CommandOrchestrator {
       message.slice(0, 80),
       mode
     );
+    // Correction Impact: 修正で影響する案件・見積・指標・記憶を探索して報告する
+    const allMemories = await this.repository.getMemories();
+    const impact = analyzeCorrectionImpact(ctx.dataset, target, newContent, allMemories);
+    const impactLines = formatImpactReport(impact);
     return {
       response: {
         text: [
           '記憶を更新しました（履歴は保持しています）。',
           `旧: ${target.statement}（${mode}）`,
-          `新: ${replacement.statement}（${replacement.validFrom}〜 / ACTIVE）`
+          `新: ${replacement.statement}（${replacement.validFrom}〜 / ACTIVE）`,
+          ...(impactLines.length > 0 ? ['', ...impactLines] : [])
         ].join('\n'),
         dataStatus,
         uiHint: 'text',
@@ -1994,7 +2064,8 @@ export class CommandOrchestrator {
     ctx: ToolContext,
     message: string,
     principal: Principal,
-    dataStatus: DataStatus
+    dataStatus: DataStatus,
+    mode: { bold?: boolean; firstPrinciples?: boolean } = {}
   ): Promise<HandlerResult> {
     const related = await this.memoryService.search(
       { q: message, includeInactive: false, limit: 5 },
@@ -2006,7 +2077,14 @@ export class CommandOrchestrator {
     );
     const concise =
       /簡潔|短く|要点だけ/.test(message) || preferences.some((m) => /簡潔|短く/.test(m.statement));
-    const proposal = buildInnovationProposal(ctx.dataset, ctx.scope, message, related, concise);
+    const proposal = buildInnovationProposal(
+      ctx.dataset,
+      ctx.scope,
+      message,
+      related,
+      concise,
+      mode
+    );
     return {
       response: {
         text: formatInnovationProposal(proposal, concise),
@@ -2017,7 +2095,8 @@ export class CommandOrchestrator {
         evidence: [],
         toolsUsed: ['innovation_engine', 'memory_search']
       },
-      intent: 'ideation'
+      intent: 'ideation',
+      proposal: { problem: message }
     };
   }
 
@@ -2064,6 +2143,349 @@ export class CommandOrchestrator {
     };
   }
 
+  // ------------------------------------------------------------------
+  // Phase N: Multi-Agent Plan / Critic / Impact / 会話操作
+  // ------------------------------------------------------------------
+
+  private async handlePlan(
+    ctx: ToolContext,
+    message: string,
+    plan: NonNullable<ReturnType<typeof buildPlan>>,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    // §30: 内部Role名はユーザーへ露出しない自然な前置き
+    const preferences = await this.memoryService.search(
+      { type: 'PREFERENCE', limit: 5 },
+      principal
+    );
+    const concise =
+      /簡潔|短く|要点だけ/.test(message) || preferences.some((m) => /簡潔|短く/.test(m.statement));
+    const outcome = await this.executor.execute(plan, ctx, principal, concise);
+    const intro = '確認しました。社内データ・過去の判断・資金面を見ています。';
+    return {
+      response: {
+        text: `${intro}\n\n${outcome.synthesisText}`,
+        dataStatus,
+        uiHint: 'text',
+        data: {
+          planId: plan.planId,
+          budget: plan.budget,
+          taskCount: plan.tasks.length,
+          criticIssues: outcome.criticIssues,
+          trace: this.traceLog.forPlan(plan.planId)
+        },
+        confidence: 'MEDIUM',
+        evidence: outcome.evidence,
+        toolsUsed: ['agent_plan']
+      },
+      intent: 'plan'
+    };
+  }
+
+  private async handleRememberThis(
+    ctx: ToolContext,
+    message: string,
+    context: ConversationContext,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const explicit = message.replace(/それ|これ|を?覚えておいて|覚えといて|。/g, '').trim();
+    const statement =
+      explicit.length >= 4 ? explicit : context.lastText.split('\n')[0]?.slice(0, 120);
+    if (!statement) {
+      return this.simpleText(
+        '覚える内容を特定できませんでした。内容を添えて指示してください。',
+        'memory_recall',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    try {
+      const saved = await this.memoryService.save(
+        {
+          type: 'CONTEXT',
+          statement,
+          entities: extractEntities(ctx.dataset, statement),
+          relations: [],
+          layer: 'PRESIDENT',
+          sensitivity: 'NORMAL',
+          companyId:
+            ctx.scope === 'group' ? (ctx.dataset.companies[0]?.companyId ?? 'group') : ctx.scope,
+          source: 'CONVERSATION',
+          sourceId: context.sessionId,
+          sourceTimestamp: ctx.dataset.asOf,
+          validFrom: ctx.dataset.asOf.slice(0, 10),
+          confidence: 'HIGH',
+          createdBy: `user:${principal.label}`,
+          reviewStatus: 'CONFIRMED_BY_USER',
+          evidence: [
+            {
+              label: '指示',
+              value: message.slice(0, 120),
+              source: `会話（${principal.label}）`,
+              asOf: ctx.dataset.asOf
+            }
+          ]
+        },
+        ctx.dataset.asOf
+      );
+      return {
+        response: {
+          text: `覚えました: 「${saved.record.statement}」`,
+          dataStatus,
+          uiHint: 'text',
+          confidence: 'HIGH',
+          evidence: [],
+          toolsUsed: ['memory_save']
+        },
+        intent: 'memory_recall',
+        memoryIds: [saved.record.memoryId]
+      };
+    } catch (error) {
+      return this.simpleText(
+        `この内容は記憶できません: ${error instanceof Error ? error.message : String(error)}`,
+        'memory_recall',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+  }
+
+  private async handleUndoMemory(
+    ctx: ToolContext,
+    context: ConversationContext,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const targetId = context.lastMemoryIds[0];
+    try {
+      const archived = await this.memoryService.archive(targetId, ctx.dataset.asOf);
+      return {
+        response: {
+          text: `取り消しました（「${archived.statement}」をARCHIVED。履歴は保持しています）。`,
+          dataStatus,
+          uiHint: 'text',
+          confidence: 'HIGH',
+          evidence: [],
+          toolsUsed: ['memory_archive']
+        },
+        intent: 'memory_recall',
+        memoryIds: []
+      };
+    } catch {
+      return this.simpleText(
+        '取り消す対象の記憶を特定できませんでした。',
+        'memory_recall',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+  }
+
+  private async handlePromoteDecision(
+    ctx: ToolContext,
+    context: ConversationContext,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    if (!canRequestWrite(principal) || !['PRESIDENT', 'EXECUTIVE'].includes(principal.role)) {
+      return this.simpleText(
+        `ロール${principal.role}は正式方針の確定ができません。`,
+        'decision_review',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    const memories = await this.repository.getMemories();
+    const target = memories.find((m) => m.memoryId === context.lastMemoryIds[0]);
+    if (!target) {
+      return this.simpleText(
+        '正式化する対象の記憶を特定できませんでした。',
+        'decision_review',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    target.type = 'DECISION';
+    target.reviewStatus = 'CONFIRMED_BY_USER';
+    target.confidence = 'CONFIRMED';
+    target.layer = 'PRESIDENT';
+    target.updatedAt = ctx.dataset.asOf;
+    await this.repository.saveMemory(target);
+    const impact = analyzeCorrectionImpact(ctx.dataset, target, null, memories);
+    const impactLines = formatImpactReport(impact);
+    return {
+      response: {
+        text: [
+          `正式方針として確定しました: 「${target.statement}」（DECISION / CONFIRMED）`,
+          ...(impactLines.length > 0 ? ['', ...impactLines] : [])
+        ].join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        confidence: 'HIGH',
+        evidence: target.evidence.slice(0, 3),
+        toolsUsed: ['memory_confirm']
+      },
+      intent: 'decision_review',
+      memoryIds: [target.memoryId]
+    };
+  }
+
+  private async handleImpactQuery(
+    ctx: ToolContext,
+    context: ConversationContext,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const memories = await this.repository.getMemories();
+    const target = memories.find((m) => m.memoryId === context.lastMemoryIds[0]);
+    if (!target) {
+      return this.simpleText(
+        '影響範囲を調べる対象を特定できませんでした。',
+        'memory_recall',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    const impact = analyzeCorrectionImpact(ctx.dataset, target, null, memories);
+    const lines = formatImpactReport(impact);
+    return {
+      response: {
+        text:
+          lines.length > 0
+            ? [`「${target.statement}」の影響範囲:`, ...lines].join('\n')
+            : `「${target.statement}」について、現在のデータで直接影響する案件・見積は見つかりませんでした。`,
+        dataStatus,
+        uiHint: 'text',
+        data: impact,
+        confidence: 'MEDIUM',
+        evidence: [],
+        toolsUsed: ['impact_analysis']
+      },
+      intent: 'memory_recall',
+      memoryIds: context.lastMemoryIds
+    };
+  }
+
+  private async handleProposalRisk(
+    ctx: ToolContext,
+    context: ConversationContext,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const review = reviewAnswer(
+      {
+        text: context.lastText,
+        evidence: context.lastEvidence,
+        confidence: context.lastConfidence
+      },
+      await this.memoryService.search(
+        { type: 'DECISION', limit: 5 },
+        { role: 'PRESIDENT', companyIds: [], label: 'critic' }
+      ),
+      false
+    );
+    const lines = [
+      '直前の案のリスク:',
+      '・実行体制: 例外対応の設計が甘いと現場負荷が増える',
+      '・検知精度: 過検知が続くと通知が無視される',
+      '・移行期: 旧運用との二重管理が発生する',
+      ...(review.issues.length > 0 ? review.issues.map((i) => `・検証指摘: ${i.issue}`) : []),
+      '',
+      '対策: 最小テストで一致率・工数を測ってから拡大してください。'
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        confidence: 'MEDIUM',
+        evidence: [],
+        toolsUsed: ['critic']
+      },
+      intent: 'critic'
+    };
+  }
+
+  private async handleDevilsAdvocate(
+    ctx: ToolContext,
+    context: ConversationContext,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    if (!context.lastText) {
+      return this.simpleText('検証する直前の回答がありません。', 'critic', 'UNKNOWN', dataStatus);
+    }
+    const decisions = await this.memoryService.search({ type: 'DECISION', limit: 5 }, principal);
+    const review = reviewAnswer(
+      {
+        text: context.lastText,
+        evidence: context.lastEvidence,
+        confidence: context.lastConfidence
+      },
+      decisions,
+      false
+    );
+    const counters = devilsAdvocate(context.lastText.slice(0, 60), context.lastText.split('\n'));
+    const lines = [
+      '【反対側からの検証（Devil’s Advocate）】',
+      ...counters.map((c) => `・${c}`),
+      '',
+      review.issues.length > 0
+        ? `【検証で見つかった指摘 ${review.issues.length}件】`
+        : '【検証指摘】重大な問題は検出されませんでした（根拠と確信度は直前回答のとおり）',
+      ...review.issues.map((i) => `・[${i.severity}] ${i.issue} → ${i.recommendation}`),
+      '',
+      '※検証は回答を書き換えません。判断材料としてご利用ください。'
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: review,
+        confidence: 'MEDIUM',
+        evidence: [],
+        toolsUsed: ['critic']
+      },
+      intent: 'critic'
+    };
+  }
+
+  private async handleExperimentStatus(
+    ctx: ToolContext,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const experiments = await this.repository.getExperiments();
+    if (experiments.length === 0) {
+      return this.simpleText(
+        '登録されている実験はありません。改善案を「実験として登録」すると結果まで追跡します。',
+        'general',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    const lines = [
+      `実験ポートフォリオ（${experiments.length}件）:`,
+      ...experiments
+        .slice(-5)
+        .map(
+          (e) =>
+            `・${e.hypothesis}（${e.metric}: ${e.baseline} → ${e.result ?? e.current ?? '計測中'} / ${e.status}${e.evaluation ? ` / ${e.evaluation}` : ''}）`
+        )
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: { experiments },
+        confidence: 'HIGH',
+        evidence: [],
+        toolsUsed: ['experiments']
+      },
+      intent: 'general'
+    };
+  }
+
   private async handleUnknown(
     ctx: ToolContext,
     message: string,
@@ -2100,6 +2522,8 @@ export class CommandOrchestrator {
     }
     if (result.draft !== undefined) context.lastDraft = result.draft;
     if (result.memoryIds) context.lastMemoryIds = result.memoryIds;
+    if (result.proposal !== undefined) context.lastProposal = result.proposal;
+    context.lastText = result.response.text.slice(0, 600);
     context.lastEvidence = result.response.evidence;
     context.lastConfidence = result.response.confidence;
     this.contexts.save(context);
