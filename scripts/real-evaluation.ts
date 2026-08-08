@@ -7,17 +7,51 @@ import 'dotenv/config';
  * 評価は「実データ評価としては無効」である旨を明示して終了する。
  * 結果は data/real-eval-report.json（Git管理外のdata/配下）へ保存する。
  */
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { createCommandRepository } from '../src/command/repositories/CommandRepository.js';
 import { CommandOrchestrator } from '../src/command/orchestrator/orchestrator.js';
 import { datasetAvailability } from '../src/command/sources/SourceAdapter.js';
-import { runRealEvaluation } from '../src/command/evaluation/realEval.js';
+import { runRealEvaluation, type RealEvalQuestion } from '../src/command/evaluation/realEval.js';
 import { CONTINUOUS_30, buildRealEval100 } from '../src/command/livebeta/battleSet.js';
+import type { CommandDataset } from '../src/command/data/seed.js';
 
-/** 実データ100問+評価セット（LIVE BETA §4。カテゴリ×スコープ + Hallucination Probes） */
-const QUESTIONS = buildRealEval100();
+/**
+ * 実在エンティティ質問（実データ接続後にのみ作れる評価）。
+ * 実際の案件名・顧客名で質問し、正しく特定して答えられるかを検査する。
+ */
+function buildRealEntityQuestions(dataset: CommandDataset): RealEvalQuestion[] {
+  const questions: RealEvalQuestion[] = [];
+  const projects = dataset.projects.filter((p) => p.name.trim().length >= 6).slice(0, 20);
+  for (const [i, project] of projects.entries()) {
+    questions.push({
+      id: `real-proj-${i}`,
+      category: 'project-detail',
+      question: `${project.name}どう？`,
+      scope: 'lcc',
+      expectAnswerable: true
+    });
+  }
+  const withProjects = new Set(dataset.projects.map((p) => p.customerId));
+  const customers = dataset.customers
+    .filter((c) => c.name.trim().length >= 3 && withProjects.has(c.customerId))
+    .slice(0, 10);
+  for (const [i, customer] of customers.entries()) {
+    questions.push({
+      id: `real-cust-${i}`,
+      category: 'customer',
+      question: `${customer.name}さんの案件どう？`,
+      scope: 'lcc',
+      expectAnswerable: true
+    });
+  }
+  return questions;
+}
 
 async function main(): Promise<void> {
+  // 評価は独立した一時Storeで実行する（評価中に保存される記憶・実験が
+  // 本番Memoryを汚染したり、次回評価のHallucination判定に混入するのを防ぐ）
+  process.env.LCC_COMMAND_DB_PATH = './data/real-eval-store.json';
+  await rm('./data/real-eval-store.json', { force: true });
   const repository = createCommandRepository();
   const asOf = new Date().toISOString();
   const dataset = await repository.getDataset(asOf);
@@ -32,10 +66,19 @@ async function main(): Promise<void> {
     return;
   }
 
+  // 質問セット: 接続済みスコープのみ（未接続法人へは推測回答を求めない）+ 実在エンティティ質問
+  const connectedScopes = ['group', ...dataset.companies.map((c) => c.companyId)];
+  const QUESTIONS = [...buildRealEval100(connectedScopes), ...buildRealEntityQuestions(dataset)];
+  console.log(`[real-eval] 質問数: ${QUESTIONS.length}問（スコープ: ${connectedScopes.join('/')}）`);
+
   const orchestrator = new CommandOrchestrator(repository);
-  const report = await runRealEvaluation(QUESTIONS, (question, scope) =>
-    orchestrator.chat({ message: question, scope, asOf, sessionId: 'real-eval' })
-  );
+  // 各質問は独立会話として評価する（前問の文脈が混ざると評価が汚染される。
+  // 文脈保持は別途「30ターン連続会話試験」で検査する）
+  let evalSeq = 0;
+  const report = await runRealEvaluation(QUESTIONS, (question, scope) => {
+    evalSeq += 1;
+    return orchestrator.chat({ message: question, scope, asOf, sessionId: `real-eval-${evalSeq}` });
+  });
 
   // 30ターン連続会話試験（LIVE BETA §4: Context Retention）
   let retained = 0;

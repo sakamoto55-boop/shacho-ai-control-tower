@@ -22,6 +22,11 @@ export interface RealEvalQuestion {
   expectText?: string[];
   /** 回答に含まれてはならない文字列（捏造検知） */
   notText?: string[];
+  /**
+   * データ蓄積状態に依存する質問（記憶・学習・Growth・原価未接続時の粗利等）。
+   * 正直な「まだありません」も、データが揃った後の実回答も両方正解として扱う。
+   */
+  allowHonestEmpty?: boolean;
 }
 
 export interface RealEvalRecord {
@@ -126,13 +131,28 @@ export async function runRealEvaluation(
       continue;
     }
 
-    const honest = HONEST_REFUSAL.test(response.text);
-    const answerable = response.dataStatus === 'OK' && !honest;
+    // 未接続Domainの正直な注記行（「銀行データ未接続」等）を拒否回答と誤判定しない。
+    // 拒否判定は注記行を除いた本文に対して行う（Hallucination Probeは全文で判定）。
+    const textWithoutDisclaimers = response.text
+      .split('\n')
+      .filter((line) => !/銀行|会計|未接続|未登録|接続されていません|算出できません/.test(line))
+      .join('\n');
+    const honestFull = HONEST_REFUSAL.test(response.text);
+    // 注記行を除いた本文がほぼ空＝回答全体が未接続説明だった場合は全文で判定する
+    const honest =
+      textWithoutDisclaimers.trim().length < 10 ? honestFull : HONEST_REFUSAL.test(textWithoutDisclaimers);
+    // PARTIAL（一部ソース未接続）でも、接続済みDomainの質問は実データで回答できる
+    const answerable =
+      (response.dataStatus === 'OK' || response.dataStatus === 'PARTIAL') && !honest;
     // Hallucination: 存在しないものへ正直表現なしで断定回答した場合
     const forbidden = (q.notText ?? []).some((t) => response.text.includes(t));
-    const hallucination = Boolean(q.hallucinationProbe) && (!honest || forbidden);
+    const hallucination = Boolean(q.hallucinationProbe) && (!honestFull || forbidden);
     const textOk = (q.expectText ?? []).every((t) => response.text.includes(t)) && !forbidden;
-    const correct = q.hallucinationProbe ? !hallucination : answerable === q.expectAnswerable && textOk;
+    const correct = q.hallucinationProbe
+      ? !hallucination
+      : q.allowHonestEmpty
+        ? textOk
+        : answerable === q.expectAnswerable && textOk;
     const numberCount = (response.text.match(/[0-9][0-9,]{2,}(円|%)/g) ?? []).length;
 
     records.push({

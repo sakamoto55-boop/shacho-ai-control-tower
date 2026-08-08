@@ -116,13 +116,23 @@ function pct(rate: number): string {
 }
 
 function findProject(dataset: CommandDataset, message: string): Project | undefined {
-  return dataset.projects.find((project) => {
-    const shortName = project.name.split('（')[0];
-    return (
-      message.includes(shortName) ||
-      (shortName.length >= 3 && message.includes(shortName.slice(0, 3)))
-    );
-  });
+  // 実データでは「（修正）…」等の名称で shortName が空になり全メッセージに一致する事故があるため、
+  // 空・極端に短い名称を除外し、前方一致は「一意に特定できた場合のみ」採用する（誤案件回答の防止）。
+  const exact: Project[] = [];
+  const prefixOnly: Project[] = [];
+  for (const project of dataset.projects) {
+    const shortName = (project.name.split('（')[0] || project.name).trim();
+    if (shortName.length < 2) continue;
+    if (message.includes(shortName)) {
+      exact.push(project);
+    } else if (shortName.length >= 3 && message.includes(shortName.slice(0, 3))) {
+      prefixOnly.push(project);
+    }
+  }
+  if (exact.length > 0) {
+    return exact.sort((a, b) => b.name.length - a.name.length)[0];
+  }
+  return prefixOnly.length === 1 ? prefixOnly[0] : undefined;
 }
 
 function findCustomer(dataset: CommandDataset, message: string): Customer | undefined {
@@ -561,8 +571,10 @@ export class CommandOrchestrator {
       return this.handleLastContact(ctx, message, dataStatus);
     if (/請求.{0,4}(漏|も)れ|未請求|未入金|入金.{0,4}(遅|超過)/.test(message))
       return this.runIntent('invoices', ctx, dataStatus);
-    if (/危ない|やばい|まずい|リスク.{0,4}(案件|現場)|悪い現場/.test(message))
+    if (/危ない|やばい|まずい|リスク.{0,4}(案件|現場)|悪い現場|粗利.{0,6}悪化|悪化して(いる|る)(案件|の)/.test(message))
       return this.runIntent('risky', ctx, dataStatus);
+    if (/(営業|追客|見積).{0,6}(漏|も)れ|漏れて(る|いる)(の|ところ)?は/.test(message))
+      return this.runIntent('today', ctx, dataStatus);
     if (/今日.{0,6}(やる|すべき|何)|やること|要対応/.test(message))
       return this.runIntent('today', ctx, dataStatus);
     if (/来月|仕事.{0,4}足り|パイプライン|見込み案件/.test(message))
@@ -580,6 +592,15 @@ export class CommandOrchestrator {
     );
     if (employee)
       return this.handleEmployeeProjects(ctx, employee.employeeId, employee.name, dataStatus);
+
+    // 顧客名での照会（実データでは顧客名で「○○さんの案件どう？」と聞かれる）
+    if (/(さん|様|社)の(案件|工事|状況)|の案件どう/.test(message)) {
+      const scoped = filterDatasetByScope(ctx.dataset, ctx.scope);
+      const customer = scoped.customers
+        .filter((item) => item.name.trim().length >= 3 && message.includes(item.name.trim()))
+        .sort((a, b) => b.name.length - a.name.length)[0];
+      if (customer) return this.handleCustomerProjects(ctx, customer, dataStatus);
+    }
 
     if (/売上|今月どう|着地|目標/.test(message)) return this.runIntent('sales', ctx, dataStatus);
 
@@ -1405,6 +1426,62 @@ export class CommandOrchestrator {
       intent: 'project_card',
       projectId: project.projectId,
       customerId: project.customerId
+    };
+  }
+
+  /** 顧客名での案件照会（LIVE BETA: 実データでは顧客名で聞かれることが多い） */
+  private async handleCustomerProjects(
+    ctx: ToolContext,
+    customer: Customer,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const scoped = filterDatasetByScope(ctx.dataset, ctx.scope);
+    const projects = scoped.projects.filter((p) => p.customerId === customer.customerId);
+    if (projects.length === 0) {
+      return this.simpleText(
+        `【確認できた事実】${customer.name}様の案件は現在のデータに登録されていません。`,
+        'project_card',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    const active = projects.filter((p) => p.stage !== 'completed' && p.stage !== 'lost');
+    const lines = [
+      '【確認できた事実】',
+      `${customer.name}様の案件は${projects.length}件（進行・追客中${active.length}件）です。`,
+      ...projects
+        .slice(0, 6)
+        .map(
+          (p) =>
+            `・${p.name}（${p.stage}${p.orderAmount > 0 ? `、受注額${yen(p.orderAmount)}` : ''}${p.dueDate ? `、完工予定${p.dueDate}` : ''}）`
+        ),
+      ...(projects.length > 6 ? [`（他${projects.length - 6}件）`] : [])
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'pipeline',
+        data: { customer: customer.customerId, projects: projects.slice(0, 10) },
+        confidence: 'HIGH',
+        evidence: projects.slice(0, 5).map((p) => ({
+          label: p.name,
+          value: p.stage,
+          refId: p.projectId,
+          source: '案件台帳',
+          asOf: p.updatedAt
+        })),
+        toolsUsed: ['get_customer_projects']
+      },
+      intent: 'project_card',
+      projectId: projects[0]?.projectId ?? null,
+      listItems: projects.slice(0, 10).map((p) => ({
+        id: p.projectId,
+        kind: 'project' as const,
+        label: p.name,
+        projectId: p.projectId
+      })),
+      listShown: Math.min(projects.length, 6)
     };
   }
 

@@ -11,3 +11,4 @@ data/*.jsonl
 .DS_Store
 data/snapshots/
 data/artifacts/
+secure/

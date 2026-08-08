@@ -19,6 +19,7 @@ import { buildSeedDataset, type CommandDataset } from '../data/seed.js';
 import {
   DemoSourceRegistry,
   ProductionSourceRegistry,
+  datasetAvailability,
   type SourceRegistry
 } from '../sources/SourceAdapter.js';
 import { createSheetsRegistryFromEnv } from '../sources/googleSheets.js';
@@ -92,6 +93,8 @@ function defaultStore(): CommandStore {
 export class LocalCommandRepository implements CommandRepository {
   private readonly dbPath: string;
   private readonly registry: SourceRegistry;
+  /** Sheets API連続呼び出しでクォータ超過しないための短期キャッシュ（失敗結果は保持しない） */
+  private datasetCache: { key: string; dataset: CommandDataset; cachedAtMs: number } | null = null;
 
   constructor(
     dbPath = process.env.LCC_COMMAND_DB_PATH ?? './data/lcc-command-local.json',
@@ -122,7 +125,20 @@ export class LocalCommandRepository implements CommandRepository {
 
   async getDataset(asOf: string): Promise<CommandDataset> {
     // Demo Fixture隔離: productionモードのRegistryはデモデータへフォールバックしない
-    return this.registry.compose(asOf);
+    const ttlMs = Number(process.env.LCC_DATASET_CACHE_MS ?? 60_000);
+    if (
+      this.datasetCache &&
+      this.datasetCache.key === asOf &&
+      Date.now() - this.datasetCache.cachedAtMs < ttlMs
+    ) {
+      return this.datasetCache.dataset;
+    }
+    const dataset = await this.registry.compose(asOf);
+    // 取得失敗（DATA_UNAVAILABLE）はキャッシュせず、次回リトライさせる
+    if (datasetAvailability(dataset) !== 'DATA_UNAVAILABLE') {
+      this.datasetCache = { key: asOf, dataset, cachedAtMs: Date.now() };
+    }
+    return dataset;
   }
 
   async getStore(): Promise<CommandStore> {

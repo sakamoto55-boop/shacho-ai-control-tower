@@ -51,14 +51,14 @@ export const CONTINUOUS_30: string[] = [
   'おはよう'
 ];
 
-const READ_TEMPLATES: Array<{ category: string; question: string; expectAnswerable: boolean }> = [
+const READ_TEMPLATES: Array<{ category: string; question: string; expectAnswerable: boolean; allowHonestEmpty?: boolean }> = [
   { category: 'brief', question: 'おはよう', expectAnswerable: true },
   { category: 'sales', question: '今月どう？', expectAnswerable: true },
   { category: 'sales', question: '売上どう？', expectAnswerable: true },
   { category: 'sales', question: '来月仕事足りる？', expectAnswerable: true },
   { category: 'risk', question: '一番危ない案件は？', expectAnswerable: true },
   { category: 'risk', question: '危ない現場は？', expectAnswerable: true },
-  { category: 'margin', question: '粗利悪化してるのは？', expectAnswerable: true },
+  { category: 'margin', question: '粗利悪化してるのは？', expectAnswerable: true, allowHonestEmpty: true },
   { category: 'leak', question: '営業で漏れてるのは？', expectAnswerable: true },
   { category: 'invoice', question: '請求漏れてない？', expectAnswerable: true },
   { category: 'invoice', question: '未入金どこ？', expectAnswerable: true },
@@ -70,22 +70,22 @@ const READ_TEMPLATES: Array<{ category: string; question: string; expectAnswerab
   { category: 'future', question: '3か月後どうなる？', expectAnswerable: true },
   { category: 'constitution', question: '会社の原則は？', expectAnswerable: true },
   { category: 'search', question: '経営計画書どこにある？', expectAnswerable: true },
-  { category: 'growth', question: '次に何を改善すべき？', expectAnswerable: true },
-  { category: 'growth', question: '会社で何が改善した？', expectAnswerable: true },
-  { category: 'learning', question: '今日何を覚えた？', expectAnswerable: true },
+  { category: 'growth', question: '次に何を改善すべき？', expectAnswerable: true, allowHonestEmpty: true },
+  { category: 'growth', question: '会社で何が改善した？', expectAnswerable: true, allowHonestEmpty: true },
+  { category: 'learning', question: '今日何を覚えた？', expectAnswerable: true, allowHonestEmpty: true },
   { category: 'capability', question: 'プレゼン作って', expectAnswerable: true },
   { category: 'capability', question: '見積案作って', expectAnswerable: true },
   { category: 'estimate', question: '解体の見積案作って', expectAnswerable: true },
-  { category: 'targets', question: '目標比どう？', expectAnswerable: false },
-  { category: 'memory', question: '前に何の話した？', expectAnswerable: true },
-  { category: 'advice', question: 'この判断どう思う？', expectAnswerable: true },
+  { category: 'targets', question: '目標比どう？', expectAnswerable: false, allowHonestEmpty: true },
+  { category: 'memory', question: '前に何の話した？', expectAnswerable: true, allowHonestEmpty: true },
+  { category: 'advice', question: 'この判断どう思う？', expectAnswerable: true, allowHonestEmpty: true },
   { category: 'innovation', question: '営業の改善案考えて', expectAnswerable: true },
   { category: 'build', question: '請求チェックを自動化して', expectAnswerable: true },
-  { category: 'general', question: '会社として次の一手は？', expectAnswerable: true },
+  { category: 'general', question: '会社として次の一手は？', expectAnswerable: true, allowHonestEmpty: true },
   { category: 'brief', question: 'ブリーフ', expectAnswerable: true },
   { category: 'brief', question: '朝の報告', expectAnswerable: true },
-  { category: 'learning', question: '最近何を学んだ？', expectAnswerable: true },
-  { category: 'growth', question: '失敗した施策は？', expectAnswerable: true }
+  { category: 'learning', question: '最近何を学んだ？', expectAnswerable: true, allowHonestEmpty: true },
+  { category: 'growth', question: '失敗した施策は？', expectAnswerable: true, allowHonestEmpty: true }
 ];
 
 /**
@@ -101,7 +101,8 @@ export function buildRealEval100(scopes: CompanyScope[] = ['group', 'lcc', 'wel'
         category: template.category,
         question: template.question,
         scope,
-        expectAnswerable: template.expectAnswerable
+        expectAnswerable: template.expectAnswerable,
+        allowHonestEmpty: template.allowHonestEmpty
       });
     }
   }
