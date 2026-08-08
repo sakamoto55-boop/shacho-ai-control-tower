@@ -1,3 +1,4 @@
+import 'dotenv/config';
 /**
  * サニティチェック（Phase B1 §4）: ソース側の実件数 vs Canonical取込件数の照合。
  *

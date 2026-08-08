@@ -1,3 +1,4 @@
+import 'dotenv/config';
 /**
  * 日次Growth観測（Phase GROWTH §3-§5・§35）。
  *

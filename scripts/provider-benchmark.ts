@@ -1,3 +1,4 @@
+import 'dotenv/config';
 /**
  * Provider Benchmark実行（Phase LIVE-AI §12）。
  * 設定済みの実Providerへ同一質問を投げ、Latency/Structured成功率等を比較する。

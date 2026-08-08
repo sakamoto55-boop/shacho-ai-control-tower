@@ -1,3 +1,4 @@
+import 'dotenv/config';
 /**
  * 実データ100問評価（Phase B1.5 §29）。
  *

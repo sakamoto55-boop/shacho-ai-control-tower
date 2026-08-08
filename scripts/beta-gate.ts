@@ -1,3 +1,4 @@
+import 'dotenv/config';
 /**
  * LIVE BETA Gate チェック（LIVE BETA §1-§2・§20）。
  *

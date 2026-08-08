@@ -1,3 +1,4 @@
+import 'dotenv/config';
 /**
  * 夜間Memoryメンテナンス（Phase B1 §15）。
  *
