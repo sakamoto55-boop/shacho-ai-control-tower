@@ -11,6 +11,8 @@ import { dirname, resolve } from 'node:path';
 import type { ApprovalRequest, CommandTask, Decision, ResearchTask } from '../domain/types.js';
 import type { ExperimentRecord, MemoryRecord } from '../memory/types.js';
 import type { TargetRecord } from '../targets/targetRegistry.js';
+import type { ConstitutionPrinciple } from '../constitution/constitutionRegistry.js';
+import type { ArtifactRecord } from '../artifacts/artifactRegistry.js';
 import { buildSeedDataset, type CommandDataset } from '../data/seed.js';
 import {
   DemoSourceRegistry,
@@ -29,6 +31,10 @@ export interface CommandStore {
   experiments: ExperimentRecord[];
   /** Target Registry（Phase B1.5）。経営目標の正本。履歴を保持する */
   targets: TargetRecord[];
+  /** Company Constitution（Phase X）。会社原則の正本。履歴を保持する */
+  principles: ConstitutionPrinciple[];
+  /** Artifact Registry（Phase X）。生成成果物の管理 */
+  artifacts: ArtifactRecord[];
 }
 
 export interface CommandRepository {
@@ -51,6 +57,10 @@ export interface CommandRepository {
   saveExperiment(record: ExperimentRecord): Promise<ExperimentRecord>;
   getTargets(): Promise<TargetRecord[]>;
   saveTarget(record: TargetRecord): Promise<TargetRecord>;
+  getPrinciples(): Promise<ConstitutionPrinciple[]>;
+  savePrinciple(record: ConstitutionPrinciple): Promise<ConstitutionPrinciple>;
+  getArtifacts(): Promise<ArtifactRecord[]>;
+  saveArtifact(record: ArtifactRecord): Promise<ArtifactRecord>;
 }
 
 function defaultStore(): CommandStore {
@@ -61,7 +71,9 @@ function defaultStore(): CommandStore {
     research: [],
     memories: [],
     experiments: [],
-    targets: []
+    targets: [],
+    principles: [],
+    artifacts: []
   };
 }
 
@@ -189,6 +201,34 @@ export class LocalCommandRepository implements CommandRepository {
     await this.writeStore(store);
     return record;
   }
+
+  async getPrinciples(): Promise<ConstitutionPrinciple[]> {
+    return (await this.readStore()).principles;
+  }
+
+  async savePrinciple(record: ConstitutionPrinciple): Promise<ConstitutionPrinciple> {
+    const store = await this.readStore();
+    store.principles = [
+      ...store.principles.filter((r) => r.principleId !== record.principleId),
+      record
+    ];
+    await this.writeStore(store);
+    return record;
+  }
+
+  async getArtifacts(): Promise<ArtifactRecord[]> {
+    return (await this.readStore()).artifacts;
+  }
+
+  async saveArtifact(record: ArtifactRecord): Promise<ArtifactRecord> {
+    const store = await this.readStore();
+    store.artifacts = [
+      ...store.artifacts.filter((r) => r.artifactId !== record.artifactId),
+      record
+    ];
+    await this.writeStore(store);
+    return record;
+  }
 }
 
 /** テスト用: メモリ上のみで動くリポジトリ */
@@ -295,6 +335,30 @@ export class InMemoryCommandRepository implements CommandRepository {
   async saveTarget(record: TargetRecord): Promise<TargetRecord> {
     this.store.targets = [
       ...this.store.targets.filter((t) => t.targetId !== record.targetId),
+      record
+    ];
+    return record;
+  }
+
+  async getPrinciples(): Promise<ConstitutionPrinciple[]> {
+    return this.store.principles;
+  }
+
+  async savePrinciple(record: ConstitutionPrinciple): Promise<ConstitutionPrinciple> {
+    this.store.principles = [
+      ...this.store.principles.filter((r) => r.principleId !== record.principleId),
+      record
+    ];
+    return record;
+  }
+
+  async getArtifacts(): Promise<ArtifactRecord[]> {
+    return this.store.artifacts;
+  }
+
+  async saveArtifact(record: ArtifactRecord): Promise<ArtifactRecord> {
+    this.store.artifacts = [
+      ...this.store.artifacts.filter((r) => r.artifactId !== record.artifactId),
       record
     ];
     return record;

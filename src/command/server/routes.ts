@@ -55,6 +55,17 @@ import { DATA_GAPS } from '../domain/dataGaps.js';
 import { assessCapabilities } from '../domain/capability.js';
 import { createDefaultRegistry } from '../agents/providerRegistry.js';
 import { TargetRegistryService, type NewTargetInput } from '../targets/targetRegistry.js';
+import { ConstitutionService } from '../constitution/constitutionRegistry.js';
+import { computeFutureInsights } from '../future/futureEngine.js';
+import {
+  CAPABILITIES,
+  availableProvidersFromEnv,
+  capabilityStatus
+} from '../capabilities/capabilityRegistry.js';
+import { ArtifactService } from '../artifacts/artifactRegistry.js';
+import { DATA_STEWARDSHIP } from '../domain/stewardship.js';
+import { unifiedSearch } from '../search/unifiedSearch.js';
+import { MemoryService as MemorySearchService } from '../memory/store.js';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -105,6 +116,8 @@ export function createCommandApp(
   const memoryService = new MemoryService(repository);
   const targetService = new TargetRegistryService(repository);
   const providerRegistry = createDefaultRegistry();
+  const constitutionService = new ConstitutionService(repository);
+  const artifactService = new ArtifactService(repository);
 
   // --- Principal解決 + Rate Limit（全ルート共通） ---
   app.use('*', async (c, next) => {
@@ -769,6 +782,78 @@ export function createCommandApp(
         outcome: 'ok'
       });
       return c.json(approved);
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // --- Phase X: Constitution / Future / Capability / Artifact / Stewardship / Search ---
+
+  app.get('/constitution', async (c) => {
+    try {
+      return c.json({ principles: await constitutionService.list() });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // 会社原則の正式確定（PRESIDENTのみ。§5: AI判断だけでCURRENTにしない）
+  app.post('/constitution/:id/approve', async (c) => {
+    const principal = c.get('principal');
+    try {
+      const approved = await constitutionService.approve(c.req.param('id'), principal, nowIso());
+      await audit.record({
+        actor: principal.label,
+        role: principal.role,
+        action: 'constitution_approve',
+        scope: approved.scope,
+        detail: approved.principleId,
+        outcome: 'ok'
+      });
+      return c.json(approved);
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  app.get('/future', async (c) => {
+    try {
+      const { scope, dataset } = await scopedDataset(c);
+      return c.json({ insights: computeFutureInsights(dataset, scope) });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // AI Capability Registry（§15。データCapability Matrixとは別物）
+  app.get('/ai-capabilities', (c) => {
+    const available = availableProvidersFromEnv();
+    return c.json({
+      capabilities: CAPABILITIES.map((definition) => ({
+        ...definition,
+        status: capabilityStatus(definition, available)
+      }))
+    });
+  });
+
+  app.get('/artifacts', async (c) => {
+    try {
+      return c.json({ artifacts: await artifactService.list() });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  app.get('/stewardship', (c) => c.json({ stewards: DATA_STEWARDSHIP }));
+
+  app.get('/search', async (c) => {
+    const principal = c.get('principal');
+    try {
+      const q = (c.req.query('q') ?? '').slice(0, 100);
+      if (!q) throw new ValidationError('q（検索語）を指定してください');
+      const { dataset } = await scopedDataset(c);
+      const memories = await new MemorySearchService(repository).search({ limit: 100 }, principal);
+      return c.json({ results: unifiedSearch(dataset, memories, q, principal) });
     } catch (error) {
       return handleError(c, error);
     }

@@ -291,6 +291,37 @@ Phase A/B0の決定論エンジン・Canonical Model・Source Adapter・RBAC・E
   Chromium実機レンダリング確認（Desktop/Mobile/reduced-motion/ライブ会話でRole発光・
   Generative UI・Streaming・Approval動作をスクリーンショット確認済み）。
 
+## Phase X（Company Constitution / Future Intelligence / Universal Capability OS）の状態
+
+- **Company Constitution Layer（§2-§8）**: `constitution/constitutionRegistry.ts` + `GET /command/constitution`。
+  第13期系列9ファイルをREAD ONLY比較（`CONSTITUTION_SOURCES.md`）し、v7社長用（系列最新）等から
+  9原則を抽出。**すべてCANDIDATE**（AI判断でCURRENTにしない）。承認はPRESIDENTのみ、変更は
+  SUPERSEDED+新CANDIDATE（履歴保持）。`checkProposal()` が「正本は1つ」等に反する提案へ警告（§7・§46）。
+- **Data Stewardship（§9）**: `domain/stewardship.ts` + `GET /command/stewardship`。8つの重要Sourceに
+  Owner・部門・更新頻度・品質責任をEvidence付きで定義（経営の聖書v7の運用記載に基づく）。
+- **Future Intelligence Engine（§10-§14）**: `future/futureEngine.ts` + `GET /command/future`。
+  受注残の月数・資金・粗利傾向・キャパシティ・パイプラインを決定論評価。未接続領域（銀行・日報）は
+  推測補完せずUNKNOWN/INCOMPLETE明示。Scenario Planning（売上±%・退職・投資・現状継続）は
+  確定計算+仮定明示。AIからの問い提案（§14）は提案のみで行動しない。
+- **Universal Capability Registry（§15-§18・§39-§41）**: `capabilities/capabilityRegistry.ts` +
+  `GET /command/ai-capabilities`。45能力（検索/分析/読解/生成/Artifact作成/Build/見積8能力/音声/実行）を
+  §16の全属性付きで正本管理。Provider未接続はNOT_CONFIGUREDの正常状態。Capability Routerが
+  依頼→能力連鎖・Execution Budget（LOW/NORMAL/DEEP/BUILD）・権限（給与→PRESIDENT、公開/Deploy→承認）を決定。
+- **Artifact Registry / Creation（§19-§22・§35-§36）**: `artifacts/artifactRegistry.ts` + `GET /command/artifacts`。
+  「プレゼン作って」等はCapability連鎖Plan（SEARCH_INTERNAL→…→CRITIC）になり、生成Provider未接続時は
+  正直に伝えてPLANNEDとして登録（偽の完成品を返さない）。supersedeで版履歴を保持。
+- **Software Build（§23-§24）**: `build/softwareBuild.ts`。既存システムカタログ7件との重複チェックを
+  必ず先行し、新規/既存改修/統合を比較提示。「作れるから作る」を構造的に禁止。Constitution照合込み。
+  本番Deployは承認なしで行わない。
+- **見積Capability（§25-§26）**: `estimate/estimateCapability.ts`。顧客→工種→類似案件→受注額中央値→
+  粗利参考→不足情報の草案生成。金額はすべて決定論（AIが暗算しない）。
+- **Internal Search Super Layer（§27-§30）**: `search/unifiedSearch.ts` + `GET /command/search?q=`。
+  正本カタログ（実測7ソース）+顧客・案件+Memoryを統一Schemaで検索。「第13期経営計画書どれ？」に
+  正本判定付きで回答。People OSはPRESIDENT権限のみ。見つからない場所は推測しない。
+- **UI Schema拡張（§35・§48）**: FUTURE_INSIGHT / ARTIFACT_PREVIEW / SEARCH_RESULTS / CONSTITUTION を追加。
+- **Evaluation（§52）**: `tests/command/xphase/`（Constitution/Future/Scenario/Capability Routing/
+  Permission/Artifact/Build重複チェック/見積/統合検索/Stewardship/API）。
+
 ## フェーズ計画
 
 - **Phase A（本実装）**: 会話コア＋決定論エンジン＋承認フロー＋Brief＋UI＋RBAC/セキュリティ。読み取り正本はDemo Fixture（demoモード限定）。実行は全てdry-run。

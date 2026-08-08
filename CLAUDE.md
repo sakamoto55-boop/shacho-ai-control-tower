@@ -103,6 +103,15 @@ HTTPリクエスト (src/server.ts, Hono)
 - Criticは答えを書き換えずissuesを返す。SYNTHESISの回答構造（結論→事実→分析→リスク→別案→推奨→次）を維持する。
 - 内部Role名・Provider名をユーザー向け回答テキストへ露出しない。
 
+### Universal AI OS層（Phase X）
+
+- Company Constitution（`constitution/`）はAIが作文しない。実在資料からの抽出候補（CANDIDATE）のみ登録し、CURRENT化はPRESIDENT承認のみ。変更は旧SUPERSEDED+新CANDIDATEで履歴保持。`checkProposal` の警告（正本は1つ等）を提案系ハンドラから外さない。
+- Capability Registry（`capabilities/`）でProvider未接続はNOT_CONFIGUREDの正常状態。生成系依頼（プレゼン・画像・Excel等）はPlan+正直な未接続通知を返し、偽の完成品を返さない。給与関連はPRESIDENT、公開物・DeployはApproval必須（Capability Permission）。
+- Software Buildは既存システム重複チェック（`build/softwareBuild.ts` KNOWN_SYSTEMS）を必ず先行。「作れるから作る」を許さない。
+- Future Engine / Scenario（`future/`）は決定論計算+仮定明示。未接続領域（銀行・日報）を推測で補完しない。
+- 見積（`estimate/`）の金額は過去実績の決定論計算のみ。AIが暗算で金額を決めない。
+- 統合検索（`search/unifiedSearch.ts`）のPeople OSカタログはPRESIDENT以外へ返さない。見つからない場所を推測で答えない。
+
 ### Phase VUI（docs/lcc-command-vui.html — Visual Intelligence UI）
 
 - 粒子AI COREの視覚仕様の正本は `src/command/vui/visualSpec.ts`。UI側（HTML内のCORE_VISUALS）と同期させ、変更時は両方更新する（`tests/command/vui/` が検査）。

@@ -51,6 +51,18 @@ import {
 } from '../memory/curator.js';
 import { discoverProblems, rankInsights } from '../memory/maintenance.js';
 import type { ObservabilityLog } from '../observability/observability.js';
+import { ConstitutionService } from '../constitution/constitutionRegistry.js';
+import { computeFutureInsights, parseScenario, runScenario } from '../future/futureEngine.js';
+import {
+  CAPABILITIES,
+  availableProvidersFromEnv,
+  capabilityStatus,
+  routeCapabilities
+} from '../capabilities/capabilityRegistry.js';
+import { ArtifactService, planArtifactCreation } from '../artifacts/artifactRegistry.js';
+import { buildSoftwarePlan } from '../build/softwareBuild.js';
+import { unifiedSearch } from '../search/unifiedSearch.js';
+import { draftEstimate } from '../estimate/estimateCapability.js';
 import {
   ROLE_DISPLAY_LABELS,
   type CommandEventBus,
@@ -146,6 +158,8 @@ export interface OrchestratorOptions {
 export class CommandOrchestrator {
   private readonly contexts = new ContextStore();
   private readonly memoryService: MemoryService;
+  private constitutionService!: ConstitutionService;
+  private artifactService!: ArtifactService;
   private readonly reasoner: GeneralReasoner;
 
   private readonly traceLog = new AgentTraceLog();
@@ -156,6 +170,8 @@ export class CommandOrchestrator {
     private readonly options: OrchestratorOptions = {}
   ) {
     this.memoryService = new MemoryService(repository);
+    this.constitutionService = new ConstitutionService(repository);
+    this.artifactService = new ArtifactService(repository);
     this.reasoner = new GeneralReasoner(createGeneralRouter());
     this.executor = new PlanExecutor(
       createDefaultRegistry(),
@@ -353,6 +369,19 @@ export class CommandOrchestrator {
       return this.handleExperimentStatus(ctx, dataStatus);
     }
 
+    // --- Phase X: 統合検索「どこにある？」（§27-§29。記憶想起より先に判定） ---
+    if (
+      /どこにある|どこだっけ|(計画書|正本|マニュアル|規程|ルール|申請|資料).{0,8}(どこ|どれ)|どれが(正本|最新)/.test(
+        message
+      )
+    ) {
+      return this.handleWhereIs(ctx, message, principal, dataStatus);
+    }
+    // --- Phase X: Company Constitution（§47） ---
+    if (/会社の原則|経営の原則|会社原則/.test(message)) {
+      return this.handleConstitution(ctx, dataStatus);
+    }
+
     // --- Persistent Memory（訂正・想起・監査・判断レビュー） ---
     if (detectCorrection(message).isCorrection && context.lastMemoryIds.length > 0) {
       return this.handleCorrection(ctx, message, context, principal, dataStatus);
@@ -381,6 +410,33 @@ export class CommandOrchestrator {
       return this.handleInnovation(ctx, message, principal, dataStatus, {
         firstPrinciples: /そもそも|根本から|ゼロから/.test(message)
       });
+    }
+
+    // --- Phase X: Future Intelligence / Scenario（§10-§14） ---
+    {
+      const scenario = parseScenario(message);
+      if (scenario && /売上|辞め|退職|投資|このまま/.test(message)) {
+        return this.handleScenario(ctx, scenario, dataStatus);
+      }
+    }
+    if (/(\d|３|3|三)か月後|か月後.{0,6}どうなる|今後.{0,6}(どうなる|起こり|リスクは)|将来.{0,4}(リスク|どうなる)/.test(message)) {
+      return this.handleFuture(ctx, dataStatus);
+    }
+    // --- Phase X: 見積Capability（§25-§26） ---
+    if (/見積(案|書)?.{0,4}(作|出し)/.test(message)) {
+      return this.handleEstimateDraft(ctx, message, dataStatus);
+    }
+    // --- Phase X: Software Build（§23-§24。重複チェック→Constitution照合→比較） ---
+    if (/アプリ(にして|化|作って)|システム(にして|化して)|自動化して|ツール作って/.test(message)) {
+      return this.handleBuildRequest(ctx, message, dataStatus);
+    }
+    // --- Phase X: Artifact Creation（§18-§19。生成Provider未接続時は正直に伝える） ---
+    if (
+      /プレゼン|スライド|パワポ|ポスター|チラシ|図にして|図解して|(画像|イラスト|漫画).{0,4}(作|生成|描)|(Excel|エクセル|Word|ワード|PDF).{0,4}(にして|化|作って|で管理)|資料(にして|化して)/i.test(
+        message
+      )
+    ) {
+      return this.handleArtifactRequest(ctx, message, principal, dataStatus);
     }
 
     // --- Write系（下書き→承認） ---
@@ -2158,6 +2214,245 @@ export class CommandOrchestrator {
       },
       intent: 'memory_audit',
       memoryIds: [...pending, ...active].slice(0, 5).map((m) => m.memoryId)
+    };
+  }
+
+  // ------------------------------------------------------------------
+  // Phase X: Constitution / Future / Capability / Artifact / Build / Search
+  // ------------------------------------------------------------------
+
+  private async handleConstitution(ctx: ToolContext, dataStatus: DataStatus): Promise<HandlerResult> {
+    const principles = await this.constitutionService.list();
+    const current = principles.filter((p) => p.status === 'CURRENT');
+    const candidates = principles.filter((p) => p.status === 'CANDIDATE');
+    const lines = [
+      '【会社の原則（Company Constitution）】',
+      current.length > 0
+        ? `正式原則（CURRENT）: ${current.length}件`
+        : '正式確定済みの原則はまだありません（候補の承認をお願いします）。',
+      ...current.slice(0, 5).map((p) => `・[${p.category}] ${p.statement}`),
+      '',
+      `候補（CANDIDATE・第13期資料からの抽出）: ${candidates.length}件`,
+      ...candidates.slice(0, 6).map((p) => `・[${p.category}] ${p.statement.split('。')[0]}（出典: ${p.sourceVersion}）`),
+      '',
+      '出典は経営の聖書 第13期 v7 社長用（系列最新）等。「この原則で確定」で正式化できます（履歴は保持されます）。'
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: { current: current.length, candidates: candidates.length },
+        confidence: 'HIGH',
+        evidence: candidates.slice(0, 3).flatMap((p) => p.evidence.slice(0, 1)),
+        toolsUsed: ['constitution_registry']
+      },
+      intent: 'memory_audit'
+    };
+  }
+
+  private async handleWhereIs(
+    ctx: ToolContext,
+    message: string,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const memories = await this.memoryService.search({ limit: 100 }, principal);
+    const results = unifiedSearch(ctx.dataset, memories, message, principal);
+    if (results.length === 0) {
+      return this.simpleText(
+        '該当する資料・データを社内カタログから特定できませんでした。推測で場所を答えることはしません。キーワードを変えるか、外部調査が必要ならその旨お知らせください。',
+        'unknown',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    const lines = [
+      '【社内検索結果】',
+      ...results.slice(0, 5).map(
+        (r) =>
+          `・${r.title}\n  ${r.source} / 更新: ${r.date ?? '不明'} / ${r.snippet.slice(0, 60)}`
+      )
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: { results },
+        confidence: results[0].confidence,
+        evidence: [],
+        toolsUsed: ['unified_search']
+      },
+      intent: 'memory_recall'
+    };
+  }
+
+  private async handleFuture(ctx: ToolContext, dataStatus: DataStatus): Promise<HandlerResult> {
+    const insights = computeFutureInsights(ctx.dataset, ctx.scope);
+    const risks = insights.filter((i) => i.kind !== 'OPPORTUNITY');
+    const opportunities = insights.filter((i) => i.kind === 'OPPORTUNITY');
+    const lines = [
+      '【Future Intelligence（30〜90日の先行き）】',
+      '',
+      ...(risks.length > 0 ? ['〈リスク・要注意〉', ...risks.map((i) => `・[${i.kind}] ${i.statement}`)] : []),
+      ...(opportunities.length > 0 ? ['', '〈機会〉', ...opportunities.map((i) => `・${i.statement}`)] : []),
+      '',
+      ...(risks.some((i) => i.assumptions.length > 0)
+        ? ['【前提（仮定）】', ...new Set(risks.flatMap((i) => i.assumptions.map((a) => `・${a}`)))]
+        : []),
+      ...(insights.find((i) => i.suggestedQuestion)
+        ? ['', `${insights.find((i) => i.suggestedQuestion)?.suggestedQuestion}`]
+        : [])
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: { insights },
+        confidence: insights.some((i) => i.confidence === 'UNKNOWN') ? 'MEDIUM' : 'HIGH',
+        evidence: insights.flatMap((i) => i.evidence).slice(0, 6),
+        toolsUsed: ['future_engine']
+      },
+      intent: 'risky'
+    };
+  }
+
+  private async handleScenario(
+    ctx: ToolContext,
+    scenario: ReturnType<typeof parseScenario> & object,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const result = runScenario(ctx.dataset, ctx.scope, scenario);
+    const lines = [
+      `【シナリオ分析: ${result.label}】`,
+      '',
+      '【確定計算できる範囲】',
+      ...result.lines.map((l) => `・${l}`),
+      '',
+      '【明示した仮定（不確実な部分）】',
+      ...result.assumptions.map((a) => `・${a}`)
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: { scenario: result },
+        confidence: result.confidence,
+        evidence: result.evidence,
+        toolsUsed: ['scenario_engine']
+      },
+      intent: 'cash'
+    };
+  }
+
+  private async handleEstimateDraft(
+    ctx: ToolContext,
+    message: string,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const draft = draftEstimate(ctx.dataset, message);
+    return {
+      response: {
+        text: draft.lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: { estimateDraft: { workKind: draft.workKind, referenceAmount: draft.referenceAmount, missingInfo: draft.missingInfo } },
+        confidence: draft.referenceAmount !== null ? 'MEDIUM' : 'LOW',
+        evidence: draft.evidence,
+        toolsUsed: ['estimate_capability']
+      },
+      intent: 'project_card',
+      customerId: draft.customer?.customerId ?? null
+    };
+  }
+
+  private async handleBuildRequest(
+    ctx: ToolContext,
+    message: string,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const constitutionHits = await this.constitutionService.checkProposal(message);
+    const plan = buildSoftwarePlan(message, constitutionHits.map((h) => h.warning));
+    return {
+      response: {
+        text: plan.lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: { buildPlan: { steps: plan.steps, recommendation: plan.duplicateCheck.recommendation } },
+        confidence: 'HIGH',
+        evidence: [],
+        toolsUsed: ['software_build_planner', 'constitution_registry']
+      },
+      intent: 'ideation',
+      proposal: { problem: message }
+    };
+  }
+
+  private async handleArtifactRequest(
+    ctx: ToolContext,
+    message: string,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const route = routeCapabilities(message);
+    // Capability Permission（§40）
+    if (route.permission?.requiredRole === 'PRESIDENT' && principal.role !== 'PRESIDENT') {
+      return this.simpleText(
+        `この依頼は実行できません。${route.permission.reason}`,
+        'unknown',
+        'HIGH',
+        dataStatus
+      );
+    }
+    const available = availableProvidersFromEnv();
+    const executable = new Set(
+      CAPABILITIES.filter((c) => capabilityStatus(c, available) === 'ACTIVE').map((c) => c.capabilityId)
+    );
+    const artifactType = route.artifactType ?? 'DOCX';
+    const plan = planArtifactCreation(artifactType, message.slice(0, 40), {
+      executableCapabilities: executable
+    });
+    const constitutionHits = await this.constitutionService.checkProposal(message);
+    const now = ctx.dataset.asOf;
+    const artifact = await this.artifactService.register(
+      {
+        type: artifactType,
+        title: message.slice(0, 60),
+        createdBy: `ai:planner(${principal.label})`,
+        sourceData: [],
+        sourceEvidence: [],
+        sourceMemoryIds: [],
+        status: plan.executable ? 'QUEUED' : 'PLANNED',
+        purpose: message.slice(0, 80)
+      },
+      now
+    );
+    const lines = [
+      `【${artifactType}生成のご依頼】`,
+      ...(constitutionHits.length > 0 ? [...constitutionHits.map((h) => `⚠ ${h.warning}`), ''] : []),
+      '実行ステップ:',
+      ...plan.steps.map((st) => `${st.step}. ${st.description}`),
+      '',
+      plan.executable
+        ? `キューへ登録しました（${artifact.artifactId}）。完了時に成果物Registryへ記録されます。`
+        : `現在、生成プロバイダ（${plan.blockedBy.join(' / ')}）が未接続のため、この成果物はまだ生成できません。計画として登録しました（${artifact.artifactId}）。プロバイダ接続後にそのまま実行できます。それらしい完成品を偽って返すことはしません。`,
+      '',
+      `想定コスト区分: ${route.budget}${route.permission?.requiresApproval ? ' / 公開・配布時は承認が必要です' : ''}`
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: { artifact, plan, capabilities: route.capabilities, budget: route.budget },
+        confidence: 'HIGH',
+        evidence: [],
+        toolsUsed: ['capability_router', 'artifact_registry']
+      },
+      intent: 'ideation'
     };
   }
 

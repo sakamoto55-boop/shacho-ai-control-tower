@@ -24,7 +24,12 @@ export type UiComponentType =
   | 'ALERT'
   | 'APPROVAL'
   | 'RESEARCH_RESULT'
-  | 'COMPARISON';
+  | 'COMPARISON'
+  // Phase X（§35・§48）
+  | 'FUTURE_INSIGHT'
+  | 'ARTIFACT_PREVIEW'
+  | 'SEARCH_RESULTS'
+  | 'CONSTITUTION';
 
 export interface UiComponent {
   type: UiComponentType;
