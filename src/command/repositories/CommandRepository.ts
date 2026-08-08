@@ -9,6 +9,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import type { ApprovalRequest, CommandTask, Decision, ResearchTask } from '../domain/types.js';
+import type { ExperimentRecord, MemoryRecord } from '../memory/types.js';
 import { buildSeedDataset, type CommandDataset } from '../data/seed.js';
 import {
   DemoSourceRegistry,
@@ -22,6 +23,9 @@ export interface CommandStore {
   tasks: CommandTask[];
   approvals: ApprovalRequest[];
   research: ResearchTask[];
+  /** Persistent Memory（Phase M）。物理削除しない */
+  memories: MemoryRecord[];
+  experiments: ExperimentRecord[];
 }
 
 export interface CommandRepository {
@@ -38,10 +42,14 @@ export interface CommandRepository {
     patch: Partial<ApprovalRequest>
   ): Promise<ApprovalRequest | null>;
   saveResearch(task: ResearchTask): Promise<ResearchTask>;
+  getMemories(): Promise<MemoryRecord[]>;
+  saveMemory(record: MemoryRecord): Promise<MemoryRecord>;
+  getExperiments(): Promise<ExperimentRecord[]>;
+  saveExperiment(record: ExperimentRecord): Promise<ExperimentRecord>;
 }
 
 function defaultStore(): CommandStore {
-  return { decisions: [], tasks: [], approvals: [], research: [] };
+  return { decisions: [], tasks: [], approvals: [], research: [], memories: [], experiments: [] };
 }
 
 export class LocalCommandRepository implements CommandRepository {
@@ -132,6 +140,31 @@ export class LocalCommandRepository implements CommandRepository {
     await this.writeStore(store);
     return task;
   }
+
+  async getMemories(): Promise<MemoryRecord[]> {
+    return (await this.readStore()).memories;
+  }
+
+  async saveMemory(record: MemoryRecord): Promise<MemoryRecord> {
+    const store = await this.readStore();
+    store.memories = [...store.memories.filter((m) => m.memoryId !== record.memoryId), record];
+    await this.writeStore(store);
+    return record;
+  }
+
+  async getExperiments(): Promise<ExperimentRecord[]> {
+    return (await this.readStore()).experiments;
+  }
+
+  async saveExperiment(record: ExperimentRecord): Promise<ExperimentRecord> {
+    const store = await this.readStore();
+    store.experiments = [
+      ...store.experiments.filter((e) => e.experimentId !== record.experimentId),
+      record
+    ];
+    await this.writeStore(store);
+    return record;
+  }
 }
 
 /** テスト用: メモリ上のみで動くリポジトリ */
@@ -205,5 +238,29 @@ export class InMemoryCommandRepository implements CommandRepository {
       task
     ];
     return task;
+  }
+
+  async getMemories(): Promise<MemoryRecord[]> {
+    return this.store.memories;
+  }
+
+  async saveMemory(record: MemoryRecord): Promise<MemoryRecord> {
+    this.store.memories = [
+      ...this.store.memories.filter((m) => m.memoryId !== record.memoryId),
+      record
+    ];
+    return record;
+  }
+
+  async getExperiments(): Promise<ExperimentRecord[]> {
+    return this.store.experiments;
+  }
+
+  async saveExperiment(record: ExperimentRecord): Promise<ExperimentRecord> {
+    this.store.experiments = [
+      ...this.store.experiments.filter((e) => e.experimentId !== record.experimentId),
+      record
+    ];
+    return record;
   }
 }

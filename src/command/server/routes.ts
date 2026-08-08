@@ -36,6 +36,13 @@ import {
 import { AuditLog } from '../security/audit.js';
 import { addDaysJst, jstDate } from '../utils/jst.js';
 import { checkDataQuality } from '../domain/dataQuality.js';
+import { MemoryService } from '../memory/store.js';
+import type { MemoryLayer, MemoryType } from '../memory/types.js';
+import {
+  buildExperiment,
+  completeExperiment,
+  runMemoryMaintenance
+} from '../memory/maintenance.js';
 import {
   createGoogleAuthenticatorFromEnv,
   type GoogleIdentityAuthenticator
@@ -73,6 +80,7 @@ export function createCommandApp(
       : createGoogleAuthenticatorFromEnv();
   const app = new Hono<{ Variables: { principal: Principal } }>();
   const orchestrator = new CommandOrchestrator(repository);
+  const memoryService = new MemoryService(repository);
 
   // --- Principal解決 + Rate Limit（全ルート共通） ---
   app.use('*', async (c, next) => {
@@ -375,6 +383,198 @@ export function createCommandApp(
     try {
       const { scope, dataset } = await scopedDataset(c);
       return c.json({ scope, issues: checkDataQuality(dataset, scope) });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // --- Persistent Memory（Phase M）。Memory Audit UIのバックエンド ---
+  app.get('/memory/maintenance', async (c) => {
+    const principal = c.get('principal');
+    try {
+      if (!canDecideApproval(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}はMemoryメンテナンスを実行できません`);
+      }
+      const asOf = validateAsOf(c.req.query('asOf')) ?? nowIso();
+      const dataset = await repository.getDataset(asOf);
+      return c.json(await runMemoryMaintenance(repository, asOf, dataset));
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  app.get('/memory', async (c) => {
+    const principal = c.get('principal');
+    try {
+      const results = await memoryService.search(
+        {
+          q: c.req.query('q') || undefined,
+          type: (c.req.query('type') as MemoryType) || undefined,
+          layer: (c.req.query('layer') as MemoryLayer) || undefined,
+          validAt: validateAsOf(c.req.query('validAt')),
+          includeInactive: c.req.query('includeInactive') === 'true',
+          limit: Math.min(Number(c.req.query('limit') ?? 20), 100)
+        },
+        principal
+      );
+      return c.json({ memories: results });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  app.post('/memory/:id/confirm', async (c) => {
+    const principal = c.get('principal');
+    try {
+      // AI抽出の判断候補を正式確定できるのは人間（PRESIDENT/EXECUTIVE）のみ
+      if (!canRecordDecision(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}はMemoryを確定できません`);
+      }
+      const memories = await repository.getMemories();
+      const memory = memories.find((m) => m.memoryId === c.req.param('id'));
+      if (!memory) return c.json({ error: 'memory not found' }, 404);
+      assertScopeAllowed(principal, memory.companyId);
+      memory.reviewStatus = 'CONFIRMED_BY_USER';
+      if (memory.type === 'DECISION') memory.confidence = 'CONFIRMED';
+      memory.updatedAt = nowIso();
+      await repository.saveMemory(memory);
+      await audit.record({
+        actor: principal.label,
+        role: principal.role,
+        action: 'memory.confirm',
+        scope: memory.companyId,
+        detail: memory.statement,
+        outcome: 'ok'
+      });
+      return c.json(memory);
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  app.post('/memory/:id/archive', async (c) => {
+    const principal = c.get('principal');
+    try {
+      if (!canRecordDecision(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}はMemoryをアーカイブできません`);
+      }
+      const memory = await memoryService.archive(c.req.param('id'), nowIso());
+      return c.json(memory);
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  app.post('/memory/conflicts/resolve', async (c) => {
+    const principal = c.get('principal');
+    try {
+      if (!canRecordDecision(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}はConflictを解決できません`);
+      }
+      const body = (await c.req.json()) as { keepId?: string; supersedeId?: string; note?: string };
+      if (!body.keepId || !body.supersedeId)
+        throw new ValidationError('keepIdとsupersedeIdが必要です');
+      await memoryService.resolveConflict(
+        body.keepId,
+        body.supersedeId,
+        nowIso(),
+        body.note ?? 'ユーザー判断'
+      );
+      return c.json({ ok: true });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // --- Experiment Engine（提案して終わりにしない） ---
+  app.get('/experiments', async (c) => {
+    return c.json({ experiments: await repository.getExperiments() });
+  });
+
+  app.post('/experiments', async (c) => {
+    const principal = c.get('principal');
+    try {
+      if (!canRecordDecision(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}は実験を登録できません`);
+      }
+      const body = (await c.req.json()) as Record<string, string>;
+      for (const field of ['companyId', 'hypothesis', 'metric', 'baseline', 'target']) {
+        if (!body[field]) throw new ValidationError(`${field}は必須です`);
+      }
+      assertScopeAllowed(principal, body.companyId);
+      const experiment = buildExperiment(
+        {
+          companyId: body.companyId,
+          hypothesis: body.hypothesis,
+          metric: body.metric,
+          baseline: body.baseline,
+          target: body.target,
+          plannedEndAt: body.plannedEndAt
+        },
+        `user:${principal.label}`,
+        nowIso()
+      );
+      return c.json(await repository.saveExperiment(experiment));
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  app.post('/experiments/:id/result', async (c) => {
+    const principal = c.get('principal');
+    try {
+      if (!canRecordDecision(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}は実験結果を登録できません`);
+      }
+      const body = (await c.req.json()) as { result?: string; evaluation?: string };
+      if (!body.result || !body.evaluation)
+        throw new ValidationError('resultとevaluationが必要です');
+      const experiments = await repository.getExperiments();
+      const experiment = experiments.find((e) => e.experimentId === c.req.param('id'));
+      if (!experiment) return c.json({ error: 'experiment not found' }, 404);
+      assertScopeAllowed(principal, experiment.companyId);
+      const now = nowIso();
+      const { experiment: completed, lessonStatement } = completeExperiment(
+        experiment,
+        body.result,
+        body.evaluation,
+        now
+      );
+      await repository.saveExperiment(completed);
+      // 成功・失敗の両方をLESSONとして会社Memoryへ戻す
+      const lesson = await memoryService.save(
+        {
+          type: 'LESSON',
+          statement: lessonStatement,
+          entities: [],
+          relations: completed.hypothesisMemoryId
+            ? [{ kind: 'validates', targetMemoryId: completed.hypothesisMemoryId }]
+            : [],
+          layer: 'COMPANY',
+          sensitivity: 'NORMAL',
+          companyId: completed.companyId,
+          source: 'SYSTEM',
+          sourceId: completed.experimentId,
+          sourceTimestamp: now,
+          validFrom: now.slice(0, 10),
+          confidence: 'HIGH',
+          createdBy: `user:${principal.label}`,
+          reviewStatus: 'CONFIRMED_BY_USER',
+          evidence: [
+            {
+              label: '実験結果',
+              value: `${completed.metric}: ${completed.baseline} → ${body.result}`,
+              refId: completed.experimentId,
+              source: 'Experiment Engine',
+              asOf: now
+            }
+          ]
+        },
+        now
+      );
+      completed.lessonMemoryId = lesson.record.memoryId;
+      await repository.saveExperiment(completed);
+      return c.json({ experiment: completed, lesson: lesson.record });
     } catch (error) {
       return handleError(c, error);
     }

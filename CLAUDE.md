@@ -72,6 +72,13 @@ HTTPリクエスト (src/server.ts, Hono)
 - RBAC（`src/command/domain/rbac.ts`）はAPI側とOrchestrator（Tool実行前）の両方で強制。UIで隠すだけの権限制御を追加しない。
 - 日付判定（今日・当月・期日）は `src/command/utils/jst.ts` を通しAsia/Tokyo基準。ISO文字列の `slice` で直接判定しない。
 
+### Persistent Memory（src/command/memory/ — Phase M）
+
+- Learning Safetyは `memory/store.ts` の `MemoryService.validate` で強制される。AI推測のFACT保存・DECISION独断確定・出典なし重要Memory・給与等実値の複製・履歴なし上書きは禁止。この検証を迂回してMemoryを直接保存しない。
+- 記憶は物理削除せず状態遷移（SUPERSEDED/CORRECTED/EXPIRED/ARCHIVED）で履歴を保持する。
+- PRESIDENT層・SENSITIVE_REFのRBACは `MemoryService.search` が強制する。検索を経由せず全件を返すAPIを追加しない。
+- 汎用推論（`ai/generalReasoner.ts`）へ渡してよい社内事実はTool/Memory由来のみ。
+
 ### docs/ のLCC業務アプリ（APIとは独立）
 
 `docs/` にはGitHub Pages公開用の単一HTML完結アプリ（LCC統合見積システム `lcc.html`、原価管理 `lcc-cost.html`、ポータル `index.html`）がある。Vue3 + Tailwind をCDN読み込みし、ビルドツール不使用。ルートの `lcc-redesigned.html` はその開発版。これらは `src/` のAPIとは独立しており、npmビルド・テストの対象外。

@@ -42,6 +42,11 @@ import {
 } from '../tools/registry.js';
 import { addDaysJst, jstDate } from '../utils/jst.js';
 import { ContextStore, type ConversationContext, type IntentKey } from './context.js';
+import { MemoryService } from '../memory/store.js';
+import { curateConversationTurn, detectCorrection, extractEntities } from '../memory/curator.js';
+import { classifyConversation } from './universalRouter.js';
+import { buildInnovationProposal, formatInnovationProposal } from '../memory/innovation.js';
+import { GeneralReasoner, createGeneralRouter } from '../ai/generalReasoner.js';
 
 /** 無制限ループ禁止のための上限。1リクエストで超えたら打ち切る */
 export const ORCHESTRATOR_LIMITS = {
@@ -95,6 +100,7 @@ interface HandlerResult {
   listItems?: ConversationContext['lastListItems'];
   listShown?: number;
   draft?: ConversationContext['lastDraft'];
+  memoryIds?: string[];
 }
 
 interface ExecutionState {
@@ -105,8 +111,13 @@ interface ExecutionState {
 
 export class CommandOrchestrator {
   private readonly contexts = new ContextStore();
+  private readonly memoryService: MemoryService;
+  private readonly reasoner: GeneralReasoner;
 
-  constructor(private readonly repository: CommandRepository) {}
+  constructor(private readonly repository: CommandRepository) {
+    this.memoryService = new MemoryService(repository);
+    this.reasoner = new GeneralReasoner(createGeneralRouter());
+  }
 
   async chat(
     request: CommandChatRequest,
@@ -169,6 +180,31 @@ export class CommandOrchestrator {
     }
 
     const result = await this.dispatch(ctx, message, context, principal, state, dataStatus);
+
+    // Memory Curator: 会話から意味単位の記憶候補を抽出（Learning Safetyはstore側で強制）
+    if (result.intent !== 'memory_recall') {
+      try {
+        const companyId = scope === 'group' ? (dataset.companies[0]?.companyId ?? 'group') : scope;
+        const curation = await curateConversationTurn(
+          this.memoryService,
+          dataset,
+          message,
+          principal,
+          companyId,
+          asOf,
+          sessionId
+        );
+        if (curation.notices.length > 0) {
+          result.response.text += `\n\n${curation.notices.join('\n')}`;
+        }
+        if (curation.saved.length > 0 && !result.memoryIds) {
+          result.memoryIds = curation.saved.map((item) => item.record.memoryId);
+        }
+      } catch {
+        // 記憶抽出の失敗で会話を止めない
+      }
+    }
+
     this.remember(context, scope, result);
     return result.response;
   }
@@ -192,6 +228,27 @@ export class CommandOrchestrator {
     // --- 文脈フォローアップ（直前の話題を参照する発話） ---
     const followUp = await this.tryFollowUp(ctx, message, context, principal, state, dataStatus);
     if (followUp) return followUp;
+
+    // --- Persistent Memory（訂正・想起・監査・判断レビュー） ---
+    if (detectCorrection(message).isCorrection && context.lastMemoryIds.length > 0) {
+      return this.handleCorrection(ctx, message, context, principal, dataStatus);
+    }
+    if (/(私|会社)について何を覚えて|何を記憶して/.test(message)) {
+      return this.handleMemoryAudit(ctx, principal, dataStatus);
+    }
+    if (/今も正しい|まだ有効/.test(message) && context.lastMemoryIds.length > 0) {
+      return this.handleDecisionReview(ctx, context, dataStatus);
+    }
+    if (/前に|以前|昨日の話|この間|何だっけ|言ってた|覚えて/.test(message)) {
+      return this.handleMemoryRecall(ctx, message, context, principal, dataStatus);
+    }
+    if (
+      /(アイデア|新しい事業|工夫|いいやり方|改善案|対策).{0,8}(考えて|ない？|ある？|出して)|考えて$/.test(
+        message
+      )
+    ) {
+      return this.handleInnovation(ctx, message, principal, dataStatus);
+    }
 
     // --- Write系（下書き→承認） ---
     if (/送って|送信して/.test(message))
@@ -242,7 +299,8 @@ export class CommandOrchestrator {
 
     if (/売上|今月どう|着地|目標/.test(message)) return this.runIntent('sales', ctx, dataStatus);
 
-    return this.handleUnknown(ctx, message, dataStatus);
+    // 固定Intent外はUNKNOWNで終了せず、General Reasoningへフォールバックする
+    return this.handleGeneral(ctx, message, principal, dataStatus);
   }
 
   /** Intentキーからの再実行（スコープ切替・文脈再訪で使う） */
@@ -387,6 +445,34 @@ export class CommandOrchestrator {
       if (context.lastIntent === 'cash') return this.handleCashDetail(ctx, dataStatus);
       if (context.lastIntent === 'sales') return this.runIntent('pipeline', ctx, dataStatus);
       return this.runIntent(context.lastIntent, ctx, dataStatus, context.lastProjectId);
+    }
+
+    // 「それどこから？」（Memory Provenance）
+    if (/どこから|出典(は|を)/.test(message) && context.lastMemoryIds.length > 0) {
+      const memories = await this.repository.getMemories();
+      const targets = context.lastMemoryIds
+        .map((id) => memories.find((m) => m.memoryId === id))
+        .filter((m) => m !== undefined)
+        .slice(0, 3);
+      if (targets.length > 0) {
+        const lines = targets.flatMap((m) => [
+          `「${m.statement}」の出典:`,
+          `・ソース: ${m.source}${m.sourceTimestamp ? `（${m.sourceTimestamp.slice(0, 10)}）` : ''} / 記録者: ${m.createdBy} / 確信度: ${m.confidence}`,
+          ...m.evidence.slice(0, 3).map((ev) => `・${ev.label}: ${ev.value}（${ev.source}）`)
+        ]);
+        return {
+          response: {
+            text: lines.join('\n'),
+            dataStatus,
+            uiHint: 'text',
+            confidence: 'HIGH',
+            evidence: targets.flatMap((m) => m.evidence).slice(0, 6),
+            toolsUsed: ['memory_search']
+          },
+          intent: 'memory_recall',
+          memoryIds: context.lastMemoryIds
+        };
+      }
     }
 
     // 「根拠は？」
@@ -1634,6 +1720,350 @@ export class CommandOrchestrator {
     };
   }
 
+  // ------------------------------------------------------------------
+  // Persistent Memory / Innovation / General（Phase M）
+  // ------------------------------------------------------------------
+
+  private async handleCorrection(
+    ctx: ToolContext,
+    message: string,
+    context: ConversationContext,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const targetId = context.lastMemoryIds[0];
+    const memories = await this.repository.getMemories();
+    const target = memories.find((m) => m.memoryId === targetId);
+    if (!target) {
+      return this.simpleText(
+        'どの記憶についての訂正か特定できませんでした。「前に◯◯って言ってた件」のように対象を呼び出してから訂正してください。',
+        'memory_recall',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    const now = ctx.dataset.asOf;
+    const { newContent } = detectCorrection(message);
+    const mode = /方針変えた|やめた/.test(message) ? 'SUPERSEDED' : 'CORRECTED';
+
+    if (!newContent) {
+      await this.memoryService.invalidate(targetId, now, message.slice(0, 80));
+      return {
+        response: {
+          text: [
+            `「${target.statement}」を${mode === 'SUPERSEDED' ? '方針変更' : '訂正'}として記録しました（旧情報は履歴として保持します）。`,
+            '現在の正しい情報を教えていただければ、新しい記憶として登録します。'
+          ].join('\n'),
+          dataStatus,
+          uiHint: 'text',
+          confidence: 'HIGH',
+          evidence: [],
+          toolsUsed: ['memory_correct']
+        },
+        intent: 'memory_recall',
+        memoryIds: [targetId]
+      };
+    }
+
+    const { replacement } = await this.memoryService.correct(
+      targetId,
+      {
+        type: target.type,
+        statement: newContent,
+        entities: target.entities,
+        relations: [],
+        layer: target.layer,
+        sensitivity: 'NORMAL',
+        companyId: target.companyId,
+        projectId: target.projectId,
+        source: 'CONVERSATION',
+        sourceId: context.sessionId,
+        sourceTimestamp: now,
+        validFrom: now.slice(0, 10),
+        confidence: 'HIGH',
+        createdBy: `user:${principal.label}`,
+        reviewStatus: 'CONFIRMED_BY_USER',
+        evidence: [
+          {
+            label: '訂正発言',
+            value: message.slice(0, 120),
+            source: `会話（${principal.label}）`,
+            asOf: now
+          }
+        ]
+      },
+      now,
+      message.slice(0, 80),
+      mode
+    );
+    return {
+      response: {
+        text: [
+          '記憶を更新しました（履歴は保持しています）。',
+          `旧: ${target.statement}（${mode}）`,
+          `新: ${replacement.statement}（${replacement.validFrom}〜 / ACTIVE）`
+        ].join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        confidence: 'HIGH',
+        evidence: replacement.evidence,
+        toolsUsed: ['memory_correct']
+      },
+      intent: 'memory_recall',
+      memoryIds: [replacement.memoryId]
+    };
+  }
+
+  private async handleMemoryRecall(
+    ctx: ToolContext,
+    message: string,
+    context: ConversationContext,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    // 「いつ変更した？」「なぜ変えた？」→ 変遷履歴で答える
+    if (/いつ変更|なぜ変えた|変更の経緯/.test(message) && context.lastMemoryIds[0]) {
+      const chain = await this.memoryService.history(context.lastMemoryIds[0]);
+      if (chain.length > 1) {
+        const lines = [
+          '変遷履歴:',
+          ...chain.map(
+            (m) =>
+              `・${m.validFrom}〜${m.validUntil ?? '現在'}: ${m.statement}（${m.status}${m.correctionNote ? ` / 理由: ${m.correctionNote}` : ''}）`
+          )
+        ];
+        return {
+          response: {
+            text: lines.join('\n'),
+            dataStatus,
+            uiHint: 'text',
+            confidence: 'HIGH',
+            evidence: chain.flatMap((m) => m.evidence).slice(0, 6),
+            toolsUsed: ['memory_history']
+          },
+          intent: 'memory_recall',
+          memoryIds: chain.map((m) => m.memoryId)
+        };
+      }
+    }
+
+    const yearMatch = message.match(/(20\d{2})年(当時|時点|の頃|は)/);
+    const validAt = yearMatch ? `${yearMatch[1]}-07-01` : undefined;
+    const q = message
+      .replace(
+        /前に|以前|昨日の話|この間|何だっけ|何て言ってた|言ってた|覚えてる|覚えている|どうなった|について|の件|[？?]/g,
+        ' '
+      )
+      .replace(/(20\d{2})年(当時|時点|の頃|は)/, ' ')
+      .trim();
+    const results = await this.memoryService.search(
+      {
+        q: q.length >= 2 ? q : undefined,
+        validAt,
+        includeInactive: Boolean(validAt),
+        companyId: ctx.scope !== 'group' ? ctx.scope : undefined,
+        limit: 5
+      },
+      principal
+    );
+    if (results.length === 0) {
+      return this.simpleText(
+        [
+          '該当する記憶が見つかりませんでした。推測では補いません。',
+          '（記憶されるのは会話で確認された事実・判断・課題などです。対象や時期を変えて聞き直すこともできます）'
+        ].join('\n'),
+        'memory_recall',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    const lines = [
+      validAt ? `【${yearMatch?.[1]}年時点で有効だった記憶】` : '【関連する記憶】',
+      ...results.map(
+        (m) =>
+          `・[${m.type}] ${m.statement}（${m.validFrom}〜${m.validUntil ?? '現在'} / ${m.status}${m.reviewStatus === 'PENDING_REVIEW' ? ' / 確認待ち' : ''} / 出典: ${m.source}）`
+      ),
+      '',
+      '「それどこから？」で出典、「それ、今も正しい？」で有効性、「それ違う」で訂正できます。'
+    ];
+    const confidence = results.some((m) => ['CONFIRMED', 'HIGH'].includes(m.confidence))
+      ? 'HIGH'
+      : 'MEDIUM';
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        confidence,
+        evidence: results.flatMap((m) => m.evidence).slice(0, 8),
+        toolsUsed: ['memory_search']
+      },
+      intent: 'memory_recall',
+      memoryIds: results.map((m) => m.memoryId)
+    };
+  }
+
+  private async handleDecisionReview(
+    ctx: ToolContext,
+    context: ConversationContext,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const memories = await this.repository.getMemories();
+    const target = memories.find((m) => m.memoryId === context.lastMemoryIds[0]);
+    if (!target) {
+      return this.simpleText(
+        '対象の記憶を特定できませんでした。',
+        'decision_review',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    const today = jstDate(ctx.dataset.asOf);
+    const lines: string[] = [`「${target.statement}」の現在の状態:`];
+    if (target.status === 'ACTIVE' && (!target.validUntil || target.validUntil >= today)) {
+      lines.push(
+        `・ACTIVE（有効）です。有効期限: ${target.validUntil ?? '設定なし'} / 確信度: ${target.confidence}${target.reviewStatus === 'PENDING_REVIEW' ? ' / ただし正式確認待ちです' : ''}`
+      );
+    } else if (target.supersededBy) {
+      const successor = memories.find((m) => m.memoryId === target.supersededBy);
+      lines.push(
+        `・${target.status}: 置き換えられています。現在有効: 「${successor?.statement ?? '不明'}」`
+      );
+    } else {
+      lines.push(
+        `・${target.status}: 有効期限（${target.validUntil ?? '不明'}）を過ぎているか訂正済みです。再評価を推奨します。`
+      );
+    }
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        confidence: 'HIGH',
+        evidence: target.evidence.slice(0, 4),
+        toolsUsed: ['memory_search']
+      },
+      intent: 'decision_review',
+      memoryIds: [target.memoryId]
+    };
+  }
+
+  private async handleMemoryAudit(
+    ctx: ToolContext,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const results = await this.memoryService.search(
+      { includeInactive: false, limit: 100 },
+      principal
+    );
+    if (results.length === 0) {
+      return this.simpleText(
+        'まだ有効な記憶はありません。会話の中の事実・判断・課題を少しずつ記憶していきます。',
+        'memory_audit',
+        'HIGH',
+        dataStatus
+      );
+    }
+    const byType = new Map<string, number>();
+    for (const m of results) byType.set(m.type, (byType.get(m.type) ?? 0) + 1);
+    const lines = [
+      `現在、あなたの権限で参照できる有効な記憶は${results.length}件です。`,
+      ...[...byType.entries()].map(([type, count]) => `・${type}: ${count}件`),
+      '',
+      '直近の記憶:',
+      ...results.slice(0, 5).map((m) => `・[${m.type}] ${m.statement}`),
+      '',
+      '「それ違う」で訂正、「それどこから？」で出典を確認できます（記憶はブラックボックスにしません）。'
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        confidence: 'HIGH',
+        evidence: [],
+        toolsUsed: ['memory_search']
+      },
+      intent: 'memory_audit',
+      memoryIds: results.slice(0, 5).map((m) => m.memoryId)
+    };
+  }
+
+  private async handleInnovation(
+    ctx: ToolContext,
+    message: string,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const related = await this.memoryService.search(
+      { q: message, includeInactive: false, limit: 5 },
+      principal
+    );
+    const preferences = await this.memoryService.search(
+      { type: 'PREFERENCE', limit: 5 },
+      principal
+    );
+    const concise =
+      /簡潔|短く|要点だけ/.test(message) || preferences.some((m) => /簡潔|短く/.test(m.statement));
+    const proposal = buildInnovationProposal(ctx.dataset, ctx.scope, message, related, concise);
+    return {
+      response: {
+        text: formatInnovationProposal(proposal, concise),
+        dataStatus,
+        uiHint: 'text',
+        data: proposal,
+        confidence: 'MEDIUM',
+        evidence: [],
+        toolsUsed: ['innovation_engine', 'memory_search']
+      },
+      intent: 'ideation'
+    };
+  }
+
+  private async handleGeneral(
+    ctx: ToolContext,
+    message: string,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const categories = classifyConversation(message);
+    // 社内事実として渡してよいのはTool/Memory由来のみ（LLMに捏造させない）
+    const facts: string[] = [];
+    for (const entity of extractEntities(ctx.dataset, message)) {
+      if (entity.entityType === 'Project' && entity.entityId) {
+        const project = ctx.dataset.projects.find((p) => p.projectId === entity.entityId);
+        if (project) {
+          facts.push(
+            `案件「${project.name}」: ステージ${project.stage}、受注額${yen(project.orderAmount)}`
+          );
+        }
+      }
+    }
+    const memories = await this.memoryService.search({ q: message, limit: 3 }, principal);
+    facts.push(...memories.map((m) => `記憶[${m.type}] ${m.statement}`));
+
+    const answer = await this.reasoner.answer(message, facts);
+    return {
+      response: {
+        text: answer.available
+          ? answer.text
+          : [
+              `${answer.text}`,
+              '',
+              `（分類: ${categories.join(' + ')} / 推測では回答しません）`
+            ].join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        confidence: answer.available ? 'MEDIUM' : 'UNKNOWN',
+        evidence: [],
+        toolsUsed: answer.available ? ['general_reasoning'] : []
+      },
+      intent: 'general',
+      memoryIds: memories.length > 0 ? memories.map((m) => m.memoryId) : undefined
+    };
+  }
+
   private async handleUnknown(
     ctx: ToolContext,
     message: string,
@@ -1669,6 +2099,7 @@ export class CommandOrchestrator {
       context.lastListShown = result.listShown ?? result.listItems.length;
     }
     if (result.draft !== undefined) context.lastDraft = result.draft;
+    if (result.memoryIds) context.lastMemoryIds = result.memoryIds;
     context.lastEvidence = result.response.evidence;
     context.lastConfidence = result.response.confidence;
     this.contexts.save(context);

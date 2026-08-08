@@ -149,6 +149,20 @@ LCC COMMANDのコード・シードからkintone前提の記述は除去済み�
 - **正本調査**: `REAL_DATA_SOURCE_MAP.md` 参照。Drive読み取りツールの承認待ちのため全候補UNKNOWN維持。
 - **スナップショット経路**: `SnapshotSheetsClient`（`data/snapshots/`、Git管理外）でクレデンシャルなしの実データ検証が可能。
 
+## Phase M（Persistent Intelligence / 会話学習・Innovation Engine）の状態
+
+Phase A/B0の決定論エンジン・Canonical Model・Source Adapter・RBAC・Evidenceを変更せず、上位に「継続学習する会社知能層」を追加した。学習＝Fine-tuningではなく、会話→抽出→検証→永続Memory→将来の想起→実験→結果→Lessonのループ。
+
+- **Persistent Memory** `src/command/memory/`（12種のAtomic Memory型、ACTIVE/SUPERSEDED/CORRECTED/EXPIRED/REJECTED/ARCHIVEDの状態遷移、validFrom/validUntilのTemporal Memory、出典・確信度・Entity/Relation付き）。COMPANY/PRESIDENT/OPERATIONAL/EXTERNALの層分離とRBAC（PRESIDENT層は経営者のみ）。
+- **Learning Safety（store側で強制）**: AI推測のFACT保存禁止／AIによるDECISION独断確定禁止（PENDING_REVIEW必須）／出典なし重要Memory禁止／給与等の実値複製禁止（SENSITIVE_REFは参照のみ）／外部調査はEXTERNAL層へ強制／履歴なし上書き禁止／物理削除なし。
+- **Memory Curator**: 会話から意見→HYPOTHESIS(UNVERIFIED)、決定宣言→DECISION候補（確認待ち）、問題・好み・約束を自動抽出。重複はEvidence追記、矛盾はConflictとして両方保持し報告（ユーザー判断で解決）。
+- **会話能力**: 「前に◯◯何だっけ？」（Cross-session想起）「2025年当時は？」（時間軸）「それどこから？」（Provenance）「それ、今も正しい？」（Decision Review）「それ違う。今は◯◯」（訂正・履歴保持）「何を覚えている？」（Memory Audit）。
+- **Universal Router + General Fallback**: 12カテゴリ多重分類。固定Intent外はUNKNOWN終了せず汎用推論へ。`ANTHROPIC_API_KEY` 設定時はAnthropicモデル（社内事実はTool/Memory由来のみ注入・捏造禁止プロンプト）、未設定時は「できない」と正直に返す。
+- **Innovation Engine**: 問題定義→データによる現状→Root Cause候補→社内類似事例(Memory)→前提を疑う→Conservative/Practical/Innovative 3案（実現性・ROI観点・Risk・最小テスト付き）。簡潔指定時は要約のみ。
+- **Experiment Engine + Result Feedback**: 仮説→実験（指標・Baseline・Target）→結果→Lesson化して会社Memoryへ還元。結果未登録はメンテナンスが検出。
+- **Nightly Maintenance** `GET /command/memory/maintenance`: 期限切れDECISIONのEXPIRED遷移（機械的ルールのみ自動）、未検証仮説・確認待ち・重複・矛盾・Archive候補の報告、Proactive Problem Discovery（複数案件に共通する原価超過パターン等）。
+- **API**: `GET /command/memory`（検索・時間軸・RBAC）、`POST /command/memory/:id/confirm|archive`、`POST /command/memory/conflicts/resolve`、`GET/POST /command/experiments`、`POST /command/experiments/:id/result`。
+
 ## フェーズ計画
 
 - **Phase A（本実装）**: 会話コア＋決定論エンジン＋承認フロー＋Brief＋UI＋RBAC/セキュリティ。読み取り正本はDemo Fixture（demoモード限定）。実行は全てdry-run。

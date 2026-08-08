@@ -26,6 +26,11 @@ export type IntentKey =
   | 'send'
   | 'advice'
   | 'compound'
+  | 'memory_recall'
+  | 'memory_audit'
+  | 'decision_review'
+  | 'ideation'
+  | 'general'
   | 'unknown';
 
 export interface ContextListItem {
@@ -46,6 +51,8 @@ export interface ConversationContext {
   /** リストのうち既に表示した件数 */
   lastListShown: number;
   lastDraft: { text: string; customerName: string; customerId?: string; projectId?: string } | null;
+  /** 直前に提示・参照したMemory（「それ違う」「それどこから？」の解決に使う） */
+  lastMemoryIds: string[];
   lastEvidence: Evidence[];
   lastConfidence: DataConfidence;
   updatedAtMs: number;
@@ -64,6 +71,7 @@ export function emptyContext(sessionId: string, scope: CompanyScope): Conversati
     lastListItems: [],
     lastListShown: 0,
     lastDraft: null,
+    lastMemoryIds: [],
     lastEvidence: [],
     lastConfidence: 'UNKNOWN',
     updatedAtMs: Date.now()
