@@ -10,10 +10,11 @@
 import type { CommandDataset } from '../data/seed.js';
 import type { DataConfidence, Principal } from '../domain/types.js';
 import type { MemoryRecord } from '../memory/types.js';
+import type { ArtifactRecord } from '../artifacts/artifactRegistry.js';
 
 export interface UnifiedSearchResult {
   source: string;
-  entity: 'CUSTOMER' | 'PROJECT' | 'MEMORY' | 'DOCUMENT' | 'SYSTEM';
+  entity: 'CUSTOMER' | 'PROJECT' | 'MEMORY' | 'DOCUMENT' | 'SYSTEM' | 'ARTIFACT';
   title: string;
   date?: string;
   freshness: 'FRESH' | 'STALE' | 'VERY_STALE' | 'UNKNOWN';
@@ -119,9 +120,28 @@ export function unifiedSearch(
   dataset: CommandDataset,
   memories: MemoryRecord[],
   query: string,
-  principal: Principal
+  principal: Principal,
+  artifacts: ArtifactRecord[] = []
 ): UnifiedSearchResult[] {
   const results: UnifiedSearchResult[] = [];
+
+  // 生成済みArtifact（§30: 「前に作った○○どれ？」に答える）
+  for (const artifact of artifacts) {
+    const terms = artifact.title.match(/[一-龠ァ-ヶーA-Za-z0-9]{2,}/g) ?? [];
+    if (terms.some((term) => term.length >= 2 && query.includes(term))) {
+      results.push({
+        source: 'Artifact Registry',
+        entity: 'ARTIFACT',
+        title: `${artifact.title}（${artifact.type} v${artifact.version}）`,
+        date: artifact.createdAt.slice(0, 10),
+        freshness: 'FRESH',
+        confidence: 'HIGH',
+        permission: 'ALL',
+        snippet: `状態: ${artifact.status}${artifact.storageLocation ? ` / ${artifact.storageLocation}` : ''}`,
+        reference: artifact.artifactId
+      });
+    }
+  }
 
   // 正本カタログ（権限フィルタをここで強制。§27 People OSはPRESIDENTのみ）
   for (const item of SOURCE_CATALOG) {

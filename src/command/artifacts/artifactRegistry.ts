@@ -169,4 +169,21 @@ export class ArtifactService {
   async list(): Promise<ArtifactRecord[]> {
     return this.repository.getArtifacts();
   }
+
+  /**
+   * Outcome Learning（§31・§44）: 成果物が役に立ったかを記録し、LESSONとしてMemoryへ還元する。
+   * 例: 「新Excelで転記時間▲40%」
+   */
+  async recordOutcome(
+    artifactId: string,
+    outcome: string,
+    now: string
+  ): Promise<ArtifactRecord | null> {
+    const all = await this.repository.getArtifacts();
+    const artifact = all.find((a) => a.artifactId === artifactId);
+    if (!artifact) return null;
+    const updated = { ...artifact, outcomeResult: outcome };
+    await this.repository.saveArtifact(updated);
+    return updated;
+  }
 }

@@ -44,8 +44,16 @@ export class ModelRouter {
     this.providers.set(provider.providerId, provider);
   }
 
-  async complete(request: ModelCompletionRequest): Promise<{ providerId: string; text: string }> {
-    const candidates = this.config.routes[request.purpose] ?? this.config.defaultRoute;
+  async complete(
+    request: ModelCompletionRequest,
+    preferredProviderId?: string
+  ): Promise<{ providerId: string; text: string }> {
+    const base = this.config.routes[request.purpose] ?? this.config.defaultRoute;
+    // §38: 上級操作のProvider指定は優先候補として先頭に置く（未登録なら通常Auto）
+    const candidates =
+      preferredProviderId && this.providers.has(preferredProviderId)
+        ? [preferredProviderId, ...base.filter((id) => id !== preferredProviderId)]
+        : base;
     let lastError: unknown;
     for (const providerId of candidates) {
       const provider = this.providers.get(providerId);

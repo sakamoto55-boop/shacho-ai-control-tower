@@ -846,6 +846,52 @@ export function createCommandApp(
 
   app.get('/stewardship', (c) => c.json({ stewards: DATA_STEWARDSHIP }));
 
+  // Outcome Learning（LIVE-AI §31）: 成果物の効果を記録しLESSON化（自動学習には使わない）
+  app.post('/artifacts/:id/outcome', async (c) => {
+    const principal = c.get('principal');
+    try {
+      const body = (await c.req.json()) as { outcome?: string };
+      if (!body.outcome || typeof body.outcome !== 'string') {
+        throw new ValidationError('outcome（結果の説明）を指定してください');
+      }
+      const updated = await artifactService.recordOutcome(
+        c.req.param('id'),
+        body.outcome.slice(0, 200),
+        nowIso()
+      );
+      if (!updated) return c.json({ error: 'artifact not found' }, 404);
+      try {
+        await memoryService.save(
+          {
+            type: 'LESSON',
+            statement: `成果物「${updated.title.slice(0, 40)}」の結果: ${body.outcome.slice(0, 120)}`,
+            entities: [],
+            relations: [],
+            layer: 'OPERATIONAL',
+            sensitivity: 'NORMAL',
+            companyId: 'lcc',
+            source: 'CONVERSATION',
+            sourceId: updated.artifactId,
+            sourceTimestamp: nowIso(),
+            validFrom: nowIso().slice(0, 10),
+            confidence: 'MEDIUM',
+            createdBy: `user:${principal.label}`,
+            reviewStatus: 'AUTO',
+            evidence: [
+              { label: 'Artifact', value: updated.artifactId, source: 'Artifact Registry', asOf: nowIso() }
+            ]
+          },
+          nowIso()
+        );
+      } catch {
+        // Lesson保存失敗でもOutcome記録自体は成立
+      }
+      return c.json(updated);
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
   app.get('/search', async (c) => {
     const principal = c.get('principal');
     try {

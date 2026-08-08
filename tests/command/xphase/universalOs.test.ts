@@ -150,9 +150,10 @@ describe('X: Universal Capability Registry / Router / Permission / Cost', () => 
     // 決定論実装は常時ACTIVE
     expect(statuses.find((s) => s.id === 'SEARCH_INTERNAL')?.status).toBe('ACTIVE');
     expect(statuses.find((s) => s.id === 'CREATE_ESTIMATE_DRAFT')?.status).toBe('ACTIVE');
-    // 生成系は未接続
+    // 画像・Coding Agentは未接続（LIVE-AIでPPTX/XLSX/DOCX/PDFは決定論RendererによりACTIVE化）
     expect(statuses.find((s) => s.id === 'IMAGE_GENERATION')?.status).toBe('NOT_CONFIGURED');
-    expect(statuses.find((s) => s.id === 'PRESENTATION_CREATION')?.status).toBe('NOT_CONFIGURED');
+    expect(statuses.find((s) => s.id === 'PRESENTATION_CREATION')?.status).toBe('ACTIVE');
+    expect(statuses.find((s) => s.id === 'SPREADSHEET_CREATION')?.status).toBe('ACTIVE');
     expect(statuses.find((s) => s.id === 'SOFTWARE_ENGINEERING')?.status).toBe('NOT_CONFIGURED');
   });
 
@@ -201,15 +202,17 @@ describe('X: Artifact Creation / Software Build / Estimate / Search', () => {
     orchestrator = new CommandOrchestrator(repository);
   });
 
-  it('「プレゼン作って」はCapability連鎖のPlanになり、未接続を正直に伝えてArtifact登録する（§19-§20）', async () => {
+  it('「プレゼン作って」はArtifact登録される（LIVE-AIで実生成に昇格。詳細はliveaiテスト）', async () => {
     const res = await orchestrator.chat({ message: '来月の経営会議プレゼン作って', scope: 'lcc', asOf: ASOF });
-    expect(res.text).toContain('実行ステップ');
-    expect(res.text).toContain('未接続');
-    expect(res.text).toContain('偽って返すことはしません');
+    expect(res.text).toContain('PPTX');
     const artifacts = await repository.getArtifacts();
     expect(artifacts.length).toBe(1);
     expect(artifacts[0].type).toBe('PPTX');
-    expect(artifacts[0].status).toBe('PLANNED');
+    expect(['PLANNED', 'COMPLETED']).toContain(artifacts[0].status);
+    if (artifacts[0].storageLocation) {
+      const { rmSync } = await import('node:fs');
+      rmSync(artifacts[0].storageLocation, { force: true });
+    }
   });
 
   it('Artifact Plan: PPTX連鎖はSEARCH_INTERNALから始まりCRITICで終わる（§19）', () => {

@@ -8,6 +8,7 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 import { ModelRouter, type CommandModelProvider } from './ModelRouter.js';
+import { GeminiCommandModelProvider, OpenAICommandModelProvider } from './liveProviders.js';
 
 /** Anthropic実Provider。ANTHROPIC_API_KEY設定時のみ登録される */
 export class AnthropicCommandModelProvider implements CommandModelProvider {
@@ -52,13 +53,16 @@ export interface GeneralAnswer {
 export function createGeneralRouter(
   env = process.env
 ): ModelRouter & { hasRealProvider?: boolean } {
-  const hasKey = Boolean(env.ANTHROPIC_API_KEY);
-  const router = new ModelRouter({
-    routes: {},
-    defaultRoute: hasKey ? ['anthropic', 'mock'] : ['mock']
-  });
-  if (hasKey) router.register(new AnthropicCommandModelProvider(env.ANTHROPIC_API_KEY as string));
-  return Object.assign(router, { hasRealProvider: hasKey });
+  // 実Providerの登録（Phase LIVE-AI §7: Anthropic → OpenAI → Gemini の優先順。固定はしない）
+  const order: string[] = [];
+  if (env.ANTHROPIC_API_KEY) order.push('anthropic');
+  if (env.OPENAI_API_KEY) order.push('openai');
+  if (env.GEMINI_API_KEY) order.push('gemini');
+  const router = new ModelRouter({ routes: {}, defaultRoute: [...order, 'mock'] });
+  if (env.ANTHROPIC_API_KEY) router.register(new AnthropicCommandModelProvider(env.ANTHROPIC_API_KEY));
+  if (env.OPENAI_API_KEY) router.register(new OpenAICommandModelProvider(env.OPENAI_API_KEY));
+  if (env.GEMINI_API_KEY) router.register(new GeminiCommandModelProvider(env.GEMINI_API_KEY));
+  return Object.assign(router, { hasRealProvider: order.length > 0 });
 }
 
 export class GeneralReasoner {
@@ -75,11 +79,15 @@ export class GeneralReasoner {
   /**
    * internalContext: Tool/Memoryから取得済みの社内事実（これ以外を社内事実として使わせない）
    */
-  async answer(message: string, internalContext: string[]): Promise<GeneralAnswer> {
+  async answer(
+    message: string,
+    internalContext: string[],
+    preferredProviderId?: string
+  ): Promise<GeneralAnswer> {
     if (!this.hasRealProvider) {
       return {
         text: [
-          'この質問は汎用推論（自由対話）の領域ですが、現在この環境には生成AIモデルが接続されていません（ANTHROPIC_API_KEY未設定）。',
+          'この質問は汎用推論（自由対話）の領域ですが、現在この環境には生成AIモデルが接続されていません（ANTHROPIC/OPENAI/GEMINIのAPI Keyいずれも未設定）。',
           'それらしい回答を捏造することはしません。',
           '',
           ...(internalContext.length > 0
@@ -95,11 +103,14 @@ export class GeneralReasoner {
       internalContext.length > 0
         ? `【社内コンテキスト】\n${internalContext.map((c) => `- ${c}`).join('\n')}\n\n`
         : '【社内コンテキスト】\n（この質問に関連する社内データはありません）\n\n';
-    const result = await this.router.complete({
-      purpose: 'conversation',
-      systemPrompt: SYSTEM_PROMPT,
-      userMessage: `${contextBlock}【質問】\n${message}`
-    });
+    const result = await this.router.complete(
+      {
+        purpose: 'conversation',
+        systemPrompt: SYSTEM_PROMPT,
+        userMessage: `${contextBlock}【質問】\n${message}`
+      },
+      preferredProviderId
+    );
     return { text: result.text, providerId: result.providerId, available: true };
   }
 }

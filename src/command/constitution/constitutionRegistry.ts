@@ -64,6 +64,10 @@ export interface ConstitutionPrinciple {
   conflictTriggers?: string[];
   /** 矛盾検知時にユーザーへ提示する説明 */
   conflictGuidance?: string;
+  /** RECOMMENDED_CANDIDATE: 複数資料の突合で推奨できる候補（正式化はPRESIDENT承認） */
+  recommended?: boolean;
+  /** ACTIVE候補として優先レビュー対象 */
+  priorityReview?: boolean;
 }
 
 /**
@@ -73,6 +77,12 @@ export interface ConstitutionPrinciple {
  * すべてCANDIDATE — 社長承認でCURRENTへ格上げされる。
  */
 const V7_SOURCE = 'LCC 経営の聖書 第13期 v7 社長用（Google Sheets 1qpfTv1U5…）';
+const PDF_SOURCE = '（LCC様）第13期 経営計画書（3校）.pdf（Drive 1GzykTkpd…）';
+const PDF_VERSION = '印刷3校（2026-04-01）本文読解済み';
+
+function pdfEv(label: string, value: string): Evidence {
+  return { label, value, source: PDF_SOURCE, asOf: DISCOVERED };
+}
 const V7_VERSION = 'v7（2026-06-04更新・系列中最新）';
 const DISCOVERED = '2026-08-08';
 
@@ -83,6 +93,7 @@ function ev(label: string, value: string): Evidence {
 export const CONSTITUTION_CANDIDATES: ConstitutionPrinciple[] = [
   {
     principleId: 'const-001',
+    priorityReview: true,
     category: 'DATA_PRINCIPLE',
     statement: '正本は1つ。元データは「LCC 全社業務OS 統合版」を正とし、他は参照専用とする',
     scope: 'group',
@@ -98,6 +109,7 @@ export const CONSTITUTION_CANDIDATES: ConstitutionPrinciple[] = [
   },
   {
     principleId: 'const-002',
+    priorityReview: true,
     category: 'DATA_PRINCIPLE',
     statement: '手入力箇所は最小化する（経営の聖書では月次実績入力が唯一の手入力シート。将来は原価日報から自動取得へ）',
     scope: 'group',
@@ -145,6 +157,7 @@ export const CONSTITUTION_CANDIDATES: ConstitutionPrinciple[] = [
   },
   {
     principleId: 'const-005',
+    priorityReview: true,
     category: 'MEETING_PRINCIPLE',
     statement:
       '現場別信号は毎日16時以降に確認し、赤・黒信号案件は当日中に社長へ報告する。スコアボードは各部長と代表が週次確認、月次実績は毎月5日までに前月分入力',
@@ -161,6 +174,7 @@ export const CONSTITUTION_CANDIDATES: ConstitutionPrinciple[] = [
   },
   {
     principleId: 'const-006',
+    priorityReview: true,
     category: 'BEHAVIOR_STANDARD',
     statement:
       '現場配置の運用基準: 配置は前日18時まで確定 / 責任者未設定は即対応 / 車両は前日確認 / 翌日赤信号案件は最優先',
@@ -182,15 +196,23 @@ export const CONSTITUTION_CANDIDATES: ConstitutionPrinciple[] = [
     sourceVersion: V7_VERSION,
     evidence: [
       ev('全社目標', '売上463.8百万円/年（38.6/月）・粗利327.9百万円/年（27.3/月）'),
-      ev('注意', '経営管理_第13期_統合最終版（2026-04-01停止）には「均等割仮値」警告あり。不動産課はv7=15.0 vs 経営管理=15.6の差異（CONFLICT）')
+      ev('注意', '経営管理_第13期_統合最終版（2026-04-01停止）には「均等割仮値」警告あり。不動産課はv7=15.0 vs 経営管理=15.6の差異'),
+      {
+        label: '突合結果',
+        value: '不動産課15.0百万は印刷版経営計画書の長期事業構想表（第13期 不動産15.0）とも一致 → 15.0をRECOMMENDED_CANDIDATEとする',
+        source: '（LCC様）第13期 経営計画書（3校）.pdf 長期事業構想表',
+        asOf: DISCOVERED
+      }
     ],
     validFrom: '2026-04-01',
     validUntil: '2027-03-31',
     status: 'CANDIDATE',
+    recommended: true,
     relatedDecisions: []
   },
   {
     principleId: 'const-008',
+    priorityReview: true,
     category: 'AUTHORITY_PRINCIPLE',
     statement: '粗利警戒案件・赤黒信号案件への介入は社長判断とする（配置アラート「粗利警戒件数→社長判断」）',
     scope: 'lcc',
@@ -203,6 +225,7 @@ export const CONSTITUTION_CANDIDATES: ConstitutionPrinciple[] = [
   },
   {
     principleId: 'const-009',
+    priorityReview: true,
     category: 'DX_AI_POLICY',
     statement:
       'AIによる外部自動送信・自動確定は行わない。金額・契約・納期・謝罪・責任認定・人事はAIが自動確定しない（LCC COMMAND運用原則）',
@@ -222,6 +245,148 @@ export const CONSTITUTION_CANDIDATES: ConstitutionPrinciple[] = [
     relatedDecisions: [],
     conflictTriggers: ['自動送信', '自動で送', '自動返信', '自動確定', '勝手に送'],
     conflictGuidance: '会社原則候補「AIの外部自動送信・自動確定は行わない」に反します。承認フロー（dry-run）を通してください'
+  }
+,
+  // ---- 印刷版「（LCC様）第13期 経営計画書（3校）.pdf」本文からの抽出（2026-08-08読解） ----
+  {
+    principleId: 'const-010',
+    category: 'MISSION',
+    statement: 'ミッション: 地域の「困った」を「ありがとう」に変える',
+    scope: 'group',
+    source: PDF_SOURCE,
+    sourceVersion: PDF_VERSION,
+    evidence: [pdfEv('原文', '地域の「困った」を「ありがとう」に変える。私たちのすべての事業は、この使命から始まっています')],
+    validFrom: '2026-04-01',
+    status: 'CANDIDATE',
+    priorityReview: true,
+    relatedDecisions: []
+  },
+  {
+    principleId: 'const-011',
+    category: 'VISION',
+    statement: 'ビジョン: 暮らしのすべてを支える、山陰の生活インフラになる（「何かあったら、まずLCCに相談しよう」と真っ先に思い浮かべられる存在）',
+    scope: 'group',
+    source: PDF_SOURCE,
+    sourceVersion: PDF_VERSION,
+    evidence: [pdfEv('原文', '暮らしのすべてを支える、山陰の生活インフラになる')],
+    validFrom: '2026-04-01',
+    status: 'CANDIDATE',
+    priorityReview: true,
+    relatedDecisions: []
+  },
+  {
+    principleId: 'const-012',
+    category: 'VALUES',
+    statement: 'バリュー: ①我がごと化するプロであれ ②まず、やってみる ③チームで、大きな価値を',
+    scope: 'group',
+    source: PDF_SOURCE,
+    sourceVersion: PDF_VERSION,
+    evidence: [pdfEv('原文', '（１）我がごと化するプロであれ（２）まず、やってみる（３）チームで、大きな価値を')],
+    validFrom: '2026-04-01',
+    status: 'CANDIDATE',
+    priorityReview: true,
+    relatedDecisions: []
+  },
+  {
+    principleId: 'const-013',
+    category: 'MANAGEMENT_PRINCIPLE',
+    statement: '経営理念: 各事業を通しお客様の満足と社員の幸福を同時に実現し、社業を通じて地域社会への貢献を実行する（社訓: 礼節・信用・責任）',
+    scope: 'group',
+    source: PDF_SOURCE,
+    sourceVersion: PDF_VERSION,
+    evidence: [pdfEv('原文', '経営理念・社訓（礼節/信用/責任）・行動指針3項')],
+    validFrom: '2026-04-01',
+    status: 'CANDIDATE',
+    priorityReview: true,
+    relatedDecisions: []
+  },
+  {
+    principleId: 'const-014',
+    category: 'SAFETY_POLICY',
+    statement: '安全第一。工期が遅れても安全を犠牲にしない。飲酒運転絶対禁止・アルコールチェック実施・事故時は人命救助→警察→上司事務所→保険会社の順',
+    scope: 'group',
+    source: PDF_SOURCE,
+    sourceVersion: PDF_VERSION,
+    evidence: [pdfEv('原文', '施工に関する方針「安全第一。工期が遅れても、安全を犠牲にしてはならない」/ 運転に関する方針')],
+    validFrom: '2026-04-01',
+    status: 'CANDIDATE',
+    relatedDecisions: []
+  },
+  {
+    principleId: 'const-015',
+    category: 'QUALITY_POLICY',
+    statement: '「完了」とは作業が終わったことではない。清掃を終え、お客様に引き渡して初めて完了とする。現場は毎日ショールーム',
+    scope: 'lcc',
+    source: PDF_SOURCE,
+    sourceVersion: PDF_VERSION,
+    evidence: [pdfEv('原文', '施工に関する方針 2.品質・納期')],
+    validFrom: '2026-04-01',
+    status: 'CANDIDATE',
+    relatedDecisions: []
+  },
+  {
+    principleId: 'const-016',
+    category: 'CUSTOMER_POLICY',
+    statement: 'クレーム・事故の第一報は即時（30分以内）。発生責任はすべて社長にあり、報告者を責めず仕組みを改善する。隠した時のみ評価を下げる',
+    scope: 'group',
+    source: PDF_SOURCE,
+    sourceVersion: PDF_VERSION,
+    evidence: [pdfEv('原文', 'クレーム及び事故に関する方針')],
+    validFrom: '2026-04-01',
+    status: 'CANDIDATE',
+    relatedDecisions: []
+  },
+  {
+    principleId: 'const-017',
+    category: 'SALES_POLICY',
+    statement: '見積提出後の値引きはしない（クロージング時値引きは5%以下）。規定の利益率を計算した上で提出し、予備費5%・価格の3割の利益を確保。60分商圏外は粗利率50%以上のみ受注',
+    scope: 'lcc',
+    source: PDF_SOURCE,
+    sourceVersion: PDF_VERSION,
+    evidence: [pdfEv('原文', '営業に関する方針 3.価格 / 長期事業構想書（60分商圏）')],
+    validFrom: '2026-04-01',
+    status: 'CANDIDATE',
+    relatedDecisions: [],
+    conflictTriggers: ['値引き', '大幅割引', '安売り'],
+    conflictGuidance: '営業方針候補「見積提出後の値引きはしない・値引き5%以下」に照らして確認してください'
+  },
+  {
+    principleId: 'const-018',
+    category: 'INVESTMENT_POLICY',
+    statement: '財務原則: 現預金残高は常に月商の3ヶ月分以上を維持。支払手形は発行しない。粉飾決算は絶対にしない。悪い情報ほど早く銀行に報告する',
+    scope: 'group',
+    source: PDF_SOURCE,
+    sourceVersion: PDF_VERSION,
+    evidence: [pdfEv('原文', '資金計画 / 内部体制に関する方針 2.資金・決算')],
+    validFrom: '2026-04-01',
+    status: 'CANDIDATE',
+    priorityReview: true,
+    relatedDecisions: []
+  },
+  {
+    principleId: 'const-019',
+    category: 'DX_AI_POLICY',
+    statement: 'DX原則: AIを強制活用し転記・属人化を排除。口頭・紙の報告は受け取らない（デジタル報告のみ）。「社内指定システム」を情報の中心基地とし、入力なき仕事は評価しない。人を増やさずに回すために投資する',
+    scope: 'group',
+    source: PDF_SOURCE,
+    sourceVersion: PDF_VERSION,
+    evidence: [pdfEv('原文', '長期事業構想書 5.装置・設備計画（IT・DXの徹底）/ 内部体制に関する方針')],
+    validFrom: '2026-04-01',
+    status: 'CANDIDATE',
+    priorityReview: true,
+    relatedDecisions: []
+  },
+  {
+    principleId: 'const-020',
+    category: 'GOAL',
+    statement: '長期目標: 5年後（第17期）売上8.1億円・粗利5.8億円・経常利益0.75億円。解体は元請比率70%以上・高粗利体質。不動産在庫は6ヶ月以内に現金化。企業支援事業は第14期以降完全撤退',
+    scope: 'group',
+    source: PDF_SOURCE,
+    sourceVersion: PDF_VERSION,
+    evidence: [pdfEv('原文', '長期事業構想書 3.利益計画（必達）/ 長期事業構想表')],
+    validFrom: '2026-04-01',
+    status: 'CANDIDATE',
+    relatedDecisions: []
   }
 ];
 

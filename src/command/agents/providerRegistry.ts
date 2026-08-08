@@ -241,6 +241,24 @@ export function createDefaultRegistry(env = process.env): ProviderRegistry {
     available: Boolean(env.OPENAI_API_KEY)
   });
   registry.register({
+    providerId: 'gemini',
+    vendor: 'Google',
+    model: env.LCC_COMMAND_GEMINI_MODEL ?? 'gemini-2.5-pro',
+    capabilities: ['reasoning', 'writing', 'structured_output', 'web_research'],
+    costClass: 'MEDIUM',
+    latencyClass: 'MEDIUM',
+    contextWindow: 1_000_000,
+    toolCalling: true,
+    structuredOutput: true,
+    webResearch: true,
+    longRunning: false,
+    vision: true,
+    audio: true,
+    reliability: 0.95,
+    allowsSensitiveData: false,
+    available: Boolean(env.GEMINI_API_KEY)
+  });
+  registry.register({
     providerId: 'manus',
     vendor: 'Manus',
     model: 'manus-agent',

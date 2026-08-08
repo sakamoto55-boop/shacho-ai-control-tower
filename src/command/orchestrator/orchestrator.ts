@@ -12,6 +12,7 @@
  * ユーザー入力・外部文書内の命令はSystem Instructionとして扱わない。
  */
 import type {
+  Evidence,
   CashScenarioAdjustment,
   CommandChatRequest,
   CommandChatResponse,
@@ -57,12 +58,27 @@ import {
   CAPABILITIES,
   availableProvidersFromEnv,
   capabilityStatus,
-  routeCapabilities
+  routeCapabilities,
+  type CapabilityId
 } from '../capabilities/capabilityRegistry.js';
 import { ArtifactService, planArtifactCreation } from '../artifacts/artifactRegistry.js';
 import { buildSoftwarePlan } from '../build/softwareBuild.js';
 import { unifiedSearch } from '../search/unifiedSearch.js';
 import { draftEstimate } from '../estimate/estimateCapability.js';
+import { parsePreferredProvider } from '../ai/liveProviders.js';
+import {
+  buildEstimateWorkbookSpec,
+  buildManagementDeckSpec,
+  buildReportDocumentSpec
+} from '../artifacts/contentBuilders.js';
+import {
+  renderDocument,
+  renderFlowDiagramSvg,
+  renderPdf,
+  renderPresentation,
+  renderWorkbook,
+  writeSvg
+} from '../artifacts/renderers.js';
 import {
   ROLE_DISPLAY_LABELS,
   type CommandEventBus,
@@ -2258,7 +2274,8 @@ export class CommandOrchestrator {
     dataStatus: DataStatus
   ): Promise<HandlerResult> {
     const memories = await this.memoryService.search({ limit: 100 }, principal);
-    const results = unifiedSearch(ctx.dataset, memories, message, principal);
+    const artifacts = await this.artifactService.list();
+    const results = unifiedSearch(ctx.dataset, memories, message, principal, artifacts);
     if (results.length === 0) {
       return this.simpleText(
         '該当する資料・データを社内カタログから特定できませんでした。推測で場所を答えることはしません。キーワードを変えるか、外部調査が必要ならその旨お知らせください。',
@@ -2281,7 +2298,13 @@ export class CommandOrchestrator {
         uiHint: 'text',
         data: { results },
         confidence: results[0].confidence,
-        evidence: [],
+        // §14: 検索結果には必ずEvidenceを返す
+        evidence: results.slice(0, 5).map((r) => ({
+          label: r.title.slice(0, 40),
+          value: r.reference,
+          source: r.source,
+          asOf: r.date ?? '不明'
+        })),
         toolsUsed: ['unified_search']
       },
       intent: 'memory_recall'
@@ -2315,7 +2338,9 @@ export class CommandOrchestrator {
         evidence: insights.flatMap((i) => i.evidence).slice(0, 6),
         toolsUsed: ['future_engine']
       },
-      intent: 'risky'
+      intent: 'risky',
+      // §33: Future Riskは「対策考えて」「もっと大胆に」でInnovation Engineへ渡せる
+      proposal: risks.length > 0 ? { problem: risks[0].statement } : null
     };
   }
 
@@ -2417,6 +2442,33 @@ export class CommandOrchestrator {
     });
     const constitutionHits = await this.constitutionService.checkProposal(message);
     const now = ctx.dataset.asOf;
+
+    // Phase LIVE-AI §15-§22: 型に対応するRenderer CapabilityがACTIVEなら実ファイルまで生成する
+    // （文章表現の改善はLLM接続時に上乗せ。決定論テンプレート+実数値のみでも成果物として成立する）
+    const creationCapability: Record<string, CapabilityId> = {
+      PPTX: 'PRESENTATION_CREATION',
+      XLSX: 'SPREADSHEET_CREATION',
+      DOCX: 'DOCUMENT_CREATION',
+      PDF: 'PDF_CREATION',
+      DIAGRAM: 'DIAGRAM_GENERATION',
+      IMAGE: 'IMAGE_GENERATION',
+      CODE: 'SOFTWARE_ENGINEERING'
+    };
+    const rendererReady = executable.has(creationCapability[artifactType]);
+    if (rendererReady && artifactType !== 'IMAGE' && artifactType !== 'CODE' && dataStatus !== 'DATA_UNAVAILABLE') {
+      try {
+        return await this.generateArtifactFile(ctx, message, principal, artifactType, route.budget, constitutionHits, dataStatus);
+      } catch (error) {
+        // 生成失敗は正直に伝える（偽の完成品を返さない）
+        return this.simpleText(
+          `成果物の生成中にエラーが発生しました（${error instanceof Error ? error.message : String(error)}）。生成は完了していません。`,
+          'ideation',
+          'LOW',
+          dataStatus
+        );
+      }
+    }
+
     const artifact = await this.artifactService.register(
       {
         type: artifactType,
@@ -2425,7 +2477,7 @@ export class CommandOrchestrator {
         sourceData: [],
         sourceEvidence: [],
         sourceMemoryIds: [],
-        status: plan.executable ? 'QUEUED' : 'PLANNED',
+        status: 'PLANNED',
         purpose: message.slice(0, 80)
       },
       now
@@ -2436,9 +2488,7 @@ export class CommandOrchestrator {
       '実行ステップ:',
       ...plan.steps.map((st) => `${st.step}. ${st.description}`),
       '',
-      plan.executable
-        ? `キューへ登録しました（${artifact.artifactId}）。完了時に成果物Registryへ記録されます。`
-        : `現在、生成プロバイダ（${plan.blockedBy.join(' / ')}）が未接続のため、この成果物はまだ生成できません。計画として登録しました（${artifact.artifactId}）。プロバイダ接続後にそのまま実行できます。それらしい完成品を偽って返すことはしません。`,
+      `現在、生成プロバイダ（${plan.blockedBy.join(' / ')}）が未接続のため、この成果物はまだ生成できません。計画として登録しました（${artifact.artifactId}）。プロバイダ接続後にそのまま実行できます。それらしい完成品を偽って返すことはしません。`,
       '',
       `想定コスト区分: ${route.budget}${route.permission?.requiresApproval ? ' / 公開・配布時は承認が必要です' : ''}`
     ];
@@ -2454,6 +2504,128 @@ export class CommandOrchestrator {
       },
       intent: 'ideation'
     };
+  }
+
+  /** 実ファイル生成（§16-§22・§36）。内容は決定論エンジン、レンダリングは決定論Renderer */
+  private async generateArtifactFile(
+    ctx: ToolContext,
+    message: string,
+    principal: Principal,
+    artifactType: 'PPTX' | 'XLSX' | 'DOCX' | 'PDF' | 'IMAGE' | 'DIAGRAM' | 'CODE',
+    budget: string,
+    constitutionHits: Array<{ warning: string }>,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const now = ctx.dataset.asOf;
+    const fileBase = `${artifactType.toLowerCase()}-${now.slice(0, 10)}-${Math.abs(this.hashText(message)) % 100000}`;
+    const emit = (label: string) =>
+      this.options.eventBus?.emit({ event: 'TOOL_STARTED', displayLabel: label });
+
+    let storageLocation = '';
+    let steps: string[] = [];
+    const sourceEvidence: Evidence[] = [];
+
+    if (artifactType === 'PPTX') {
+      emit('データを確認しています');
+      const spec = buildManagementDeckSpec(ctx.dataset, ctx.scope);
+      emit('グラフを作成しています');
+      emit(`${spec.slides.length + 1}枚のスライドを生成しています`);
+      storageLocation = await renderPresentation(spec, fileBase);
+      steps = ['社内データ確認', '決定論集計', `スライド${spec.slides.length + 1}枚生成`];
+      sourceEvidence.push({ label: '数値出典', value: '決定論エンジン（KPI/資金/アラート）', source: 'LCC COMMAND', asOf: now });
+    } else if (artifactType === 'XLSX') {
+      emit('既存正本を確認しています');
+      const draft = draftEstimate(ctx.dataset, message);
+      const isEstimate = /見積/.test(message);
+      const spec = isEstimate
+        ? buildEstimateWorkbookSpec(draft, now)
+        : {
+            title: '管理表',
+            sheets: [
+              {
+                name: 'データ',
+                columns: [
+                  { header: '案件', key: 'name', width: 40 },
+                  { header: 'ステージ', key: 'stage', width: 14 },
+                  { header: '受注額', key: 'amount', width: 16, numFmt: '#,##0' }
+                ],
+                rows: ctx.dataset.projects
+                  .filter((pr) => pr.orderAmount > 0)
+                  .slice(0, 50)
+                  .map((pr) => ({ name: pr.name, stage: pr.stage, amount: pr.orderAmount }))
+              }
+            ]
+          };
+      emit('ワークブックを生成しています');
+      storageLocation = await renderWorkbook(spec, fileBase);
+      steps = ['既存正本確認', 'スキーマ・数式設計', 'ワークブック生成'];
+      sourceEvidence.push({ label: '数値出典', value: '案件台帳（決定論）', source: 'LCC COMMAND', asOf: now });
+    } else if (artifactType === 'DOCX' || artifactType === 'PDF') {
+      emit('本文を構成しています');
+      const spec = buildReportDocumentSpec(ctx.dataset, ctx.scope);
+      emit('文書を生成しています');
+      storageLocation = artifactType === 'DOCX' ? await renderDocument(spec, fileBase) : await renderPdf(spec, fileBase);
+      steps = ['データ収集', '本文構成', `${artifactType}生成`];
+      sourceEvidence.push({ label: '数値出典', value: '決定論エンジン', source: 'LCC COMMAND', asOf: now });
+    } else if (artifactType === 'DIAGRAM') {
+      emit('構造を確認しています');
+      const svg = renderFlowDiagramSvg({
+        title: '業務フロー（概要）',
+        steps: ['問い合わせ', '現調', '見積', '受注', '施工', '完工', '請求', '入金']
+      });
+      storageLocation = await writeSvg(svg, fileBase);
+      steps = ['構造確認', '図の生成'];
+    } else {
+      throw new Error(`${artifactType} は現在この経路では生成できません`);
+    }
+
+    this.options.eventBus?.emit({ event: 'TOOL_COMPLETED', displayLabel: '成果物が完成しました' });
+    const artifact = await this.artifactService.register(
+      {
+        type: artifactType,
+        title: message.slice(0, 60),
+        createdBy: `ai:renderer(${principal.label})`,
+        sourceData: ['deterministic-engines'],
+        sourceEvidence,
+        sourceMemoryIds: [],
+        status: 'COMPLETED',
+        storageLocation,
+        purpose: message.slice(0, 80)
+      },
+      now
+    );
+    const lines = [
+      `【${artifactType}を生成しました】`,
+      ...(constitutionHits.length > 0 ? [...constitutionHits.map((h) => `⚠ ${h.warning}`), ''] : []),
+      `保存先: ${storageLocation}`,
+      `成果物ID: ${artifact.artifactId}（Artifact Registryに目的・出典付きで記録済み）`,
+      '',
+      '実行ステップ: ' + steps.join(' → '),
+      '',
+      '※数値はすべて決定論エンジンの実計算値です（AIの推測値を含みません）。',
+      `想定コスト区分: ${budget}`,
+      '役に立ったかどうか（例: 転記時間が減った等）を教えていただくと、LESSONとして学習します。'
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: { artifact, storageLocation },
+        confidence: 'HIGH',
+        evidence: sourceEvidence,
+        toolsUsed: ['capability_router', 'artifact_renderer', 'artifact_registry']
+      },
+      intent: 'ideation'
+    };
+  }
+
+  private hashText(text: string): number {
+    let hash = 0;
+    for (let i = 0; i < text.length; i += 1) {
+      hash = (hash * 31 + text.charCodeAt(i)) | 0;
+    }
+    return hash;
   }
 
   private async handleMemoryAudit(
@@ -2561,7 +2733,8 @@ export class CommandOrchestrator {
     const memories = await this.memoryService.search({ q: message, limit: 3 }, principal);
     facts.push(...memories.map((m) => `記憶[${m.type}] ${m.statement}`));
 
-    const answer = await this.reasoner.answer(message, facts);
+    // §38: 「Claudeで」「Geminiでも確認」等の上級Provider指定（通常はAuto）
+    const answer = await this.reasoner.answer(message, facts, parsePreferredProvider(message) ?? undefined);
     return {
       response: {
         text: answer.available

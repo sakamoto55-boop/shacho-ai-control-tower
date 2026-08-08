@@ -322,6 +322,35 @@ Phase A/B0の決定論エンジン・Canonical Model・Source Adapter・RBAC・E
 - **Evaluation（§52）**: `tests/command/xphase/`（Constitution/Future/Scenario/Capability Routing/
   Permission/Artifact/Build重複チェック/見積/統合検索/Stewardship/API）。
 
+## Phase LIVE-AI（Constitution Activation / Real Provider / Universal Creation）の状態
+
+- **Constitution完成準備（§1-§5）**: 印刷版経営計画書（3校）PDF本文を読解し、Vision/Mission/Values/
+  経営理念/社訓/安全/品質/クレーム/営業価格/財務/DX/長期目標を原文抽出（const-010〜020、計20原則・
+  全CANDIDATE）。不動産課15.0はv7+PDFの2源一致で**RECOMMENDED_CANDIDATE**。社長の承認事項は
+  `CONSTITUTION_REVIEW.md` の**10項目**に集約（数十問ヒアリングなし）。
+- **実Provider Adapter（§6-§11）**: `ai/liveProviders.ts` — OpenAI（chat completions）/ Gemini
+  （generateContent）/ Manus（非同期Task）/ OpenAI Images。Anthropic含め4系列がKey設定のみで有効化。
+  Role→Capability→Provider構造は不変。「Claudeで」「Geminiでも」等の上級Provider指定に対応（§38。通常Auto）。
+- **Provider Benchmark（§12）**: `evaluation/providerBenchmark.ts` + `npm run command:benchmark`
+  （Quality/Latency/Structured成功率/正確性を記録。将来のRouter選択に使用）。
+- **Universal Search強化（§13-§14）**: Artifact Registryを検索対象に追加（「前に作った○○どれ？」）。
+  検索結果に必ずEvidenceを返す。
+- **Creation実装（§15-§22）**: 決定論Renderer（`artifacts/renderers.ts`: pptxgenjs/exceljs/docx/pdfkit +
+  自前SVG Chart/Diagram）により **PPTX/XLSX/DOCX/PDF/図をLLM Keyなしでも実ファイル生成**。
+  内容は`contentBuilders.ts`（経営会議デッキ・見積Workbook・経営報告書 — 全数値決定論エンジン由来）。
+  「経営会議のプレゼン作って」→実PPTX生成→Artifact Registry（COMPLETED・出典付き）→VUI進捗イベント。
+  画像生成はOPENAI_API_KEY設定時のみ（未設定は正直にPLANNED・§46）。
+- **見積→文書（§23-§24）**: 見積草案→`buildEstimateWorkbookSpec`でExcel化（数式・検証・複数シート）。
+  金額・粗利は決定論のみ。ユーザー承認なしで正式見積化しない。
+- **Software Engineering Bridge（§25-§28）**: `build/codingAgentBridge.ts` — CodingAgentAdapter抽象
+  （特定Agentへハードコードしない）+ BuildTaskライフサイクル（PLANNING〜COMPLETED）。
+  **WAITING_APPROVAL→COMPLETEDは人間承認必須**（自動Deploy禁止をコードで強制）。
+- **Artifact Intelligence（§29-§31）**: 目的・Evidence・Source・Version・Outcome KPIを保持。
+  `POST /command/artifacts/:id/outcome` で効果を記録→LESSONとしてMemoryへ還元。
+- **Future→Innovation連鎖（§32-§33）**: Future RiskをlastProposalへ渡し「対策考えて」「もっと大胆に」で
+  Innovation Engineへ接続。
+- **最小起動セット（§43）**: Sheets Service Account + 実LLM Provider1つでLIVE READ ONLY BETA起動可能。
+
 ## フェーズ計画
 
 - **Phase A（本実装）**: 会話コア＋決定論エンジン＋承認フロー＋Brief＋UI＋RBAC/セキュリティ。読み取り正本はDemo Fixture（demoモード限定）。実行は全てdry-run。

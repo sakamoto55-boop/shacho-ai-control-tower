@@ -118,13 +118,13 @@ export const CAPABILITIES: CapabilityDefinition[] = [
   def('WRITING', '業務文書ライティング', { providers: LLM, costClass: 'MEDIUM' }),
   def('TRANSLATION', '翻訳', { providers: LLM }),
   def('SUMMARIZATION', '要約', { providers: LLM }),
-  def('IMAGE_GENERATION', '画像生成（ポスター・チラシ・図版）', { providers: ['image-provider'], costClass: 'HIGH', latencyClass: 'SLOW', supportsArtifacts: true, outputTypes: ['IMAGE'], riskLevel: 'MEDIUM' }),
-  def('DIAGRAM_GENERATION', '構造図・フロー図の生成', { providers: [D, ...LLM], supportsArtifacts: true, outputTypes: ['DIAGRAM'] }),
-  def('CHART_GENERATION', 'チャート生成（データは決定論集計）', { supportsArtifacts: true, outputTypes: ['CHART'] }),
-  def('DOCUMENT_CREATION', 'Word文書の生成', { providers: ['doc-provider', ...LLM], costClass: 'MEDIUM', supportsArtifacts: true, outputTypes: ['DOCX'] }),
-  def('SPREADSHEET_CREATION', 'Excelワークブックの生成', { providers: ['sheet-provider'], costClass: 'MEDIUM', supportsArtifacts: true, outputTypes: ['XLSX'] }),
-  def('PDF_CREATION', 'PDFの生成', { providers: ['doc-provider'], supportsArtifacts: true, outputTypes: ['PDF'] }),
-  def('PRESENTATION_CREATION', 'プレゼン資料の生成', { providers: ['slide-provider'], costClass: 'HIGH', latencyClass: 'SLOW', supportsAsync: true, supportsArtifacts: true, outputTypes: ['PPTX'] }),
+  def('IMAGE_GENERATION', '画像生成（ポスター・チラシ・図版）', { providers: ['openai-image'], costClass: 'HIGH', latencyClass: 'SLOW', supportsArtifacts: true, outputTypes: ['IMAGE'], riskLevel: 'MEDIUM' }),
+  def('DIAGRAM_GENERATION', '構造図・フロー図の生成', { providers: ['renderer', ...LLM], supportsArtifacts: true, outputTypes: ['DIAGRAM'] }),
+  def('CHART_GENERATION', 'チャート生成（データは決定論集計）', { providers: ['renderer'], supportsArtifacts: true, outputTypes: ['CHART'] }),
+  def('DOCUMENT_CREATION', 'Word文書の生成', { providers: ['renderer', ...LLM], costClass: 'MEDIUM', supportsArtifacts: true, outputTypes: ['DOCX'] }),
+  def('SPREADSHEET_CREATION', 'Excelワークブックの生成', { providers: ['renderer'], costClass: 'MEDIUM', supportsArtifacts: true, outputTypes: ['XLSX'] }),
+  def('PDF_CREATION', 'PDFの生成', { providers: ['renderer'], supportsArtifacts: true, outputTypes: ['PDF'] }),
+  def('PRESENTATION_CREATION', 'プレゼン資料の生成', { providers: ['renderer'], costClass: 'HIGH', latencyClass: 'SLOW', supportsAsync: true, supportsArtifacts: true, outputTypes: ['PPTX'] }),
   def('CODE_GENERATION', 'コード生成', { providers: LLM, costClass: 'MEDIUM' }),
   def('SOFTWARE_ENGINEERING', 'ソフトウェア設計・実装（重複チェック必須）', { providers: ['coding-agent', ...LLM], costClass: 'HIGH', latencyClass: 'SLOW', supportsAsync: true, supportsArtifacts: true, outputTypes: ['CODE', 'ZIP'], riskLevel: 'HIGH' }),
   def('APP_BUILD', '業務アプリ構築', { providers: ['coding-agent'], costClass: 'HIGH', latencyClass: 'SLOW', supportsAsync: true, supportsArtifacts: true, riskLevel: 'HIGH' }),
@@ -147,7 +147,7 @@ export const CAPABILITIES: CapabilityDefinition[] = [
   def('CREATE_ESTIMATE_DRAFT', '見積草案の作成（金額確定は決定論計算）'),
   def('CALCULATE_MARGIN', '粗利の決定論計算'),
   def('COMPARE_ESTIMATE', '見積の比較'),
-  def('GENERATE_ESTIMATE_DOCUMENT', '見積書ドキュメント生成', { providers: ['doc-provider'], supportsArtifacts: true, outputTypes: ['PDF', 'XLSX'] })
+  def('GENERATE_ESTIMATE_DOCUMENT', '見積書ドキュメント生成', { providers: ['renderer'], supportsArtifacts: true, outputTypes: ['PDF', 'XLSX'] })
 ];
 
 /** Provider接続状態からCapabilityの利用可否を決める（§50） */
@@ -160,11 +160,16 @@ export function capabilityStatus(
 
 /** 現時点で利用可能なProvider集合（決定論実装は常時利用可能） */
 export function availableProvidersFromEnv(env = process.env): Set<string> {
-  const set = new Set<string>([D]);
+  // 'renderer' = 決定論ファイルRenderer（pptx/xlsx/docx/pdf/svg。Phase LIVE-AIで実装済み・常時利用可能）
+  const set = new Set<string>([D, 'renderer']);
   if (env.ANTHROPIC_API_KEY) set.add('anthropic');
-  if (env.OPENAI_API_KEY) set.add('openai');
+  if (env.OPENAI_API_KEY) {
+    set.add('openai');
+    set.add('openai-image');
+  }
+  if (env.GEMINI_API_KEY) set.add('gemini');
   if (env.MANUS_API_KEY) set.add('manus');
-  // 生成系（image/slide/sheet/doc/coding/voice）・Drive/Gmail実行時接続は未設定=NOT_CONFIGURED
+  // coding-agent / voice-provider / Drive・Gmail実行時接続は未設定=NOT_CONFIGURED
   return set;
 }
 

@@ -112,6 +112,14 @@ HTTPリクエスト (src/server.ts, Hono)
 - 見積（`estimate/`）の金額は過去実績の決定論計算のみ。AIが暗算で金額を決めない。
 - 統合検索（`search/unifiedSearch.ts`）のPeople OSカタログはPRESIDENT以外へ返さない。見つからない場所を推測で答えない。
 
+### 実Provider・Creation層（Phase LIVE-AI）
+
+- Provider Adapter（`ai/liveProviders.ts`）はKey未設定=NOT_CONFIGUREDの正常状態。資格情報はenvのみ。Role→Capability→Provider構造を崩さない（LCC COMMANDを特定AIのラッパーにしない）。
+- Artifact Renderer（`artifacts/renderers.ts`）は決定論レンダリング専用。グラフ値・金額をLLMに作らせない（内容は`contentBuilders.ts`が決定論エンジンから構築）。生成物は`data/artifacts/`（Git管理外）。
+- BuildTask（`build/codingAgentBridge.ts`）のWAITING_APPROVAL→COMPLETEDは人間承認必須。この自動Deploy禁止を緩めない。
+- Capabilityが未接続なら「できます」と言わない（§46）。画像生成等はPLANNED登録+正直な未接続通知。
+- 会社憲法の承認候補は`CONSTITUTION_REVIEW.md`が正（10項目）。AIが勝手にCURRENT化しない。
+
 ### Phase VUI（docs/lcc-command-vui.html — Visual Intelligence UI）
 
 - 粒子AI COREの視覚仕様の正本は `src/command/vui/visualSpec.ts`。UI側（HTML内のCORE_VISUALS）と同期させ、変更時は両方更新する（`tests/command/vui/` が検査）。
