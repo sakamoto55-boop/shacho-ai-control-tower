@@ -14,6 +14,8 @@
 import type {
   DatasetMeta,
   CashAccount,
+  DailyReportEntry,
+  ScheduleAssignment,
   CashPlanEntry,
   Company,
   CostEntry,
@@ -46,6 +48,10 @@ export interface CommandDataset {
   cashAccounts: CashAccount[];
   cashPlans: CashPlanEntry[];
   salesTargets: SalesTarget[];
+  /** 予定配置（配置板）。実績ではない */
+  assignments: ScheduleAssignment[];
+  /** 実績日報。人工の根拠 */
+  dailyReports: DailyReportEntry[];
 }
 
 /** asOf（ISO日時）から days 日ずらしたISO日付を返す */
@@ -864,6 +870,40 @@ export function buildSeedDataset(asOf: string): CommandDataset {
     }
   ];
 
+  // 予定配置（今日）と実績日報（昨日）。「配置=予定」「日報=実績」を明確に分ける
+  const assignments: ScheduleAssignment[] = [
+    {
+      assignmentId: 'asg-1',
+      companyId: 'lcc',
+      date: d(0),
+      projectId: 'prj-a',
+      siteName: '出雲市 旧社屋解体現場',
+      employeeId: 'emp-tanaka',
+      employeeName: '田中'
+    },
+    {
+      assignmentId: 'asg-2',
+      companyId: 'lcc',
+      date: d(0),
+      projectId: 'prj-c',
+      siteName: '斐川 アパート改修現場',
+      employeeName: '協力会社（解体）'
+    }
+  ];
+  const dailyReports: DailyReportEntry[] = [
+    {
+      reportId: 'dr-1',
+      companyId: 'lcc',
+      date: d(-1),
+      projectId: 'prj-a',
+      siteName: '出雲市 旧社屋解体現場',
+      employeeId: 'emp-tanaka',
+      employeeName: '田中',
+      manDays: 1,
+      workDescription: '内装解体・搬出'
+    }
+  ];
+
   const salesTargets: SalesTarget[] = [
     { companyId: 'lcc', month: monthOf(asOf), amount: 25_000_000 },
     { companyId: 'wel', month: monthOf(asOf), amount: 1_800_000 }
@@ -907,6 +947,8 @@ export function buildSeedDataset(asOf: string): CommandDataset {
     payments,
     cashAccounts,
     cashPlans,
-    salesTargets
+    salesTargets,
+    assignments,
+    dailyReports
   };
 }

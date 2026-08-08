@@ -28,7 +28,9 @@ export function filterDatasetByScope(dataset: CommandDataset, scope: CompanyScop
     payments: byScope(dataset.payments),
     cashAccounts: byScope(dataset.cashAccounts),
     cashPlans: byScope(dataset.cashPlans),
-    salesTargets: byScope(dataset.salesTargets)
+    salesTargets: byScope(dataset.salesTargets),
+    assignments: byScope(dataset.assignments),
+    dailyReports: byScope(dataset.dailyReports)
   };
 }
 

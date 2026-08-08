@@ -19,6 +19,7 @@ export type IntentKey =
   | 'project_card'
   | 'margin_why'
   | 'last_contact'
+  | 'schedule'
   | 'employee'
   | 'research'
   | 'draft'

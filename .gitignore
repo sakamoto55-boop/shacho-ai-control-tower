@@ -8,3 +8,4 @@ data/*.json
 data/*.db
 *.log
 .DS_Store
+data/snapshots/

@@ -177,6 +177,37 @@ export interface Interaction {
   nextActionDate?: string;
 }
 
+/**
+ * 予定配置（デジタル配置板）。「誰をどこに配置する予定か」であり実績ではない。
+ * 予定配置を実績人工として扱わない（原価計算にはDailyReportEntryを使う）。
+ */
+export interface ScheduleAssignment {
+  assignmentId: string;
+  companyId: string;
+  date: string;
+  projectId?: string;
+  siteName: string;
+  employeeId?: string;
+  employeeName: string;
+  vehicle?: string;
+  note?: string;
+}
+
+/** 実績日報。実際に行った作業の記録。工数（人工）はこちらが根拠。 */
+export interface DailyReportEntry {
+  reportId: string;
+  companyId: string;
+  date: string;
+  projectId?: string;
+  siteName: string;
+  employeeId?: string;
+  employeeName: string;
+  /** 人工（1.0=1人日） */
+  manDays: number;
+  workDescription?: string;
+  subcontractorName?: string;
+}
+
 /** 月次売上目標（経営者・幹部が設定する確定値。AIが生成しない） */
 export interface SalesTarget {
   companyId: string;

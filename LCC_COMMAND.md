@@ -135,6 +135,20 @@ Tool引数Validation / Prompt Injection検知（外部文書・入力内の命�
 
 LCC COMMANDのコード・シードからkintone前提の記述は除去済み（Mapping Layerのキーは `estimateSystem` 等の中立名）。
 
+## Phase B0（実データ発見・READ ONLY接続）の状態
+
+- **Source Adapter実装済み**: `sources/googleSheets.ts`（Sheets API v4 values.get のみ＝READ ONLY、
+  timeout/retry/schema validation/freshness/provenance/errorState）。列マッピングは `LCC_SHEETS_SOURCES` で
+  設定し、`sources/canonicalMapping.ts` が日本語シート→Canonical Modelへ変換（既存IDは `prj:`/`cust:` +
+  `externalIds.sheet` のCrosswalkで保持、振り直さない）。
+- **配置と日報の分離**: `ScheduleAssignment`（予定配置）と `DailyReportEntry`（実績・人工）を別モデルで保持。
+  「今日の現場は？」は予定として、「昨日誰がどこ？」は実績日報で回答し、予定を実績人工として扱わない。
+- **データ品質検査**: `domain/dataQuality.ts` + `GET /command/data-quality`（検出のみ・自動修正なし）。
+- **Google Identity認証**: `auth/googleIdentity.ts`。IDトークン検証（audience/期限/メール検証）→
+  email→LCC User→Role/Scope。認可（RBAC）は不変。`LCC_GOOGLE_AUDIENCE` + `LCC_COMMAND_USERS` で有効化。
+- **正本調査**: `REAL_DATA_SOURCE_MAP.md` 参照。Drive読み取りツールの承認待ちのため全候補UNKNOWN維持。
+- **スナップショット経路**: `SnapshotSheetsClient`（`data/snapshots/`、Git管理外）でクレデンシャルなしの実データ検証が可能。
+
 ## フェーズ計画
 
 - **Phase A（本実装）**: 会話コア＋決定論エンジン＋承認フロー＋Brief＋UI＋RBAC/セキュリティ。読み取り正本はDemo Fixture（demoモード限定）。実行は全てdry-run。

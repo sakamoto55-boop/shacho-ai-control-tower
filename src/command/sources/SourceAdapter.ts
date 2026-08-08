@@ -111,7 +111,9 @@ export function emptyDataset(asOf: string, meta: DatasetMeta): CommandDataset {
     payments: [],
     cashAccounts: [],
     cashPlans: [],
-    salesTargets: []
+    salesTargets: [],
+    assignments: [],
+    dailyReports: []
   };
 }
 

@@ -40,6 +40,7 @@ import {
   requestResearch,
   type ToolContext
 } from '../tools/registry.js';
+import { addDaysJst, jstDate } from '../utils/jst.js';
 import { ContextStore, type ConversationContext, type IntentKey } from './context.js';
 
 /** 無制限ループ禁止のための上限。1リクエストで超えたら打ち切る */
@@ -210,6 +211,10 @@ export class CommandOrchestrator {
     // --- Read系 ---
     if (/おはよう|ブリーフ|朝の報告|今日の報告/i.test(message))
       return this.runIntent('brief', ctx, dataStatus);
+    if (/今日の現場|今日.{0,4}(どこ|配置)/.test(message))
+      return this.handleTodaySites(ctx, dataStatus);
+    if (/昨日.{0,6}(誰|どこ|行った)/.test(message))
+      return this.handleYesterdayReports(ctx, dataStatus);
     if (/遅れたら|買ったら|購入したら|使ったら/.test(message))
       return this.handleCashScenario(ctx, message, dataStatus);
     if (/最終接点|最後の(連絡|接点)|いつ(連絡|会っ)/.test(message))
@@ -1194,6 +1199,107 @@ export class CommandOrchestrator {
         projectId: item.projectId
       })),
       listShown: 0
+    };
+  }
+
+  private async handleTodaySites(ctx: ToolContext, dataStatus: DataStatus): Promise<HandlerResult> {
+    const today = jstDate(ctx.dataset.asOf);
+    const scoped = filterDatasetByScope(ctx.dataset, ctx.scope);
+    const assignments = scoped.assignments.filter((a) => a.date === today);
+    if (assignments.length === 0) {
+      return this.simpleText(
+        '【確認できた事実】本日の配置データが登録されていません。配置板データが未接続または未入力の可能性があります。推測では回答しません。',
+        'schedule',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    const bySite = new Map<string, string[]>();
+    for (const a of assignments) {
+      bySite.set(a.siteName, [...(bySite.get(a.siteName) ?? []), a.employeeName]);
+    }
+    const lines = [
+      `【確認できた事実】本日（${today}）の予定配置は${bySite.size}現場です。`,
+      ...[...bySite.entries()].map(([site, people]) => `・${site}: ${people.join('、')}`),
+      '',
+      '※これは配置板の「予定」です。実績は日報で確認してください。'
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'tasks',
+        data: { assignments },
+        confidence: 'HIGH',
+        evidence: assignments.map((a) => ({
+          label: `予定配置 ${a.siteName}`,
+          value: `${a.date} ${a.employeeName}`,
+          refId: a.assignmentId,
+          source: 'デジタル配置板（予定）',
+          asOf: ctx.dataset.asOf
+        })),
+        toolsUsed: ['get_schedule']
+      },
+      intent: 'schedule',
+      listItems: assignments.map((a) => ({
+        id: a.assignmentId,
+        kind: 'project' as const,
+        label: `${a.siteName}（${a.employeeName}）`,
+        projectId: a.projectId
+      })),
+      listShown: assignments.length
+    };
+  }
+
+  private async handleYesterdayReports(
+    ctx: ToolContext,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const yesterday = addDaysJst(jstDate(ctx.dataset.asOf), -1);
+    const scoped = filterDatasetByScope(ctx.dataset, ctx.scope);
+    const reports = scoped.dailyReports.filter((r) => r.date === yesterday);
+    if (reports.length === 0) {
+      const planned = scoped.assignments.filter((a) => a.date === yesterday);
+      return this.simpleText(
+        planned.length > 0
+          ? `【確認できた事実】昨日（${yesterday}）の実績日報が未提出です。予定配置は${planned.length}件ありました（${planned.map((a) => `${a.siteName}:${a.employeeName}`).join('、')}）が、予定を実績として扱うことはできません。`
+          : `【確認できた事実】昨日（${yesterday}）の日報・配置データがありません。推測では回答しません。`,
+        'schedule',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    const lines = [
+      `【確認できた事実】昨日（${yesterday}）の実績日報は${reports.length}件です。`,
+      ...reports.map(
+        (r) =>
+          `・${r.siteName}: ${r.employeeName}（${r.manDays}人工${r.workDescription ? `、${r.workDescription}` : ''}）`
+      )
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'tasks',
+        data: { reports },
+        confidence: 'HIGH',
+        evidence: reports.map((r) => ({
+          label: `実績日報 ${r.siteName}`,
+          value: `${r.date} ${r.employeeName} ${r.manDays}人工`,
+          refId: r.reportId,
+          source: '実績日報',
+          asOf: ctx.dataset.asOf
+        })),
+        toolsUsed: ['get_daily_reports']
+      },
+      intent: 'schedule',
+      listItems: reports.map((r) => ({
+        id: r.reportId,
+        kind: 'project' as const,
+        label: `${r.siteName}（${r.employeeName}）`,
+        projectId: r.projectId
+      })),
+      listShown: reports.length
     };
   }
 

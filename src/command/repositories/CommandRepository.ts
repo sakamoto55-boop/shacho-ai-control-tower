@@ -15,6 +15,7 @@ import {
   ProductionSourceRegistry,
   type SourceRegistry
 } from '../sources/SourceAdapter.js';
+import { createSheetsRegistryFromEnv } from '../sources/googleSheets.js';
 
 export interface CommandStore {
   decisions: Decision[];
@@ -142,8 +143,12 @@ export class LocalCommandRepository implements CommandRepository {
 export function createCommandRepository(
   mode: 'demo' | 'production' = (process.env.LCC_COMMAND_MODE as 'demo' | 'production') ?? 'demo'
 ): CommandRepository {
-  const registry =
-    mode === 'production' ? new ProductionSourceRegistry() : new DemoSourceRegistry();
+  // production: Sheets Source設定があれば実データREAD ONLY接続、なければ未接続（DATA UNAVAILABLE）。
+  // どちらの場合もデモデータへはフォールバックしない。
+  const registry: SourceRegistry =
+    mode === 'production'
+      ? (createSheetsRegistryFromEnv() ?? new ProductionSourceRegistry())
+      : new DemoSourceRegistry();
   return new LocalCommandRepository(undefined, registry);
 }
 

@@ -35,6 +35,11 @@ import {
 } from '../security/security.js';
 import { AuditLog } from '../security/audit.js';
 import { addDaysJst, jstDate } from '../utils/jst.js';
+import { checkDataQuality } from '../domain/dataQuality.js';
+import {
+  createGoogleAuthenticatorFromEnv,
+  type GoogleIdentityAuthenticator
+} from '../auth/googleIdentity.js';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -46,6 +51,8 @@ export interface CommandAppOptions {
   rateLimiter?: RateLimiter;
   /** テスト注入用。未指定時は LCC_COMMAND_API_TOKENS 環境変数を使う */
   apiTokens?: string;
+  /** Google Identity認証（設定時はIDトークン検証を優先。認可＝RBACは共通） */
+  googleAuthenticator?: GoogleIdentityAuthenticator | null;
 }
 
 export type CommandApp = Hono<{ Variables: { principal: Principal } }>;
@@ -60,6 +67,10 @@ export function createCommandApp(
   const repository = options.repository ?? createCommandRepository();
   const audit = options.auditLog ?? new AuditLog();
   const rateLimiter = options.rateLimiter ?? new RateLimiter();
+  const googleAuth =
+    options.googleAuthenticator !== undefined
+      ? options.googleAuthenticator
+      : createGoogleAuthenticatorFromEnv();
   const app = new Hono<{ Variables: { principal: Principal } }>();
   const orchestrator = new CommandOrchestrator(repository);
 
@@ -69,13 +80,16 @@ export function createCommandApp(
     if (!rateLimiter.allow(clientKey)) {
       return c.json({ error: 'rate limit exceeded' }, 429);
     }
-    const principal = resolvePrincipal(
-      c.req.header('authorization'),
-      repository.mode,
-      options.apiTokens ?? process.env.LCC_COMMAND_API_TOKENS
-    );
+    // Authentication: Google Identity（設定時）→ 静的トークン の順。Authorization(RBAC)は共通。
+    const principal = googleAuth
+      ? await googleAuth.authenticate(c.req.header('authorization'))
+      : resolvePrincipal(
+          c.req.header('authorization'),
+          repository.mode,
+          options.apiTokens ?? process.env.LCC_COMMAND_API_TOKENS
+        );
     if (!principal) {
-      return c.json({ error: 'unauthorized: 有効なAPIトークンが必要です' }, 401);
+      return c.json({ error: 'unauthorized: 有効な認証情報が必要です' }, 401);
     }
     c.set('principal', principal);
     await next();
@@ -354,6 +368,16 @@ export function createCommandApp(
   app.get('/research', async (c) => {
     const store = await repository.getStore();
     return c.json({ research: store.research });
+  });
+
+  app.get('/data-quality', async (c) => {
+    // データ不整合の検出結果（Phase B0は検出のみ。自動修正しない）
+    try {
+      const { scope, dataset } = await scopedDataset(c);
+      return c.json({ scope, issues: checkDataQuality(dataset, scope) });
+    } catch (error) {
+      return handleError(c, error);
+    }
   });
 
   app.get('/sources', async (c) => {
