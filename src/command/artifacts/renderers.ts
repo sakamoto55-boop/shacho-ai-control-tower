@@ -6,6 +6,7 @@
  * 出力先は data/artifacts/（Git管理外）。
  */
 import { mkdir, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import pptxgen from 'pptxgenjs';
 // pptxgenjsの型定義はdefault exportがコンストラクタとして解決されないためinterop
@@ -180,6 +181,7 @@ export async function renderPdf(spec: DocumentSpec, fileBase: string): Promise<s
   const dir = await ensureDir();
   const path = join(dir, `${fileBase}.pdf`);
   const doc = new PDFDocument({ size: 'A4', margin: 48 });
+  applyJapaneseFont(doc);
   const chunks: Buffer[] = [];
   doc.on('data', (chunk: Buffer) => chunks.push(chunk));
   const done = new Promise<void>((resolveDone) => doc.on('end', () => resolveDone()));
@@ -198,6 +200,31 @@ export async function renderPdf(spec: DocumentSpec, fileBase: string): Promise<s
   await done;
   await writeFile(path, Buffer.concat(chunks));
   return path;
+}
+
+
+/** PDFは日本語フォントの埋め込みが必須（標準Helveticaは日本語を描画できない） */
+const PDF_FONT_CANDIDATES: Array<[string, string?]> = [
+  ...(process.env.LCC_PDF_FONT ? ([[process.env.LCC_PDF_FONT]] as Array<[string]>) : []),
+  ['C:\\Windows\\Fonts\\meiryo.ttc', 'Meiryo'],
+  ['C:\\Windows\\Fonts\\msgothic.ttc', 'MS-Gothic'],
+  ['C:\\Windows\\Fonts\\YuGothM.ttc', 'YuGothic-Medium'],
+  ['/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf'],
+  ['/System/Library/Fonts/Hiragino Sans GB.ttc', 'HiraginoSansGB-W3']
+];
+
+function applyJapaneseFont(doc: InstanceType<typeof PDFDocument>): void {
+  for (const [path, family] of PDF_FONT_CANDIDATES) {
+    try {
+      if (!existsSync(path)) continue;
+      if (family) doc.font(path, family);
+      else doc.font(path);
+      return;
+    } catch {
+      // 読めないフォントは次候補へ
+    }
+  }
+  // 候補なし: 標準フォント（日本語不可）。OPERATIONS.mdにLCC_PDF_FONT設定手順を記載
 }
 
 /** Chart SVG生成（§22）。決定論データのみ。AIに値を作らせない */

@@ -385,6 +385,12 @@ createApp({
   data(){
     return {
       apiBase: new URLSearchParams(location.search).get('api') || '',
+      apiToken: (() => {
+        // 本番モードはAPIトークン必須（?token=で受け取りlocalStorageへ保存。以後URL不要）
+        const fromUrl = new URLSearchParams(location.search).get('token');
+        if (fromUrl) { try { localStorage.setItem('lcc_command_token', fromUrl); } catch {} }
+        try { return fromUrl || localStorage.getItem('lcc_command_token') || ''; } catch { return fromUrl || ''; }
+      })(),
       demoRequested: new URLSearchParams(location.search).get('demo') === '1',
       demoMode: false,
       connectionError: false,
@@ -484,7 +490,7 @@ createApp({
         if (this.demoMode) { await this.demoReply(message); }
         else {
           const res = await fetch(`${this.apiBase}/command/chat`, {
-            method: 'POST', headers: { 'content-type': 'application/json' },
+            method: 'POST', headers: { 'content-type': 'application/json', ...this.authHeaders() },
             body: JSON.stringify({ message, scope: this.scope, sessionId: this.sessionId })
           });
           if (!res.ok) throw new Error('chat failed');
@@ -514,10 +520,14 @@ createApp({
       this.scrollDown();
     },
 
+    authHeaders(){
+      return this.apiToken ? { authorization: `Bearer ${this.apiToken}` } : {};
+    },
+
     async visualizeEvents(){
       // B1.5 Event Busを購読しRole活動を可視化（§3-§4・§19）
       try {
-        const res = await fetch(`${this.apiBase}/command/events?limit=40`);
+        const res = await fetch(`${this.apiBase}/command/events?limit=40`, { headers: this.authHeaders() });
         if (!res.ok) return;
         const body = await res.json();
         const recent = (body.events || []).slice(-20);
@@ -589,7 +599,7 @@ createApp({
       let note = approve ? '承認しました（dry-run実行。外部への実送信は行われません）' : '却下しました';
       try {
         if (!this.demoMode && approval.approvalId) {
-          await fetch(`${this.apiBase}/command/approvals/${approval.approvalId}/${approve ? 'approve' : 'reject'}`, { method: 'POST' });
+          await fetch(`${this.apiBase}/command/approvals/${approval.approvalId}/${approve ? 'approve' : 'reject'}`, { method: 'POST', headers: this.authHeaders() });
         }
       } catch { note = '承認APIへ接続できませんでした'; }
       this.messages.push({ role: 'ai', text: note, done: true, evidence: [], confidence: 'HIGH' });
@@ -602,7 +612,7 @@ createApp({
       message.fb = rating;
       try {
         await fetch(`${this.apiBase}/command/feedback`, {
-          method: 'POST', headers: { 'content-type': 'application/json' },
+          method: 'POST', headers: { 'content-type': 'application/json', ...this.authHeaders() },
           body: JSON.stringify({ rating, sessionId: this.sessionId })
         });
       } catch { /* 送信失敗で会話は止めない */ }
@@ -618,7 +628,7 @@ createApp({
 
     async loadKpi(){
       try {
-        const res = await fetch(`${this.apiBase}/command/kpi?scope=${this.scope}`);
+        const res = await fetch(`${this.apiBase}/command/kpi?scope=${this.scope}`, { headers: this.authHeaders() });
         if (!res.ok) throw new Error('kpi failed');
         const body = await res.json();
         const find = (key) => (body.kpis || []).find(k => k.key === key);

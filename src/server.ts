@@ -15,6 +15,13 @@ export const app = new Hono();
 // LCC COMMAND（会話型AI経営管制OS）を /command 配下へマウント
 app.route('/command', createCommandApp());
 
+// UI配信（スマホ等の実機からも http://<PCのIP>:8787/vui で利用できるようにする）
+app.get('/vui', async (c) => {
+  const { readFile } = await import('node:fs/promises');
+  const html = await readFile(new URL('../docs/lcc-command-vui.html', import.meta.url), 'utf8');
+  return c.html(html);
+});
+
 const devEnabled = () => process.env.ENABLE_DEV_ENDPOINTS !== 'false' && process.env.NODE_ENV !== 'production';
 const repository = createRepository();
 
