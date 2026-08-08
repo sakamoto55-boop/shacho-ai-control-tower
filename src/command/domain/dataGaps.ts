@@ -98,9 +98,12 @@ export const DATA_GAPS: DataGap[] = [
     expectedSource: 'UNKNOWN（推測で接続しない）',
     status: 'OPEN',
     discoveredAt: '2026-08-08',
-    evidence: ['Drive READ ONLY実測でも銀行明細・残高シートを未発見'],
+    evidence: [
+      'Drive READ ONLY実測でも銀行明細・残高シートを未発見',
+      '印刷版経営計画書の配付先一覧（特No.1〜5）から取引先とみられる金融機関5「機関」を確認: 山陰合同銀行島根医大通支店・鳥取銀行出雲支店・ごうぎんリース出雲支店・日本政策金融公庫松江支店・島根中央信用金庫出雲西支店（※明細5行の意味ではない。口座の存在・明細データの所在はEvidence未確認のため資金繰りSourceには未採用）'
+    ],
     recommendedAction:
-      '利用中の銀行/会計サービスからのCSVエクスポートまたは残高転記シートの場所をユーザーへ確認する',
+      '上記金融機関の口座有無と、明細CSV/残高転記シートの取得方法をユーザーへ確認する（推測で接続しない）',
     capabilityImpact:
       'Current Cash Confidence = UNKNOWN → 30/60/90 Cash Forecast = INCOMPLETE（回答には常に未接続の注記を付ける）'
   },

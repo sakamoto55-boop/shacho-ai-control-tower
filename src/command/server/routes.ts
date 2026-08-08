@@ -66,6 +66,14 @@ import { ArtifactService } from '../artifacts/artifactRegistry.js';
 import { DATA_STEWARDSHIP } from '../domain/stewardship.js';
 import { unifiedSearch } from '../search/unifiedSearch.js';
 import { MemoryService as MemorySearchService } from '../memory/store.js';
+import { GrowthService } from '../growth/growthBacklog.js';
+import { PromotionPipeline } from '../growth/promotionPipeline.js';
+import {
+  buildDailyGrowthReview,
+  buildMonthlyIntelligenceReview,
+  buildWeeklyGrowthReview,
+  type GrowthReviewInput
+} from '../growth/growthReview.js';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -118,6 +126,8 @@ export function createCommandApp(
   const providerRegistry = createDefaultRegistry();
   const constitutionService = new ConstitutionService(repository);
   const artifactService = new ArtifactService(repository);
+  const growthService = new GrowthService(repository);
+  const promotionPipeline = new PromotionPipeline(repository);
 
   // --- Principal解決 + Rate Limit（全ルート共通） ---
   app.use('*', async (c, next) => {
@@ -922,6 +932,122 @@ export function createCommandApp(
       availability: datasetAvailability(dataset),
       sources: dataset.meta.sources
     });
+  });
+
+  // --- Phase GROWTH: Growth Backlog / Self-Evaluation / Review / Promotion ---
+
+  app.get('/growth/backlog', async (c) => {
+    const principal = c.get('principal');
+    try {
+      if (!canDecideApproval(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}はGrowth Backlogを参照できません`);
+      }
+      return c.json({
+        items: await growthService.list(),
+        topProposals: await growthService.topProposals(2)
+      });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  app.get('/growth/self-evaluation', (c) => {
+    const principal = c.get('principal');
+    try {
+      if (!canDecideApproval(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}はAI自己評価を参照できません`);
+      }
+      return c.json({ evaluation: orchestrator.getSelfEvaluation() });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  app.get('/growth/review', async (c) => {
+    const principal = c.get('principal');
+    try {
+      if (!canDecideApproval(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}はGrowth Reviewを参照できません`);
+      }
+      const period = c.req.query('period') ?? 'daily';
+      if (period !== 'daily' && period !== 'weekly' && period !== 'monthly') {
+        throw new ValidationError('period は daily / weekly / monthly のいずれかです');
+      }
+      const items = await growthService.list();
+      const memories = await repository.getMemories();
+      const input: GrowthReviewInput = {
+        // 変化検知（signals/patterns）は日次観測スクリプトのスナップショット履歴が正本
+        signals: [],
+        patterns: [],
+        backlog: await growthService.backlog(),
+        repairs: items.filter((i) => i.kind === 'REPAIR'),
+        experiments: await repository.getExperiments(),
+        lessons: memories.filter((m) => m.type === 'LESSON' && m.status === 'ACTIVE'),
+        selfEvaluation: orchestrator.getSelfEvaluation()
+      };
+      const text =
+        period === 'weekly'
+          ? buildWeeklyGrowthReview(input)
+          : period === 'monthly'
+            ? buildMonthlyIntelligenceReview(input)
+            : buildDailyGrowthReview(input);
+      return c.json({
+        period,
+        text,
+        note: '前回比の変化検知は日次観測（npm run command:growth）のスナップショット履歴に基づきます'
+      });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // Data Repair Candidateの人間確認（§19。AIはSource of Truthを直接修正しない）
+  app.post('/growth/repairs/:id/confirm', async (c) => {
+    const principal = c.get('principal');
+    try {
+      if (!canDecideApproval(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}は修正候補を確定できません`);
+      }
+      const repair = await growthService.confirmRepair(c.req.param('id'), principal, nowIso());
+      if (!repair) return c.json({ error: '対象の修正候補が見つかりません' }, 404);
+      await audit.record({
+        actor: principal.label,
+        role: principal.role,
+        action: 'growth_repair_confirm',
+        scope: 'group',
+        detail: repair.repairId,
+        outcome: 'ok'
+      });
+      return c.json({ repair });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // Promotion Pipeline（§27-§28）。ACTIVE化は人間承認必須・Safety Gate対象は不可（§46）
+  app.post('/growth/improvements/:id/advance', async (c) => {
+    const principal = c.get('principal');
+    try {
+      if (!canDecideApproval(principal)) {
+        throw new AccessDeniedError(`ロール${principal.role}は改善候補を昇格できません`);
+      }
+      const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+      const improvement = await promotionPipeline.advance(c.req.param('id'), nowIso(), {
+        approvedBy: body.approve === true ? principal.label : undefined,
+        evaluation: typeof body.evaluation === 'string' ? body.evaluation : undefined
+      });
+      await audit.record({
+        actor: principal.label,
+        role: principal.role,
+        action: 'growth_improvement_advance',
+        scope: 'group',
+        detail: `${improvement.improvementId} → ${improvement.status}`,
+        outcome: 'ok'
+      });
+      return c.json({ improvement });
+    } catch (error) {
+      return handleError(c, error);
+    }
   });
 
   return app;

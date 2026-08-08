@@ -57,7 +57,12 @@ export type AiCoreState =
   | 'WAITING_APPROVAL'
   | 'RESPONDING'
   | 'WARNING'
-  | 'ERROR';
+  | 'ERROR'
+  // Phase GROWTH（§38）。常時派手に動かさない静的寄りの状態
+  | 'OBSERVING'
+  | 'LEARNING'
+  | 'EXPERIMENTING'
+  | 'EVALUATING';
 
 export interface AiCoreStatus {
   primaryState: AiCoreState;
@@ -76,7 +81,7 @@ const EVENT_TO_STATE: Partial<Record<CommandEventType, AiCoreState>> = {
   RESEARCH_STARTED: 'RESEARCHING',
   RESEARCH_COMPLETED: 'ANALYZING',
   MEMORY_RECALL: 'REMEMBERING',
-  MEMORY_UPDATED: 'REMEMBERING',
+  MEMORY_UPDATED: 'LEARNING',
   CRITIC_STARTED: 'CRITIQUING',
   CRITIC_COMPLETED: 'ANALYZING',
   INNOVATION_STARTED: 'INNOVATING',

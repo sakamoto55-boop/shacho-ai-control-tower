@@ -120,6 +120,15 @@ HTTPリクエスト (src/server.ts, Hono)
 - Capabilityが未接続なら「できます」と言わない（§46）。画像生成等はPLANNED登録+正直な未接続通知。
 - 会社憲法の承認候補は`CONSTITUTION_REVIEW.md`が正（10項目）。AIが勝手にCURRENT化しない。
 
+### Autonomous Growth層（src/command/growth/ — Phase GROWTH）
+
+- 「自律成長」と「自己改変」を混同しない。本番Prompt・Router・Code・Constitution・Safety Rule・RBACの変更はPromotion Pipeline（PROPOSED→TESTED→REVIEWED→APPROVED→ACTIVE）必須で、ACTIVE化は人間承認（approvedBy）がないと例外を投げる。CONSTITUTION/SAFETY_RULE/RBACはSafety Gate対象でPipelineからACTIVE化できない（§46）。この強制を緩めない。
+- Data修正はRepair Candidate（人間CONFIRMED）のみ。AIがSource of Truth（シート・正本）を直接修正するコードを書かない。
+- Root Cause・改善効果はEvidence必須。測定データがなければ「効果測定できていません」と返す（§40-§41）。実験は実施しただけで成功扱いしない（Before/After/目標達成度で判定）。
+- 改善候補は必ずConstitution Guard（`checkProposal`）とTarget整合を通し、優先度は内訳（Impact/Urgency/Confidence/Effort/Risk/GoalAlignment）を保持する。社長への提案は上位のみ（`topProposals(2)`）。
+- 過去のFAILURE Lessonは削除せず保持し、同種の案は確信度を下げて提示する（§17）。
+- 日次観測 `npm run command:growth` はREAD ONLY（履歴は `data/growth-snapshots.jsonl`・Git管理外）。自律実行レベルは初期LEVEL 1（観測・提案のみ）で、引き上げはユーザー承認のみ。
+
 ### Phase VUI（docs/lcc-command-vui.html — Visual Intelligence UI）
 
 - 粒子AI COREの視覚仕様の正本は `src/command/vui/visualSpec.ts`。UI側（HTML内のCORE_VISUALS）と同期させ、変更時は両方更新する（`tests/command/vui/` が検査）。

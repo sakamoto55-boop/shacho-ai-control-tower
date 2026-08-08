@@ -351,6 +351,40 @@ Phase A/B0の決定論エンジン・Canonical Model・Source Adapter・RBAC・E
   Innovation Engineへ接続。
 - **最小起動セット（§43）**: Sheets Service Account + 実LLM Provider1つでLIVE READ ONLY BETA起動可能。
 
+## Phase GROWTH（Autonomous Growth Loop / 自律成長基盤）の状態
+
+- **Growth Engine（§1-§6）**: `src/command/growth/growthEngine.ts` — 決定論スナップショット
+  （着地・粗利・営業漏れ・未請求・期日超過・アラート・データ品質）→ 前回比の変化検知
+  （`detectChanges`。「前回 X → 今回 Y」のEvidence必須）→ 3回以上の繰り返しPattern検知
+  （`detectPatterns`）→ Root Cause **Candidate**（確信度LOW固定。HYPOTHESISのままFACT化しない）。
+  決定論検査が先・AI Reasoningは異常時のみ（§3）。
+- **Growth Backlog（§30-§34）**: `growth/growthBacklog.ts` — COMPANY/AI/DATAの3ドメイン。
+  全候補をConstitution Guard（`checkProposal`）とTarget整合（正式目標なし=UNKNOWNで保守的評価）に通す。
+  優先度はImpact/Urgency/Confidence/Effort/Risk/GoalAlignmentの**内訳保持**（総合点のみ禁止）。
+  過去のFAILURE Lessonと同種の案は確信度を下げる（§17。同じ失敗を再提案しない）。
+  社長への提案は`topProposals(2)`=上位のみ（通知過多禁止）。
+- **Promotion Pipeline（§24-§29・§46）**: `growth/promotionPipeline.ts` —
+  PROPOSED→TESTED→REVIEWED→APPROVED→ACTIVE。**ACTIVE化はapprovedBy（人間承認）必須＝自己改変禁止**。
+  CONSTITUTION/SAFETY_RULE/RBACは**Safety Gate対象でPipelineからACTIVE化不可**（別の承認Gateのみ）。
+  Prompt改善はA/B評価（`evaluatePromptCandidate`・決定論判定）で推奨のみ。
+- **Data Repair / Mapping学習（§19-§20）**: 修正はRepair Candidate（PROPOSED→人間CONFIRMED）のみで
+  Source of Truthは変更しない。現場名⇔案件IDのMappingは人間確認の回数で確度を上げる（上限95%）。
+- **AI Self-Evaluation（§21-§23）**: `growth/selfEvaluation.ts` — Observability+Agent Traceから
+  UNKNOWN率・確信度・訂正率・フィードバック率・Provider別実績を決定論測定。
+  総合点はサンプル20件以上のみ（少数への過適合防止）。サンプルゼロは「効果測定できていません」。
+- **Review（§35-§37・§40-§41）**: `growth/growthReview.ts` — Daily/Weekly/Monthly。
+  改善の主張は必ずBefore/After Evidence付き。測定なしは「効果測定できていません」と正直に言う。
+- **会話（§39・§43）**: 「最近AIは何を学んだ？」「会社で何が改善した？」「AI自身は賢くなった？」
+  「失敗した施策は？」「次に何を改善すべき？」に正直に回答。会話で語られた課題（PROBLEM）は
+  Growth Backlogへ自動蓄積（source=CONVERSATION）。
+- **API/スクリプト**: `GET /command/growth/backlog` / `GET /command/growth/self-evaluation` /
+  `GET /command/growth/review?period=daily|weekly|monthly` /
+  `POST /command/growth/repairs/:id/confirm` / `POST /command/growth/improvements/:id/advance`。
+  日次観測は `npm run command:growth`（READ ONLY・履歴は `data/growth-snapshots.jsonl` Git管理外）。
+- **VUI（§38）**: AI CORE状態にOBSERVING/LEARNING/EXPERIMENTING/EVALUATINGを追加（全17状態・
+  静的寄りの落ち着いた挙動・blinkHz 0。常時派手に動かさない）。
+- **自律実行レベル（§11）**: 初期本番はLEVEL 1（観測・提案のみ）。引き上げは社長の明示承認のみ。
+
 ## フェーズ計画
 
 - **Phase A（本実装）**: 会話コア＋決定論エンジン＋承認フロー＋Brief＋UI＋RBAC/セキュリティ。読み取り正本はDemo Fixture（demoモード限定）。実行は全てdry-run。

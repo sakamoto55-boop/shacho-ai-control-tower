@@ -55,7 +55,12 @@ export const CORE_VISUALS: Record<AiCoreState, CoreVisualSpec> = {
   WAITING_APPROVAL: { label: 'ご承認をお待ちしています', motion: 'hold', speed: 0.08, convergence: 0.5, blinkHz: 0, tintToken: 'core-approval' },
   RESPONDING: { label: '回答しています', motion: 'pulse', speed: 0.5, convergence: 0.5, blinkHz: 1, tintToken: 'core-respond' },
   WARNING: { label: '注意が必要です', motion: 'alert', speed: 0.4, convergence: 0.6, blinkHz: 0.5, tintToken: 'core-warning' },
-  ERROR: { label: '接続に問題があります', motion: 'calm-error', speed: 0.1, convergence: 0.1, blinkHz: 0, tintToken: 'core-error' }
+  ERROR: { label: '接続に問題があります', motion: 'calm-error', speed: 0.1, convergence: 0.1, blinkHz: 0, tintToken: 'core-error' },
+  // Phase GROWTH（§38）。観測・学習系は落ち着いた挙動（常時派手に動かさない）
+  OBSERVING: { label: '会社を観測しています', motion: 'drift', speed: 0.2, convergence: 0.1, blinkHz: 0, tintToken: 'core-idle' },
+  LEARNING: { label: '学習しています', motion: 'link', speed: 0.3, convergence: 0.4, blinkHz: 0, tintToken: 'core-memory' },
+  EXPERIMENTING: { label: '実験を追跡しています', motion: 'orbit', speed: 0.3, convergence: 0.2, blinkHz: 0, tintToken: 'core-analyze' },
+  EVALUATING: { label: '結果を評価しています', motion: 'tighten', speed: 0.3, convergence: 0.6, blinkHz: 0, tintToken: 'core-critic' }
 };
 
 /** AI CORE周辺に配置するRole Ring（§4）。内部Provider名は含めない */

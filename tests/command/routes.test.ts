@@ -109,4 +109,49 @@ describe('/command API', () => {
     };
     expect(body.scenario.minBalance.balance).toBeLessThan(body.base.minBalance.balance);
   });
+
+  // --- Phase GROWTH ---
+
+  it('GET /growth/backlog がGrowthアイテムと上位提案を返す', async () => {
+    const res = await app.request('/growth/backlog');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: unknown[]; topProposals: unknown[] };
+    expect(Array.isArray(body.items)).toBe(true);
+    expect(body.topProposals.length).toBeLessThanOrEqual(2);
+  });
+
+  it('GET /growth/self-evaluation はサンプルなしを正直に返す（§41）', async () => {
+    const res = await app.request('/growth/self-evaluation');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      evaluation: { sampleSize: number; compositeScore: number | null; note: string };
+    };
+    expect(body.evaluation.sampleSize).toBe(0);
+    expect(body.evaluation.compositeScore).toBeNull();
+    expect(body.evaluation.note).toContain('効果測定できていません');
+  });
+
+  it('GET /growth/review は daily/weekly/monthly を返し、不正periodは400', async () => {
+    for (const period of ['daily', 'weekly', 'monthly'] as const) {
+      const res = await app.request(`/growth/review?period=${period}`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { text: string };
+      expect(body.text.length).toBeGreaterThan(10);
+    }
+    const bad = await app.request('/growth/review?period=yearly');
+    expect(bad.status).toBe(400);
+  });
+
+  it('STAFFはGrowth Backlog・自己評価を参照できない（RBAC）', async () => {
+    const tokens = JSON.stringify({
+      'tok-staff': { role: 'STAFF', companyIds: ['lcc'], label: 'スタッフ' }
+    });
+    const guarded = createCommandApp({ repository: new InMemoryCommandRepository(), apiTokens: tokens });
+    for (const path of ['/growth/backlog', '/growth/self-evaluation', '/growth/review']) {
+      const res = await guarded.request(path, {
+        headers: { authorization: 'Bearer tok-staff' }
+      });
+      expect(res.status, path).toBe(403);
+    }
+  });
 });

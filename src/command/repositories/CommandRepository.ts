@@ -13,6 +13,7 @@ import type { ExperimentRecord, MemoryRecord } from '../memory/types.js';
 import type { TargetRecord } from '../targets/targetRegistry.js';
 import type { ConstitutionPrinciple } from '../constitution/constitutionRegistry.js';
 import type { ArtifactRecord } from '../artifacts/artifactRegistry.js';
+import type { GrowthItem } from '../growth/growthBacklog.js';
 import { buildSeedDataset, type CommandDataset } from '../data/seed.js';
 import {
   DemoSourceRegistry,
@@ -35,6 +36,8 @@ export interface CommandStore {
   principles: ConstitutionPrinciple[];
   /** Artifact Registry（Phase X）。生成成果物の管理 */
   artifacts: ArtifactRecord[];
+  /** Growth Registry（Phase GROWTH）。改善候補・自己改善・修正候補・Mapping学習 */
+  growthItems: GrowthItem[];
 }
 
 export interface CommandRepository {
@@ -61,6 +64,8 @@ export interface CommandRepository {
   savePrinciple(record: ConstitutionPrinciple): Promise<ConstitutionPrinciple>;
   getArtifacts(): Promise<ArtifactRecord[]>;
   saveArtifact(record: ArtifactRecord): Promise<ArtifactRecord>;
+  getGrowthItems(): Promise<GrowthItem[]>;
+  saveGrowthItem(record: GrowthItem): Promise<GrowthItem>;
 }
 
 function defaultStore(): CommandStore {
@@ -73,7 +78,8 @@ function defaultStore(): CommandStore {
     experiments: [],
     targets: [],
     principles: [],
-    artifacts: []
+    artifacts: [],
+    growthItems: []
   };
 }
 
@@ -229,6 +235,27 @@ export class LocalCommandRepository implements CommandRepository {
     await this.writeStore(store);
     return record;
   }
+
+  async getGrowthItems(): Promise<GrowthItem[]> {
+    return (await this.readStore()).growthItems;
+  }
+
+  async saveGrowthItem(record: GrowthItem): Promise<GrowthItem> {
+    const store = await this.readStore();
+    store.growthItems = [
+      ...store.growthItems.filter((item) => growthItemId(item) !== growthItemId(record)),
+      record
+    ];
+    await this.writeStore(store);
+    return record;
+  }
+}
+
+function growthItemId(item: GrowthItem): string {
+  if (item.kind === 'CANDIDATE') return item.candidateId;
+  if (item.kind === 'IMPROVEMENT') return item.improvementId;
+  if (item.kind === 'REPAIR') return item.repairId;
+  return item.mappingId;
 }
 
 /** テスト用: メモリ上のみで動くリポジトリ */
@@ -359,6 +386,18 @@ export class InMemoryCommandRepository implements CommandRepository {
   async saveArtifact(record: ArtifactRecord): Promise<ArtifactRecord> {
     this.store.artifacts = [
       ...this.store.artifacts.filter((r) => r.artifactId !== record.artifactId),
+      record
+    ];
+    return record;
+  }
+
+  async getGrowthItems(): Promise<GrowthItem[]> {
+    return this.store.growthItems;
+  }
+
+  async saveGrowthItem(record: GrowthItem): Promise<GrowthItem> {
+    this.store.growthItems = [
+      ...this.store.growthItems.filter((item) => growthItemId(item) !== growthItemId(record)),
       record
     ];
     return record;

@@ -28,7 +28,11 @@ const ALL_STATES: AiCoreState[] = [
   'WAITING_APPROVAL',
   'RESPONDING',
   'WARNING',
-  'ERROR'
+  'ERROR',
+  'OBSERVING',
+  'LEARNING',
+  'EXPERIMENTING',
+  'EVALUATING'
 ];
 
 const UI_HTML = readFileSync('docs/lcc-command-vui.html', 'utf8');

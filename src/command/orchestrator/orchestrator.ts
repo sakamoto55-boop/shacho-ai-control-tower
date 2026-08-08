@@ -96,6 +96,8 @@ import {
   type LlmCriticAdvisor
 } from '../agents/critic.js';
 import { analyzeCorrectionImpact, formatImpactReport } from '../agents/correctionImpact.js';
+import { GrowthService } from '../growth/growthBacklog.js';
+import { computeSelfEvaluation, type AiSelfEvaluation } from '../growth/selfEvaluation.js';
 
 /** 無制限ループ禁止のための上限。1リクエストで超えたら打ち切る */
 export const ORCHESTRATOR_LIMITS = {
@@ -177,6 +179,7 @@ export class CommandOrchestrator {
   private constitutionService!: ConstitutionService;
   private artifactService!: ArtifactService;
   private readonly reasoner: GeneralReasoner;
+  private readonly growthService: GrowthService;
 
   private readonly traceLog = new AgentTraceLog();
   private readonly executor: PlanExecutor;
@@ -188,6 +191,7 @@ export class CommandOrchestrator {
     this.memoryService = new MemoryService(repository);
     this.constitutionService = new ConstitutionService(repository);
     this.artifactService = new ArtifactService(repository);
+    this.growthService = new GrowthService(repository);
     this.reasoner = new GeneralReasoner(createGeneralRouter());
     this.executor = new PlanExecutor(
       createDefaultRegistry(),
@@ -200,6 +204,14 @@ export class CommandOrchestrator {
   /** Agent Observability: なぜこの回答になったかを追跡する記録 */
   getAgentTraces(limit = 50) {
     return this.traceLog.recent(limit);
+  }
+
+  /** AI Self-Evaluation（Phase GROWTH §21-§22）。決定論の測定のみ・自己申告なし */
+  getSelfEvaluation(): AiSelfEvaluation {
+    return computeSelfEvaluation(
+      this.options.observability?.recent(500) ?? [],
+      this.traceLog.recent(200)
+    );
   }
 
   /** Visual Event（§18-§19・§28）。displayLabelとIDのみ。本文・機微情報は流さない */
@@ -298,6 +310,33 @@ export class CommandOrchestrator {
           result.memoryIds = curation.saved.map((item) => item.record.memoryId);
         }
         if (curation.saved.length > 0) this.emitEvent('MEMORY_UPDATED', { sessionId });
+        // §43（Phase GROWTH）: 会話で語られた課題はGrowth Backlogの候補としても蓄積する
+        for (const item of curation.saved) {
+          if (item.record.type !== 'PROBLEM') continue;
+          try {
+            await this.growthService.addCandidate(
+              {
+                domain: 'COMPANY',
+                title: item.record.statement.slice(0, 40),
+                problem: item.record.statement,
+                source: 'CONVERSATION',
+                risk: 'LOW',
+                evidence: item.record.evidence.slice(0, 2),
+                priorityInput: {
+                  impact: 0.5,
+                  urgency: 0.4,
+                  confidence: 0.4,
+                  effort: 0.3,
+                  risk: 0.1,
+                  goalAlignment: 0.5
+                }
+              },
+              asOf
+            );
+          } catch {
+            // Growth候補の登録失敗で会話を止めない
+          }
+        }
       } catch {
         // 記憶抽出の失敗で会話を止めない
       }
@@ -385,6 +424,20 @@ export class CommandOrchestrator {
       return this.handleExperimentStatus(ctx, dataStatus);
     }
 
+    // --- Phase GROWTH（§39）: 成長・自己評価の会話（改善「すべき」を先に判定） ---
+    if (/次.{0,6}(何を|なにを)?改善|改善すべき/.test(message)) {
+      return this.handleNextImprovement(ctx, dataStatus);
+    }
+    if (/(会社|うち|最近).{0,8}改善(した|され)|何が(良く|よく)なった/.test(message)) {
+      return this.handleCompanyImprovements(ctx, dataStatus);
+    }
+    if (/賢くなった|AI(自身|自体)?.{0,6}(成長|賢く|進化)/.test(message)) {
+      return this.handleAiSelfEvaluation(dataStatus);
+    }
+    if (/失敗した(施策|実験|試み|やつ)|失敗.{0,3}(施策|実験)/.test(message)) {
+      return this.handleFailedExperiments(ctx, principal, dataStatus);
+    }
+
     // --- Phase X: 統合検索「どこにある？」（§27-§29。記憶想起より先に判定） ---
     if (
       /どこにある|どこだっけ|(計画書|正本|マニュアル|規程|ルール|申請|資料).{0,8}(どこ|どれ)|どれが(正本|最新)/.test(
@@ -402,7 +455,7 @@ export class CommandOrchestrator {
     if (detectCorrection(message).isCorrection && context.lastMemoryIds.length > 0) {
       return this.handleCorrection(ctx, message, context, principal, dataStatus);
     }
-    if (/今日.{0,4}(何を|なに)?(覚えた|学んだ)/.test(message)) {
+    if (/(今日|最近).{0,6}(何を|なに)?(覚えた|学んだ)/.test(message)) {
       return this.handleLearnedToday(ctx, principal, dataStatus);
     }
     if (/(私|会社)について何を覚えて|何を記憶して/.test(message)) {
@@ -3108,6 +3161,213 @@ export class CommandOrchestrator {
         confidence: 'HIGH',
         evidence: [],
         toolsUsed: ['experiments']
+      },
+      intent: 'general'
+    };
+  }
+
+  // ------------------------------------------------------------------
+  // Phase GROWTH（§39-§41）: 成長・自己評価の会話
+  // ------------------------------------------------------------------
+
+  /** 「会社で何が改善した？」— Evidence（Before/After測定）がある改善のみ報告する（§40-§41） */
+  private async handleCompanyImprovements(
+    ctx: ToolContext,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const experiments = await this.repository.getExperiments();
+    const measured = experiments.filter(
+      (e) => e.status === 'COMPLETED' && e.result && e.evaluation
+    );
+    const succeeded = measured.filter((e) => /SUCCESS|成功|達成/.test(e.evaluation ?? ''));
+    if (succeeded.length === 0) {
+      const running = experiments.filter(
+        (e) => e.status === 'RUNNING' || e.status === 'AWAITING_RESULT'
+      );
+      return this.simpleText(
+        [
+          '効果測定できていません。「改善した」と言える測定データ（Before/After）がまだありません。',
+          '改善の報告には、実験のBaseline → 結果 → 目標達成度のEvidenceが必要です。実施しただけでは成功扱いしません。',
+          running.length > 0
+            ? `現在測定中の実験が${running.length}件あります。結果が出たらEvidence付きで報告します。`
+            : '改善案を「実験として登録」すると、効果を測定できるようになります。'
+        ].join('\n'),
+        'general',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    const lines = [
+      '【測定データで確認できた改善】',
+      ...succeeded
+        .slice(-5)
+        .map((e) => `・${e.hypothesis}: ${e.metric} ${e.baseline} → ${e.result}（${e.evaluation}）`),
+      ...(measured.length > succeeded.length
+        ? [`（他に完了${measured.length - succeeded.length}件は目標未達・判定保留です）`]
+        : [])
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: { experiments: succeeded },
+        confidence: 'HIGH',
+        evidence: succeeded.slice(-3).map((e) => ({
+          label: e.metric,
+          value: `${e.baseline} → ${e.result ?? ''}`,
+          source: `実験 ${e.experimentId}（Before/After測定）`,
+          asOf: jstDate(e.updatedAt)
+        })),
+        toolsUsed: ['experiments']
+      },
+      intent: 'general'
+    };
+  }
+
+  /** 「AI自身は賢くなった？」— 決定論の測定指標のみで答える（§21-§22。自己申告しない） */
+  private async handleAiSelfEvaluation(dataStatus: DataStatus): Promise<HandlerResult> {
+    const evaluation = this.getSelfEvaluation();
+    if (evaluation.sampleSize === 0) {
+      return this.simpleText(
+        [
+          '効果測定できていません。会話サンプルがまだないため、AI自身の精度変化を測定できません。',
+          '実運用開始後に、UNKNOWN率・確信度・訂正率・フィードバック評価を決定論的に測定して答えます（自己申告はしません）。'
+        ].join('\n'),
+        'general',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    const m = evaluation.metrics;
+    const lines = [
+      '【AI自己評価（決定論の測定値）】',
+      `・回答${m.answerCount}件 / HIGH確信度率${Math.round(m.highConfidenceRate * 100)}% / UNKNOWN率${Math.round(m.unknownRate * 100)}% / 訂正率${Math.round(m.correctionRate * 100)}%`,
+      m.feedbackGoodRate !== null
+        ? `・フィードバック良評価率: ${Math.round(m.feedbackGoodRate * 100)}%`
+        : '・フィードバックはまだありません',
+      `・平均応答${m.avgLatencyMs}ms / 概算トークン${m.approxTokens}`,
+      ...(evaluation.perProvider.length > 0
+        ? evaluation.perProvider.map(
+            (p) => `・Provider実績: ${p.tasks}タスク / 成功率${Math.round(p.successRate * 100)}%`
+          )
+        : []),
+      '',
+      `※${evaluation.note}`,
+      '「賢くなったか」は前期間との比較測定が揃ってから判断します（1つの総合点だけで判断しません）。'
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: { evaluation },
+        confidence: 'MEDIUM',
+        evidence: [],
+        toolsUsed: ['self_evaluation']
+      },
+      intent: 'general'
+    };
+  }
+
+  /** 「失敗した施策は？」— 失敗も削除せず保持し、同じ失敗を繰り返さないための記録（§16-§17） */
+  private async handleFailedExperiments(
+    ctx: ToolContext,
+    principal: Principal,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const experiments = await this.repository.getExperiments();
+    const failed = experiments.filter(
+      (e) => e.status === 'ABORTED' || /FAILURE|失敗|未達/.test(e.evaluation ?? '')
+    );
+    const memories = await this.memoryService.search(
+      { includeInactive: true, limit: 300 },
+      principal
+    );
+    const failLessons = memories.filter(
+      (m) => m.type === 'LESSON' && /失敗|効果がなかった|FAILURE/.test(m.statement)
+    );
+    if (failed.length === 0 && failLessons.length === 0) {
+      return this.simpleText(
+        [
+          '失敗として記録された施策はまだありません。',
+          '実験の結果が目標未達だった場合も削除せずLessonとして保持し、同じ失敗案は再提案しません。'
+        ].join('\n'),
+        'general',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    const lines = [
+      '【失敗・未達として記録されている施策】（削除せず学習として保持しています）',
+      ...failed
+        .slice(-5)
+        .map((e) => `・${e.hypothesis}（${e.metric}: ${e.baseline} → ${e.result ?? '中断'} / ${e.evaluation ?? e.status}）`),
+      ...failLessons.slice(-3).map((m) => `・[LESSON] ${m.statement.slice(0, 70)}`),
+      '',
+      '※同種の案が再提案される場合は確信度を下げて提示します（§17）。'
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: { failed, lessons: failLessons.map((m) => m.memoryId) },
+        confidence: 'HIGH',
+        evidence: [],
+        toolsUsed: ['experiments', 'memory_search']
+      },
+      intent: 'general'
+    };
+  }
+
+  /** 「次に何を改善すべき？」— Growth Backlog上位のみ提案（§32-§34。通知過多にしない） */
+  private async handleNextImprovement(
+    ctx: ToolContext,
+    dataStatus: DataStatus
+  ): Promise<HandlerResult> {
+    const proposals = await this.growthService.topProposals(2);
+    if (proposals.length === 0) {
+      const insights = rankInsights(discoverProblems(ctx.dataset, ctx.scope)).slice(0, 2);
+      return this.simpleText(
+        [
+          'Growth Backlogに提案待ちの改善候補はまだありません。',
+          ...(insights.length > 0
+            ? ['', '現在の決定論検査からの気づき（候補化前）:', ...insights.map((i) => `・${i.text}`)]
+            : []),
+          '',
+          '日次観測（npm run command:growth）と会話からの課題蓄積で候補が増えていきます。'
+        ].join('\n'),
+        'general',
+        'UNKNOWN',
+        dataStatus
+      );
+    }
+    const lines = [
+      `【次の改善提案】経営インパクト上位${proposals.length}件のみ報告します（Backlog全体は /command/growth/backlog）:`,
+      ...proposals.flatMap((p) => [
+        `・[${p.domain}] ${p.title}（優先度${p.priority.score}）`,
+        `  内訳: 影響${p.priority.impact} / 緊急${p.priority.urgency} / 確信${p.priority.confidence} / 目標整合${p.priority.goalAlignment}`,
+        `  ${p.goalAlignmentNote}`,
+        ...(p.constitutionWarnings.length > 0
+          ? [`  ⚠会社原則との照合: ${p.constitutionWarnings[0]}`]
+          : []),
+        ...(p.relatedLessonIds.length > 0
+          ? ['  ※過去に失敗した同種案があるため確信度を下げています']
+          : [])
+      ]),
+      '',
+      '実行するかどうかは社長の判断です（AIが勝手に実行しません）。'
+    ];
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        data: { proposals },
+        confidence: 'MEDIUM',
+        evidence: proposals.flatMap((p) => p.evidence.slice(0, 2)),
+        toolsUsed: ['growth_backlog']
       },
       intent: 'general'
     };
