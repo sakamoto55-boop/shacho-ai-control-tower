@@ -35,7 +35,7 @@ export function assessCapabilities(dataset: CommandDataset): CapabilityEntry[] {
     dailyReports: dataset.dailyReports.length > 0,
     cashAccounts: dataset.cashAccounts.length > 0
   };
-  const amounts = dataset.projects.filter((p) => p.orderAmount > 0).length;
+  const amounts = dataset.projects.filter((p) => (p.orderAmount ?? 0) > 0).length;
 
   return [
     {

@@ -121,11 +121,13 @@ export function buildManagementDeckSpec(
 
   // 粗利: 原価データ未接続なら数値を作らない（§検収1）
   const margins = scoped.projects
-    .filter((p) => p.orderAmount > 0)
+    .filter((p) => p.orderAmount !== null && p.orderAmount > 0)
     .map((p) => ({ project: p, margin: computeProjectMargin(dataset, p) }));
-  const marginKnown = margins.filter((m) => m.margin.forecastMarginRate !== null);
+  const marginKnown = margins.filter(
+    (m) => m.margin.forecastMarginRate !== null && m.margin.plannedMarginRate !== null
+  );
   const lowMargin = marginKnown.filter(
-    (m) => (m.margin.forecastMarginRate as number) < m.margin.plannedMarginRate - 0.03
+    (m) => (m.margin.forecastMarginRate as number) < (m.margin.plannedMarginRate as number) - 0.03
   );
 
   // パイプライン: ステージ別件数（実データ）
@@ -134,8 +136,8 @@ export function buildManagementDeckSpec(
     stage,
     count: scoped.projects.filter((p) => p.stage === stage).length
   }));
+  const unclassifiedCount = scoped.projects.filter((p) => p.stage === 'unknown').length;
   const backlog = scoped.projects.filter((p) => p.stage === 'ordered' || p.stage === 'in_progress');
-  const backlogTotal = backlog.reduce((sum, p) => sum + p.orderAmount, 0);
   const owner = (id?: string) => scoped.employees.find((e) => e.employeeId === id)?.name ?? '担当未設定';
 
   return {
@@ -184,11 +186,11 @@ export function buildManagementDeckSpec(
                 '※合計金額は金額確認済分のみ。全体額ではありません',
                 ...backlog
                   .slice()
-                  .sort((a, b) => b.orderAmount - a.orderAmount)
+                  .sort((a, b) => (b.orderAmount ?? -1) - (a.orderAmount ?? -1))
                   .slice(0, 5)
                   .map(
                     (p) =>
-                      `${p.name.slice(0, 30)}（${stageLabel(p.stage)} / ${yen(p.orderAmount)} / ${owner(p.ownerEmployeeId)}）`
+                      `${p.name.slice(0, 30)}（${stageLabel(p.stage)} / 受注額：${p.orderAmount !== null ? yen(p.orderAmount) : '不明'} / ${p.ownerName ?? owner(p.ownerEmployeeId)}）`
                   ),
                 ...(backlog.length > 5 ? [`ほか${backlog.length - 5}件（詳細は見積管理Excel参照）`] : [])
               ]
@@ -204,7 +206,7 @@ export function buildManagementDeckSpec(
                   .slice(0, 5)
                   .map(
                     (m) =>
-                      `${m.project.name.slice(0, 30)}: 予定${Math.round(m.margin.plannedMarginRate * 100)}% → 予測${Math.round((m.margin.forecastMarginRate as number) * 100)}%`
+                      `${m.project.name.slice(0, 30)}: 予定${Math.round((m.margin.plannedMarginRate as number) * 100)}% → 予測${Math.round((m.margin.forecastMarginRate as number) * 100)}%`
                   )
               ]
             : [
@@ -216,7 +218,8 @@ export function buildManagementDeckSpec(
         title: '営業パイプライン',
         bullets: [
           ...stageCounts.map((sc) => `${stageLabel(sc.stage)}: ${sc.count}件`),
-          '※ステージ対応は仮マッピング（Source側status定義の意味監査は未実施）。件数は参考値'
+          `ステータス未分類 ${unclassifiedCount}件（意味監査待ち。パイプラインへ含めていません。DATA_SEMANTICS_AUDIT.md参照）`,
+          '※分類済みステージも意味監査完了までPROVISIONAL（参考値）'
         ],
         chart: {
           title: 'ステージ別件数',
@@ -344,24 +347,27 @@ export function buildProjectLedgerWorkbookSpec(
   const rows = projects.map((project, index) => {
     const rowNo = index + 2; // 1行目はヘッダ
     const margin = computeProjectMargin(dataset, project);
-    const ordered = ['ordered', 'in_progress', 'completed', 'invoiced', 'paid'].includes(project.stage);
-    const plannedCost = costsConnected && project.orderAmount > 0
-      ? Math.round(project.orderAmount * (1 - project.plannedMarginRate))
-      : null;
+    // §検収: 不明（null）は空欄/「不明」のまま。0円へ変換しない
+    const orderKnown = project.orderAmount !== null && project.orderAmount > 0;
+    const plannedCost =
+      costsConnected && orderKnown && project.plannedMarginRate !== null
+        ? Math.round((project.orderAmount as number) * (1 - project.plannedMarginRate))
+        : null;
     return {
       projectId: project.projectId,
       customerId: project.customerId,
       customer: customerName.get(project.customerId) ?? 'UNKNOWN',
       name: project.name,
       stage: stageLabel(project.stage),
-      estimateAmount: project.orderAmount > 0 ? project.orderAmount : null,
-      orderAmount: ordered && project.orderAmount > 0 ? project.orderAmount : null,
+      sourceStatus: project.sourceStatus ?? '',
+      estimateAmount: project.estimateAmount,
+      orderAmount: project.orderAmount,
       plannedCost,
       actualCost: costsConnected ? (margin.actualCost ?? null) : null,
       plannedMargin: plannedCost !== null ? { formula: `F${rowNo}-H${rowNo}` } : null,
       forecastMargin:
-        margin.forecastMarginRate !== null && project.orderAmount > 0
-          ? Math.round(project.orderAmount * margin.forecastMarginRate)
+        margin.forecastMarginRate !== null && orderKnown
+          ? Math.round((project.orderAmount as number) * margin.forecastMarginRate)
           : null,
       marginRate:
         margin.forecastMarginRate !== null
@@ -370,10 +376,10 @@ export function buildProjectLedgerWorkbookSpec(
       estimateDate: null, // 見積日はソース列未接続（UNKNOWN）
       orderDate: project.startDate ?? null,
       dueDate: project.dueDate ?? null,
-      owner: employeeName.get(project.ownerEmployeeId ?? '') ?? (scoped.employees.length === 0 ? '未接続（担当列未マッピング）' : '未設定'),
-      updatedAt: project.updatedAt?.slice(0, 10) ?? '',
+      owner: project.ownerName ?? employeeName.get(project.ownerEmployeeId ?? '') ?? '未設定',
+      updatedAt: project.sourceRecordUpdatedAt?.slice(0, 10) ?? 'UNKNOWN',
       source: '統合業務システムDB',
-      confidence: costsConnected ? 'HIGH' : '原価UNKNOWN'
+      confidence: `金額${project.amountConfidence} / ステージ${project.stageConfidence}${costsConnected ? '' : ' / 原価UNKNOWN'}`
     };
   });
 
@@ -388,6 +394,7 @@ export function buildProjectLedgerWorkbookSpec(
           { header: '顧客名', key: 'customer', width: 26 },
           { header: '案件名', key: 'name', width: 44 },
           { header: 'ステージ', key: 'stage', width: 11 },
+          { header: 'sourceStatus', key: 'sourceStatus', width: 12 },
           { header: '見積額', key: 'estimateAmount', width: 13, numFmt: '#,##0' },
           { header: '受注額', key: 'orderAmount', width: 13, numFmt: '#,##0' },
           { header: '予定原価', key: 'plannedCost', width: 13, numFmt: '#,##0' },

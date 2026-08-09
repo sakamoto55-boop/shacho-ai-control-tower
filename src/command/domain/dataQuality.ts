@@ -106,13 +106,14 @@ export function checkDataQuality(
     if (
       project &&
       estimate.status === 'ordered' &&
+      project.orderAmount !== null &&
       project.orderAmount > 0 &&
       estimate.amount !== project.orderAmount
     ) {
       issues.push({
         kind: 'estimate_amount_mismatch',
         severity: 'INFO',
-        detail: `「${project.name}」の受注見積額${estimate.amount.toLocaleString()}円と案件受注額${project.orderAmount.toLocaleString()}円が不一致`,
+        detail: `「${project.name}」の受注見積額${estimate.amount.toLocaleString()}円と案件受注額${(project.orderAmount as number).toLocaleString()}円が不一致`,
         refId: estimate.estimateId
       });
     }

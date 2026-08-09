@@ -142,7 +142,7 @@ export function buildInnovationProposal(
   }
   if (/粗利|原価|利益|処分/.test(problem)) {
     const margins = dataset.projects
-      .filter((p) => p.orderAmount > 0)
+      .filter((p) => (p.orderAmount ?? 0) > 0)
       .map((p) => computeProjectMargin(dataset, p))
       .filter((m) => m.forecastMarginRate !== null && m.varianceDrivers.length > 0);
     const driverCount = new Map<string, number>();

@@ -158,7 +158,7 @@ export function buildAlerts(
       'margin_drop',
       severity,
       item.margin.companyId,
-      `${item.margin.projectName} の予測粗利が${(item.margin.plannedMarginRate * 100).toFixed(1)}%→${((item.margin.forecastMarginRate as number) * 100).toFixed(1)}%へ低下`,
+      `${item.margin.projectName} の予測粗利が${((item.margin.plannedMarginRate ?? 0) * 100).toFixed(1)}%→${((item.margin.forecastMarginRate as number) * 100).toFixed(1)}%へ低下`,
       `主因: ${item.margin.varianceDrivers.map((driver) => `${driver.label}費 +${driver.diff.toLocaleString()}円`).join('、') || '原価内訳を確認してください'}。`,
       item.margin.evidence,
       item.margin.projectId

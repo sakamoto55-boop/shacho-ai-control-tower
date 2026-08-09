@@ -64,6 +64,18 @@ export function validateTableSchema(config: SheetSourceConfig, header: string[])
 }
 
 /** 「¥1,234,567円」「1,234」等を数値へ。空・非数値は null */
+/** Source実更新列のパース（epoch millis / ISO / 日付文字列。無ければnull） */
+export function parseTimestampCell(raw: string | undefined): string | null {
+  if (!raw || raw.trim() === '') return null;
+  const trimmed = raw.trim();
+  if (/^\d{12,}$/.test(trimmed)) {
+    const ms = Number(trimmed);
+    if (Number.isFinite(ms)) return new Date(ms).toISOString();
+  }
+  const parsed = Date.parse(trimmed);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
+}
+
 export function parseAmount(raw: string | undefined): number | null {
   if (raw === undefined) return null;
   const cleaned = String(raw)
@@ -189,19 +201,38 @@ export function applyTableToDataset(
       const rawId = c(row, 'projectId');
       const name = c(row, 'name');
       if (!rawId || !name) continue;
-      const stage = parseStage(c(row, 'stage'), config.stageMap);
+      // §検収: 不明を既定値へ変換しない（stage→'inquiry'、金額→0、更新時刻→取得時刻の偽装を全廃）
+      const sourceStatus = c(row, 'stage');
+      const mappedStage = parseStage(sourceStatus, config.stageMap);
+      // 見積額と契約額を分離（§6）。estimateTotal等はestimateAmountのみ。契約確定額列が
+      // 確認できないSourceではorderAmount=null（見積額を受注額として集計しない）
+      const estimateRaw = parseAmount(c(row, 'estimateAmount'));
+      // 見積額0円は「未入力」として不明扱い（0円の実見積とは区別できないため保守的にnull）
+      const estimateAmount = estimateRaw !== null && estimateRaw > 0 ? estimateRaw : null;
+      const contractAmount = parseAmount(c(row, 'contractAmount'));
+      const marginPercent = parseAmount(c(row, 'plannedMarginPercent'));
+      // Source側の実更新列（§4）。列が無い場合はnull（fetchedAtで偽装しない）
+      const sourceRecordUpdatedAt = parseTimestampCell(c(row, 'sourceUpdatedAt'));
       dataset.projects.push({
         projectId: `prj:${rawId}`,
         companyId,
         customerId: c(row, 'customerId') ? `cust:${c(row, 'customerId')}` : '',
         name,
-        stage: stage ?? 'inquiry',
-        orderAmount: parseAmount(c(row, 'orderAmount')) ?? 0,
-        plannedMarginRate: (parseAmount(c(row, 'plannedMarginPercent')) ?? 0) / 100,
+        stage: mappedStage ?? 'unknown',
+        sourceStatus,
+        stageConfidence: mappedStage ? 'PROVISIONAL' : sourceStatus ? 'PROVISIONAL' : 'UNKNOWN',
+        orderAmount: contractAmount,
+        estimateAmount,
+        orderAmountSource: contractAmount !== null ? 'CONTRACT' : 'NONE',
+        amountConfidence: contractAmount !== null ? 'HIGH' : 'UNKNOWN',
+        plannedMarginRate: marginPercent !== null ? marginPercent / 100 : null,
         startDate: parseDateCell(c(row, 'startDate')) ?? undefined,
         dueDate: parseDateCell(c(row, 'dueDate')) ?? undefined,
         completedDate: parseDateCell(c(row, 'completedDate')) ?? undefined,
-        updatedAt: table.fetchedAt,
+        ownerName: c(row, 'ownerName'),
+        sourceRecordUpdatedAt,
+        snapshotFetchedAt: table.fetchedAt,
+        updatedAt: sourceRecordUpdatedAt ?? table.fetchedAt,
         externalIds: { sheet: rawId }
       });
     }

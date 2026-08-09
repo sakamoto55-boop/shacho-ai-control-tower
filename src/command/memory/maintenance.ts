@@ -191,11 +191,11 @@ export async function extractPrincipleCandidates(
 export function discoverProblems(dataset: CommandDataset, scope: CompanyScope): string[] {
   const insights: string[] = [];
   const margins = dataset.projects
-    .filter((p) => p.orderAmount > 0 && (scope === 'group' || p.companyId === scope))
+    .filter((p) => (p.orderAmount ?? 0) > 0 && (scope === 'group' || p.companyId === scope))
     .map((p) => computeProjectMargin(dataset, p))
     .filter((m) => m.forecastMarginRate !== null);
   const lowMargin = margins.filter(
-    (m) => (m.forecastMarginRate as number) < m.plannedMarginRate - 0.03
+    (m) => (m.forecastMarginRate as number) < (m.plannedMarginRate ?? 0) - 0.03
   );
   if (lowMargin.length >= 2) {
     const driverCount = new Map<string, number>();

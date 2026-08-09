@@ -235,7 +235,7 @@ export class PlanExecutor {
           .slice(0, 2)
           .map(
             (d) =>
-              `粗利悪化: ${d.margin.projectName}（予定${(d.margin.plannedMarginRate * 100).toFixed(1)}%→予測${((d.margin.forecastMarginRate as number) * 100).toFixed(1)}%）`
+              `粗利悪化: ${d.margin.projectName}（予定${((d.margin.plannedMarginRate ?? 0) * 100).toFixed(1)}%→予測${((d.margin.forecastMarginRate as number) * 100).toFixed(1)}%）`
           )
       ];
       return {

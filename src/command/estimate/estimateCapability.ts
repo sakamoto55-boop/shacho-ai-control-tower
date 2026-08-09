@@ -40,14 +40,19 @@ export function draftEstimate(dataset: CommandDataset, message: string): Estimat
   const workKind = WORK_KINDS.find((kind) => message.includes(kind)) ?? null;
 
   const similar = dataset.projects.filter((p) => {
-    if (p.orderAmount <= 0) return false;
+    // 金額不明（null）の案件は見積の参考実績に使わない（0円扱いしない）
+    if (p.orderAmount === null || p.orderAmount <= 0) return false;
     if (workKind) return p.name.includes(workKind);
     if (customer) return p.customerId === customer.customerId;
     return false;
   });
-  const amounts = similar.map((p) => p.orderAmount);
+  const amounts = similar
+    .map((p) => p.orderAmount)
+    .filter((amount): amount is number => amount !== null);
   const referenceAmount = median(amounts);
-  const marginRates = similar.map((p) => p.plannedMarginRate).filter((r) => r > 0);
+  const marginRates = similar
+    .map((p) => p.plannedMarginRate)
+    .filter((rate): rate is number => rate !== null && rate > 0);
   const referenceMarginRate =
     marginRates.length > 0
       ? Math.round((marginRates.reduce((a, b) => a + b, 0) / marginRates.length) * 1000) / 1000

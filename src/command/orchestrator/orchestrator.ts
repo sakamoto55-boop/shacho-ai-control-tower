@@ -114,6 +114,16 @@ export const ORCHESTRATOR_LIMITS = {
 
 const DEFAULT_PRINCIPAL: Principal = { role: 'PRESIDENT', companyIds: [], label: 'demo-president' };
 
+/** 金額の表示（不明は0円ではなく「不明」） */
+function yenOrUnknown(amount: number | null): string {
+  return amount !== null ? yen(amount) : '不明';
+}
+
+/** 率の表示（不明は「不明」） */
+function pctOrUnknown(rate: number | null): string {
+  return rate !== null ? `${(rate * 100).toFixed(1)}%` : '不明';
+}
+
 function pct(rate: number): string {
   return `${(rate * 100).toFixed(1)}%`;
 }
@@ -1330,7 +1340,7 @@ export class CommandOrchestrator {
       '【確認できた事実】粗利が予定から悪化している案件:',
       ...deteriorations.map(
         (item, i) =>
-          `${i + 1}. ${item.margin.projectName}: 予定${pct(item.margin.plannedMarginRate)} → 予測${pct(item.margin.forecastMarginRate as number)}（主因: ${
+          `${i + 1}. ${item.margin.projectName}: 予定${pctOrUnknown(item.margin.plannedMarginRate)} → 予測${pct(item.margin.forecastMarginRate as number)}（主因: ${
             item.margin.varianceDrivers
               .map((driver) => `${driver.label}費+${yen(driver.diff)}`)
               .join('、') || '要確認'
@@ -1385,7 +1395,7 @@ export class CommandOrchestrator {
     const hasSubcontractOverrun = drivers.some((driver) => driver.category === 'subcontract');
     const lines = [
       '【確認できた事実】',
-      `${project.name}の予測粗利率は${pct(margin.forecastMarginRate)}（予定${pct(margin.plannedMarginRate)}）です。`,
+      `${project.name}の予測粗利率は${pctOrUnknown(margin.forecastMarginRate)}（予定${pctOrUnknown(margin.plannedMarginRate)}）です。`,
       '',
       '【主因】',
       ...(drivers.length > 0
@@ -1427,9 +1437,9 @@ export class CommandOrchestrator {
     const owner = ctx.dataset.employees.find((e) => e.employeeId === project.ownerEmployeeId);
     const lines = [
       '【確認できた事実】',
-      `${project.name}（${customer?.name ?? '顧客不明'}）: ステージ ${stageLabel(project.stage)}、受注額${yen(project.orderAmount)}。`,
+      `${project.name}（${customer?.name ?? '顧客不明'}）: ステージ ${stageLabel(project.stage)}、受注額：${yenOrUnknown(project.orderAmount)}。`,
       margin.forecastMarginRate !== null
-        ? `予測粗利率${pct(margin.forecastMarginRate)}（予定${pct(margin.plannedMarginRate)}）。`
+        ? `予測粗利率${pctOrUnknown(margin.forecastMarginRate)}（予定${pctOrUnknown(margin.plannedMarginRate)}）。`
         : '原価データ未登録のため粗利は算出できません。',
       project.dueDate ? `完工予定 ${project.dueDate}。` : '',
       owner ? `担当: ${owner.name}。` : ''
@@ -1474,7 +1484,7 @@ export class CommandOrchestrator {
         .slice(0, 6)
         .map(
           (p) =>
-            `・${p.name}（${stageLabel(p.stage)}${p.orderAmount > 0 ? `、受注額${yen(p.orderAmount)}` : ''}${p.dueDate ? `、完工予定${p.dueDate}` : ''}）`
+            `・${p.name}（${stageLabel(p.stage)}、受注額：${yenOrUnknown(p.orderAmount)}${p.dueDate ? `、完工予定${p.dueDate}` : ''}）`
         ),
       ...(projects.length > 6 ? [`（他${projects.length - 6}件）`] : [])
     ];
@@ -1670,7 +1680,7 @@ export class CommandOrchestrator {
         confidence: 'MEDIUM',
         evidence: outlook.scheduledProjects.map((project) => ({
           label: project.name,
-          value: yen(project.orderAmount),
+          value: yenOrUnknown(project.orderAmount),
           refId: project.projectId,
           source: '案件台帳',
           asOf: project.updatedAt
@@ -1866,7 +1876,7 @@ export class CommandOrchestrator {
       const margin = computeProjectMargin(ctx.dataset, contextProject);
       if (margin.forecastMarginRate !== null && margin.varianceDrivers.length > 0) {
         facts.push(
-          `${contextProject.name}の予測粗利率は${pct(margin.forecastMarginRate)}（予定${pct(margin.plannedMarginRate)}）。`,
+          `${contextProject.name}の予測粗利率は${pctOrUnknown(margin.forecastMarginRate)}（予定${pctOrUnknown(margin.plannedMarginRate)}）。`,
           ...margin.varianceDrivers.map((d) => `${d.label}費が見積比＋${yen(d.diff)}。`)
         );
         proposals.push(
@@ -2894,7 +2904,7 @@ export class CommandOrchestrator {
         const project = ctx.dataset.projects.find((p) => p.projectId === entity.entityId);
         if (project) {
           facts.push(
-            `案件「${project.name}」: ステージ${stageLabel(project.stage)}、受注額${yen(project.orderAmount)}`
+            `案件「${project.name}」: ステージ${stageLabel(project.stage)}、受注額：${yenOrUnknown(project.orderAmount)}`
           );
         }
       }

@@ -37,6 +37,9 @@ export interface SalesSummary {
   amountUnknownCount: number;
   /** 金額確認済 ÷ 受注扱い（%） */
   coverageRate: number;
+  /** 確定売上・着地のうち金額不明で合計に含められなかった件数 */
+  confirmedUnknownAmountCount: number;
+  landingUnknownAmountCount: number;
   /** 期日超過のまま未完工の件数（当月着地には含めない） */
   overdueUnfinishedCount: number;
   /** 会計・請求ソースの接続状態。未接続時、確定売上は「判定不能（完工案件ベース参考値）」 */
@@ -62,7 +65,10 @@ export function computeSalesSummary(dataset: CommandDataset, scope: CompanyScope
       project.completedDate !== undefined &&
       project.completedDate.startsWith(month)
   );
-  const confirmedSales = confirmedProjects.reduce((sum, project) => sum + project.orderAmount, 0);
+  // 契約額不明（null）は合計に含めず件数として分離（不明→0円変換をしない）
+  const confirmedKnown = confirmedProjects.filter((project) => project.orderAmount !== null);
+  const confirmedSales = confirmedKnown.reduce((sum, project) => sum + (project.orderAmount as number), 0);
+  const confirmedUnknownAmountCount = confirmedProjects.length - confirmedKnown.length;
 
   // §検収4: 当月着地は当月完工予定のみ（前月期日の未完工案件を当月へ混入させない）
   const monthStart = `${month}-01`;
@@ -73,8 +79,10 @@ export function computeSalesSummary(dataset: CommandDataset, scope: CompanyScope
       project.dueDate >= monthStart &&
       project.dueDate <= monthEnd
   );
+  const landingKnown = landingProjects.filter((project) => project.orderAmount !== null);
   const landingForecast =
-    confirmedSales + landingProjects.reduce((sum, project) => sum + project.orderAmount, 0);
+    confirmedSales + landingKnown.reduce((sum, project) => sum + (project.orderAmount as number), 0);
+  const landingUnknownAmountCount = landingProjects.length - landingKnown.length;
   const overdueUnfinishedCount = scoped.projects.filter(
     (project) =>
       ['ordered', 'in_progress'].includes(project.stage) &&
@@ -88,8 +96,10 @@ export function computeSalesSummary(dataset: CommandDataset, scope: CompanyScope
   const orderedAll = scoped.projects.filter((project) =>
     ['ordered', 'in_progress'].includes(project.stage)
   );
-  const amountKnown = orderedAll.filter((project) => project.orderAmount > 0);
-  const orderBacklog = amountKnown.reduce((sum, project) => sum + project.orderAmount, 0);
+  const amountKnown = orderedAll.filter(
+    (project) => project.orderAmount !== null && project.orderAmount > 0
+  );
+  const orderBacklog = amountKnown.reduce((sum, project) => sum + (project.orderAmount as number), 0);
   const orderedCount = orderedAll.length;
   const amountKnownCount = amountKnown.length;
   const amountUnknownCount = orderedCount - amountKnownCount;
@@ -131,14 +141,14 @@ export function computeSalesSummary(dataset: CommandDataset, scope: CompanyScope
       : []),
     ...confirmedProjects.map((project) => ({
       label: `確定売上 ${project.name}`,
-      value: `${project.orderAmount.toLocaleString()}円（完工 ${project.completedDate}）`,
+      value: `${project.orderAmount !== null ? `${project.orderAmount.toLocaleString()}円` : '金額不明'}（完工 ${project.completedDate}）`,
       refId: project.projectId,
       source: '案件台帳',
       asOf: project.updatedAt
     })),
     ...landingProjects.map((project) => ({
       label: `当月完工予定 ${project.name}`,
-      value: `${project.orderAmount.toLocaleString()}円（完工予定 ${project.dueDate}）`,
+      value: `${project.orderAmount !== null ? `${project.orderAmount.toLocaleString()}円` : '金額不明'}（完工予定 ${project.dueDate}）`,
       refId: project.projectId,
       source: '案件台帳',
       asOf: project.updatedAt
@@ -158,6 +168,8 @@ export function computeSalesSummary(dataset: CommandDataset, scope: CompanyScope
     amountKnownCount,
     amountUnknownCount,
     coverageRate,
+    confirmedUnknownAmountCount,
+    landingUnknownAmountCount,
     overdueUnfinishedCount,
     accountingConnected,
     pipeline,
@@ -177,7 +189,7 @@ export function computeNextMonthOutlook(dataset: CommandDataset, scope: CompanyS
       (project.dueDate === undefined || project.dueDate >= nextMonthStart)
   );
   return {
-    scheduledAmount: scheduled.reduce((sum, project) => sum + project.orderAmount, 0),
+    scheduledAmount: scheduled.reduce((sum, project) => sum + (project.orderAmount ?? 0), 0),
     scheduledProjects: scheduled,
     pipeline: computeSalesSummary(dataset, scope).pipeline
   };

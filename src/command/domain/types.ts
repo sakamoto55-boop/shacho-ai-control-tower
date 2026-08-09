@@ -134,20 +134,40 @@ export type ProjectStage =
   | 'paid'
   | 'lost';
 
+export type StageConfidence = 'CONFIRMED' | 'PROVISIONAL' | 'UNKNOWN';
+export type AmountConfidence = 'HIGH' | 'LOW' | 'UNKNOWN';
+
 export interface Project {
   projectId: string;
   companyId: string;
   customerId: string;
   name: string;
-  stage: ProjectStage;
-  /** 受注額（未受注時は見積額） */
-  orderAmount: number;
-  /** 見積時の予定粗利率（0-1） */
-  plannedMarginRate: number;
+  /** 'unknown' = Source status の意味監査が未了で分類しない（勝手に既定ステージへ変換しない） */
+  stage: ProjectStage | 'unknown';
+  /** Source側の生status値（意味監査の対象。DATA_SEMANTICS_AUDIT.md参照） */
+  sourceStatus?: string;
+  stageConfidence: StageConfidence;
+  /**
+   * 契約確定額。契約額が確認できない場合はnull（0円へ変換しない）。
+   * 集計は「金額確認済のみ合計+件数カバレッジ併記」が原則
+   */
+  orderAmount: number | null;
+  /** 見積額（Source: estimateTotal等）。未入力はnull */
+  estimateAmount: number | null;
+  orderAmountSource: 'CONTRACT' | 'ESTIMATE' | 'NONE';
+  amountConfidence: AmountConfidence;
+  /** 見積時の予定粗利率（0-1）。不明はnull（0へ変換しない） */
+  plannedMarginRate: number | null;
   startDate?: string;
   dueDate?: string;
   completedDate?: string;
   ownerEmployeeId?: string;
+  /** 担当者表示名（Source staff列。employeeマスタ接続前の暫定表示） */
+  ownerName?: string;
+  /** Source側レコードの実更新時刻。実更新列が無いSourceではnull（取得時刻で偽装しない） */
+  sourceRecordUpdatedAt?: string | null;
+  /** システムがSourceから取得した時刻 */
+  snapshotFetchedAt: string;
   updatedAt: string;
   externalIds?: Record<string, string>;
 }
@@ -259,8 +279,8 @@ export interface ProjectMargin {
   projectId: string;
   projectName: string;
   companyId: string;
-  orderAmount: number;
-  plannedMarginRate: number;
+  orderAmount: number | null;
+  plannedMarginRate: number | null;
   forecastMarginRate: number | null;
   actualMarginRate: number | null;
   plannedCost: number;
@@ -514,7 +534,7 @@ export interface ResearchTask {
 export interface KpiValue {
   key: string;
   label: string;
-  value: number;
+  value: number | null;
   unit: 'yen' | 'percent' | 'count';
   freshness: Freshness;
   freshnessStatus: FreshnessStatus;

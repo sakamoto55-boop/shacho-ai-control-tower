@@ -47,17 +47,15 @@ export function computeProjectMargin(dataset: CommandDataset, project: Project):
   }
 
   const totalForecast = actualCost + forecastCost;
-  const hasAmount = project.orderAmount > 0;
+  // 契約額不明（null）は「0円」ではなく算出不能として扱う（§検収: UNKNOWN保持）
+  const orderAmount = project.orderAmount;
+  const hasAmount = orderAmount !== null && orderAmount > 0;
   const forecastMarginRate =
-    hasAmount && totalForecast > 0
-      ? (project.orderAmount - totalForecast) / project.orderAmount
-      : null;
+    hasAmount && totalForecast > 0 ? (orderAmount - totalForecast) / orderAmount : null;
   // 実績粗利は完工後（forecast原価が残っていない場合）のみ確定させる
   const isFinal = ['completed', 'invoiced', 'paid'].includes(project.stage) && forecastCost === 0;
   const actualMarginRate =
-    hasAmount && isFinal && actualCost > 0
-      ? (project.orderAmount - actualCost) / project.orderAmount
-      : null;
+    hasAmount && isFinal && actualCost > 0 ? ((orderAmount as number) - actualCost) / (orderAmount as number) : null;
 
   const varianceDrivers = ALL_CATEGORIES.map((category) => ({
     category,
@@ -70,7 +68,7 @@ export function computeProjectMargin(dataset: CommandDataset, project: Project):
   const evidence: Evidence[] = [
     {
       label: '受注額',
-      value: `${project.orderAmount.toLocaleString()}円`,
+      value: orderAmount !== null ? `${orderAmount.toLocaleString()}円` : '不明（契約額未確認）',
       refId: project.projectId,
       source: '案件台帳',
       asOf: project.updatedAt
@@ -108,7 +106,7 @@ export function computeProjectMargin(dataset: CommandDataset, project: Project):
     projectId: project.projectId,
     projectName: project.name,
     companyId: project.companyId,
-    orderAmount: project.orderAmount,
+    orderAmount,
     plannedMarginRate: project.plannedMarginRate,
     forecastMarginRate,
     actualMarginRate,
@@ -138,14 +136,16 @@ export function findMarginDeteriorations(
   return scoped.projects
     .filter(
       (project) =>
+        project.orderAmount !== null &&
         project.orderAmount > 0 &&
-        !['inquiry', 'survey', 'estimating', 'following', 'lost'].includes(project.stage)
+        project.plannedMarginRate !== null &&
+        !['inquiry', 'survey', 'estimating', 'following', 'lost', 'unknown'].includes(project.stage)
     )
     .map((project) => computeProjectMargin(dataset, project))
-    .filter((margin) => margin.forecastMarginRate !== null)
+    .filter((margin) => margin.forecastMarginRate !== null && margin.plannedMarginRate !== null)
     .map((margin) => ({
       margin,
-      drop: margin.plannedMarginRate - (margin.forecastMarginRate as number)
+      drop: (margin.plannedMarginRate as number) - (margin.forecastMarginRate as number)
     }))
     .filter((item) => item.drop >= dropThreshold)
     .sort((a, b) => b.drop - a.drop);
@@ -160,16 +160,17 @@ export function computeOverallForecastMarginRate(
   const margins = scoped.projects
     .filter(
       (project) =>
+        project.orderAmount !== null &&
         project.orderAmount > 0 &&
-        !['inquiry', 'survey', 'estimating', 'following', 'lost'].includes(project.stage)
+        !['inquiry', 'survey', 'estimating', 'following', 'lost', 'unknown'].includes(project.stage)
     )
     .map((project) => computeProjectMargin(dataset, project))
     .filter((margin) => margin.forecastMarginRate !== null || margin.actualMarginRate !== null);
-  const totalAmount = margins.reduce((sum, margin) => sum + margin.orderAmount, 0);
+  const totalAmount = margins.reduce((sum, margin) => sum + (margin.orderAmount ?? 0), 0);
   if (totalAmount === 0) return null;
   const totalProfit = margins.reduce(
     (sum, margin) =>
-      sum + margin.orderAmount * ((margin.actualMarginRate ?? margin.forecastMarginRate) as number),
+      sum + (margin.orderAmount ?? 0) * ((margin.actualMarginRate ?? margin.forecastMarginRate) as number),
     0
   );
   return totalProfit / totalAmount;

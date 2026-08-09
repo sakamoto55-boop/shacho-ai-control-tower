@@ -102,7 +102,12 @@ export function buildSeedDataset(asOf: string): CommandDataset {
     { vendorId: 'ven-shobun', companyId: 'lcc', name: '処分場', category: '処分' }
   ];
 
-  const projects: Project[] = [
+  // Demo Fixtureは全フィールド確定値（CONFIRMED/CONTRACT/HIGH）として扱う
+  type ProjectSeed = Omit<
+    Project,
+    'stageConfidence' | 'estimateAmount' | 'orderAmountSource' | 'amountConfidence' | 'snapshotFetchedAt' | 'sourceRecordUpdatedAt' | 'sourceStatus'
+  >;
+  const projectSeeds: ProjectSeed[] = [
     // A案件: 施工中。予定粗利35%に対し原価超過で予測粗利24.8%へ低下
     {
       projectId: 'prj-a',
@@ -289,6 +294,16 @@ export function buildSeedDataset(asOf: string): CommandDataset {
       updatedAt: `${d(-1)}T18:10:00.000Z`
     }
   ];
+  const projects: Project[] = projectSeeds.map((seed) => ({
+    ...seed,
+    sourceStatus: String(seed.stage),
+    stageConfidence: 'CONFIRMED' as const,
+    estimateAmount: seed.orderAmount,
+    orderAmountSource: 'CONTRACT' as const,
+    amountConfidence: 'HIGH' as const,
+    sourceRecordUpdatedAt: seed.updatedAt,
+    snapshotFetchedAt: asOf
+  }));
 
   const estimates: Estimate[] = [
     {

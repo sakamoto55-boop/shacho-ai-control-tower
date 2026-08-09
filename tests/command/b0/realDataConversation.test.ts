@@ -97,7 +97,7 @@ const CONFIGS: SheetSourceConfig[] = [
       name: '案件名',
       customerId: '顧客ID',
       stage: 'ステータス',
-      orderAmount: '受注額',
+      contractAmount: '受注額',
       plannedMarginPercent: '予定粗利率',
       dueDate: '完工予定日',
       completedDate: '完工日'

@@ -314,7 +314,7 @@ const ComponentRenderer = defineComponent({
           return card([title, h('div', { class: 'grid grid-cols-2 lg:grid-cols-3 gap-1.5' },
             kpis.slice(0, 9).map(k => h('div', { class: 'bg-white/5 rounded-lg px-2 py-1.5' }, [
               h('p', { class: 'text-[9px] text-[color:var(--text-low)]' }, k.label || k.key),
-              h('p', { class: 'text-[13px] font-bold' }, k.unit === 'percent' ? `${k.value}%` : k.unit === 'count' ? `${k.value}件` : yen(k.value))
+              h('p', { class: 'text-[13px] font-bold' }, k.value === null ? '判定不能' : k.unit === 'percent' ? `${k.value}%` : k.unit === 'count' ? `${k.value}件` : yen(k.value))
             ]))
           )]);
         }
@@ -395,7 +395,15 @@ createApp({
       apiToken: (() => {
         // 本番モードはAPIトークン必須（?token=で受け取りlocalStorageへ保存。以後URL不要）
         const fromUrl = new URLSearchParams(location.search).get('token');
-        if (fromUrl) { try { localStorage.setItem('lcc_command_token', fromUrl); } catch {} }
+        if (fromUrl) {
+          try { localStorage.setItem('lcc_command_token', fromUrl); } catch {}
+          // §検収9: トークンをURL・履歴へ残さない
+          try {
+            const cleaned = new URL(location.href);
+            cleaned.searchParams.delete('token');
+            history.replaceState(null, '', cleaned.toString());
+          } catch {}
+        }
         try { return fromUrl || localStorage.getItem('lcc_command_token') || ''; } catch { return fromUrl || ''; }
       })(),
       demoRequested: new URLSearchParams(location.search).get('demo') === '1',
@@ -642,8 +650,8 @@ createApp({
         const fmt = (k, unit) => {
           if (!k) return { v: '—', sub: '' };
           // §検収6: 未接続の数値は0円ではなく「未接続」を優先する
-          if (k.confidence === 'UNKNOWN' || !(k.freshness && k.freshness.lastUpdatedAt)) {
-            return { v: '未接続', sub: '接続後に表示' };
+          if (k.value === null || k.confidence === 'UNKNOWN' || !(k.freshness && k.freshness.lastUpdatedAt)) {
+            return { v: k.value === null ? '判定不能' : '未接続', sub: '接続後に表示' };
           }
           const stale = k.freshness && k.freshness.stale;
           const v = unit === 'percent' ? `${k.value}%` : unit === 'count' ? `${k.value}件` : yen(k.value);

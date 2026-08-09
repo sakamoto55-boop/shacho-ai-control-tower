@@ -45,13 +45,14 @@ export function checkInvoices(dataset: CommandDataset, scope: CompanyScope): Inv
       (invoice) => invoice.projectId === project.projectId && invoice.issuedAt
     );
     if (!hasInvoice) {
-      uninvoicedCompletedTotal += project.orderAmount;
+      // 契約額不明の完工案件は金額合計へ含めず件数のみ（0円変換しない）
+      if (project.orderAmount !== null) uninvoicedCompletedTotal += project.orderAmount;
       issues.push({
         kind: 'uninvoiced_completed',
         projectId: project.projectId,
         title: `完工未請求: ${project.name}`,
-        detail: `${project.completedDate ?? '不明'}に完工していますが請求書が発行されていません（${project.orderAmount.toLocaleString()}円）。`,
-        amount: project.orderAmount,
+        detail: `${project.completedDate ?? '不明'}に完工していますが請求書が発行されていません（${project.orderAmount !== null ? `${project.orderAmount.toLocaleString()}円` : '金額不明'}）。`,
+        amount: project.orderAmount ?? 0,
         evidence: [
           {
             label: '完工日',

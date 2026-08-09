@@ -48,8 +48,8 @@ export function computeFutureInsights(dataset: CommandDataset, scope: CompanySco
 
   // --- SALES_GAP / BOTTLENECK: 受注残が何か月分か（仕事量の先行き） ---
   const backlog = scoped.projects
-    .filter((p) => (p.stage === 'ordered' || p.stage === 'in_progress') && p.orderAmount > 0)
-    .reduce((sum, p) => sum + p.orderAmount, 0);
+    .filter((p) => (p.stage === 'ordered' || p.stage === 'in_progress') && p.orderAmount !== null && p.orderAmount > 0)
+    .reduce((sum, p) => sum + (p.orderAmount as number), 0);
   const sales = computeSalesSummary(dataset, scope);
   const monthlyPace = sales.landingForecast > 0 ? sales.landingForecast : sales.confirmedSales;
   if (monthlyPace > 0) {
@@ -112,10 +112,12 @@ export function computeFutureInsights(dataset: CommandDataset, scope: CompanySco
 
   // --- MARGIN_RISK: 予測粗利が計画を下回る案件の傾向 ---
   const margins = scoped.projects
-    .filter((p) => p.orderAmount > 0)
+    .filter((p) => p.orderAmount !== null && p.orderAmount > 0)
     .map((p) => computeProjectMargin(dataset, p))
-    .filter((m) => m.forecastMarginRate !== null);
-  const lowMargin = margins.filter((m) => (m.forecastMarginRate as number) < m.plannedMarginRate - 0.03);
+    .filter((m) => m.forecastMarginRate !== null && m.plannedMarginRate !== null);
+  const lowMargin = margins.filter(
+    (m) => (m.forecastMarginRate as number) < (m.plannedMarginRate as number) - 0.03
+  );
   if (lowMargin.length >= 1 && margins.length > 0) {
     insights.push({
       kind: 'MARGIN_RISK',

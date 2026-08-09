@@ -58,7 +58,7 @@ export function computeKpiSnapshot(
   const kpi = (
     key: string,
     label: string,
-    value: number,
+    value: number | null,
     unit: KpiValue['unit'],
     freshness: Freshness,
     confidence: KpiValue['confidence']
@@ -89,9 +89,33 @@ export function computeKpiSnapshot(
       nowFresh,
       cash.balanceKnown ? 'MEDIUM' : 'UNKNOWN'
     ),
-    kpi('sales_month', '当月売上', sales.confirmedSales, 'yen', nowFresh, 'HIGH'),
-    kpi('sales_landing', '売上着地予測', sales.landingForecast, 'yen', nowFresh, 'MEDIUM'),
-    kpi('order_backlog', '受注残', sales.orderBacklog, 'yen', nowFresh, 'HIGH'),
+    // §検収7: 会計/請求未接続の確定売上はnull+UNKNOWN（0円表示させない）
+    kpi(
+      'sales_month',
+      '当月売上',
+      sales.accountingConnected ? sales.confirmedSales : null,
+      'yen',
+      nowFresh,
+      sales.accountingConnected ? 'HIGH' : 'UNKNOWN'
+    ),
+    // 着地は金額カバレッジが低い場合LOW（参考値）
+    kpi(
+      'sales_landing',
+      sales.coverageRate < 50 ? '売上着地予測（参考値）' : '売上着地予測',
+      sales.landingForecast,
+      'yen',
+      nowFresh,
+      sales.coverageRate < 50 ? 'LOW' : 'MEDIUM'
+    ),
+    // 受注残はカバレッジ必須表示。低カバレッジでHIGHにしない
+    kpi(
+      'order_backlog',
+      `受注残（金額確認済${sales.amountKnownCount}/${sales.orderedCount}件・カバレッジ${sales.coverageRate}%）`,
+      sales.orderBacklog,
+      'yen',
+      nowFresh,
+      sales.coverageRate < 50 ? 'LOW' : 'HIGH'
+    ),
     kpi(
       'margin_forecast',
       '全社予測粗利率',
@@ -103,10 +127,10 @@ export function computeKpiSnapshot(
     kpi(
       'uninvoiced',
       '完工未請求額',
-      invoiceCheck.uninvoicedCompletedTotal,
+      invoiceCheck.invoicesConnected ? invoiceCheck.uninvoicedCompletedTotal : null,
       'yen',
       nowFresh,
-      'HIGH'
+      invoiceCheck.invoicesConnected ? 'HIGH' : 'UNKNOWN'
     ),
     kpi('sales_actions', '営業要対応件数', leaks.length, 'count', nowFresh, 'HIGH'),
     kpi('alerts_today', '本日の重大アラート件数', criticalCount, 'count', nowFresh, 'HIGH')

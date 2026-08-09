@@ -12,7 +12,7 @@
     }
   },
   {
-    "_comment": "LCC統合業務システムDB projects タブ（53列のうちCanonicalが使う列のみ）。statusは英語コードのためstageMapで変換",
+    "_comment": "LCC統合業務システムDB projects。契約額列が無いためorderAmount=null（見積額を受注額として集計しない）。status=quoteは意味監査（DATA_SEMANTICS_AUDIT.md）完了までステータス未分類",
     "sourceName": "ProjectSource",
     "spreadsheetId": "1jOU-Kq8vh7Meaa7auNQqVflseRAPCcGzksAsvG-16HY",
     "tabName": "projects",
@@ -22,19 +22,15 @@
       "customerId": "customerId",
       "name": "name",
       "stage": "status",
-      "orderAmount": "estimateTotal",
       "startDate": "workStart",
       "dueDate": "deliveryDate",
-      "completedDate": "workEnd"
+      "completedDate": "workEnd",
+      "estimateAmount": "estimateTotal",
+      "sourceUpdatedAt": "updatedAt",
+      "ownerName": "staff"
     },
     "stageMap": {
-      "lead": "inquiry",
-      "survey": "survey",
-      "quote": "following",
-      "contract": "ordered",
-      "working": "in_progress",
-      "done": "completed",
-      "lost": "lost"
+      "contract": "ordered"
     }
   }
 ]

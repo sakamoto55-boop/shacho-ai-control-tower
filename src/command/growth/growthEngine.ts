@@ -41,11 +41,11 @@ export function takeSnapshot(dataset: CommandDataset, scope: CompanyScope): Grow
   const sales = computeSalesSummary(dataset, scope);
   const invoices = checkInvoices(dataset, scope);
   const margins = dataset.projects
-    .filter((p) => p.orderAmount > 0)
+    .filter((p) => p.orderAmount !== null && p.orderAmount > 0)
     .map((p) => computeProjectMargin(dataset, p))
     .filter((m) => m.forecastMarginRate !== null);
   const lowMargin = margins.filter(
-    (m) => (m.forecastMarginRate as number) < m.plannedMarginRate - 0.03
+    (m) => (m.forecastMarginRate as number) < (m.plannedMarginRate ?? 0) - 0.03
   );
   return {
     takenAt: dataset.asOf,
@@ -221,9 +221,9 @@ export function buildRootCauseCandidates(
   const possibleCauses: string[] = [];
   if (signal.kind === 'MARGIN_WORSENED') {
     const margins = dataset.projects
-      .filter((p) => p.orderAmount > 0)
+      .filter((p) => p.orderAmount !== null && p.orderAmount > 0)
       .map((p) => computeProjectMargin(dataset, p))
-      .filter((m) => m.forecastMarginRate !== null && (m.forecastMarginRate as number) < m.plannedMarginRate - 0.03);
+      .filter((m) => m.forecastMarginRate !== null && m.plannedMarginRate !== null && (m.forecastMarginRate as number) < (m.plannedMarginRate as number) - 0.03);
     const driverCounts = new Map<string, number>();
     for (const margin of margins) {
       for (const driver of margin.varianceDrivers) {
