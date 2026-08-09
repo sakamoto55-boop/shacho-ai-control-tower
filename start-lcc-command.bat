@@ -53,7 +53,8 @@ set HTTPCODE=000
 for /f "usebackq" %%c in (`curl -s -o nul -w "%%{http_code}" http://localhost:8787/health`) do set HTTPCODE=%%c
 if "%HTTPCODE:~0,1%"=="2" goto :healthy
 if %RETRY% GEQ 30 ( echo ERROR: health check failed - HTTP %HTTPCODE%. See logs\server.err.log & goto :error )
-timeout /t 2 /nobreak > nul
+rem ping is used as a 2s wait: "timeout" aborts when stdin is not a console.
+ping -n 3 127.0.0.1 > nul
 goto :healthloop
 
 :healthy
