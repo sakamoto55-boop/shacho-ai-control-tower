@@ -24,7 +24,8 @@ export type GrowthDomain = 'COMPANY' | 'AI' | 'DATA';
 export interface GrowthSnapshot {
   takenAt: string;
   scope: CompanyScope;
-  salesLanding: number;
+  /** 着地予測。金額カバレッジ0%（算出不能）はnull */
+  salesLanding: number | null;
   marginForecastPct: number;
   leakCount: number;
   uninvoicedTotal: number;
@@ -146,7 +147,11 @@ export function detectChanges(previous: GrowthSnapshot, current: GrowthSnapshot)
       negative: true
     });
   }
-  if (current.salesLanding < previous.salesLanding * 0.95) {
+  if (
+    current.salesLanding !== null &&
+    previous.salesLanding !== null &&
+    current.salesLanding < previous.salesLanding * 0.95
+  ) {
     signals.push({
       kind: 'SALES_PACE_DROPPED',
       domain: 'COMPANY',

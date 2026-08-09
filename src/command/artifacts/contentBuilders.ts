@@ -16,6 +16,12 @@ import { buildAlerts, activeAlerts } from '../engines/alerts.js';
 import { computeCashForecast, horizonBalance } from '../engines/cashForecast.js';
 import { computeSalesSummary } from '../engines/sales.js';
 import { yen } from '../brief/generateBrief.js';
+import {
+  formatBacklogStatus,
+  formatCashStatus,
+  formatSalesLandingStatus,
+  formatSalesMonthStatus
+} from '../domain/semanticFormat.js';
 import { scopeLabel } from '../domain/scope.js';
 import type { DocumentSpec, PresentationSpec, WorkbookSpec } from './renderers.js';
 import type { EstimateDraft } from '../estimate/estimateCapability.js';
@@ -147,15 +153,17 @@ export function buildManagementDeckSpec(
       {
         title: '経営サマリー',
         bullets: [
-          sales.accountingConnected
-            ? `当月確定売上 ${yen(sales.confirmedSales)} / 着地予測 ${yen(sales.landingForecast)}`
-            : `確定売上: 判定不能（会計・請求Source未接続。完工案件ベース参考値 ${yen(sales.confirmedSales)}） / 着地予測（参考値） ${yen(sales.landingForecast)}`,
-          `受注扱い ${sales.orderedCount}件（金額確認済 ${sales.amountKnownCount}件 ${yen(sales.orderBacklog)} / 金額未入力 ${sales.amountUnknownCount}件 / カバレッジ ${sales.coverageRate}%）`,
+          `${formatSalesMonthStatus(sales)} / ${formatSalesLandingStatus(sales)}`,
+          formatBacklogStatus(sales),
           marginKnown.length > 0
             ? `全社予測粗利率 ${kpiValue('margin_forecast')}%`
             : '粗利率: 原価データ未接続のため算出不能（架空値は表示しません）',
-          cash.balanceKnown ? `現預金 ${yen(cash.currentBalance)}` : '現預金: 銀行未接続（UNKNOWN）',
-          `重大Alert ${visible.filter((a) => a.severity === 'CRITICAL').length}件 / 警告 ${visible.filter((a) => a.severity === 'WARNING').length}件 / 営業要対応 ${leaks.length}件`
+          formatCashStatus(cash),
+          `重大Alert ${visible.filter((a) => a.severity === 'CRITICAL').length}件 / 警告 ${visible.filter((a) => a.severity === 'WARNING').length}件 / ${
+            leaks.length > 0 && leaks.every((l) => l.provisional)
+              ? `次工程未設定候補 ${leaks.length}件（status=contractの意味確認待ち）`
+              : `営業要対応 ${leaks.length}件`
+          }`
         ]
       },
       {
@@ -165,24 +173,29 @@ export function buildManagementDeckSpec(
           sales.accountingConnected
             ? `確定売上（完工済） ${yen(sales.confirmedSales)}`
             : `確定売上: 判定不能（会計・請求Source未接続。完工案件ベース参考値 ${yen(sales.confirmedSales)}）`,
-          `着地予測（確定+当月完工予定） ${yen(sales.landingForecast)}`,
+          formatSalesLandingStatus(sales),
           ...(sales.overdueUnfinishedCount > 0
             ? [`期日超過のまま未完工 ${sales.overdueUnfinishedCount}件（着地に含めず要対応として扱う）`]
             : []),
           '売上目標: 正式目標が未承認のため目標比は表示しません（Target Registry承認後に表示）'
         ],
-        chart: {
-          title: '売上・着地（円）',
-          labels: ['確定売上', '着地予測'],
-          values: [sales.confirmedSales, sales.landingForecast]
-        }
+        // 着地が算出不能（null）のときは棒グラフを描かない（0円の棒=架空表示になるため）
+        ...(sales.landingForecast !== null
+          ? {
+              chart: {
+                title: '売上・着地（円）',
+                labels: ['確定売上', '着地予測'],
+                values: [sales.confirmedSales, sales.landingForecast]
+              }
+            }
+          : {})
       },
       {
         title: '受注残',
         bullets:
           backlog.length > 0
             ? [
-                `受注扱い ${sales.orderedCount}件 / 金額確認済 ${sales.amountKnownCount}件（${yen(sales.orderBacklog)}） / 金額未入力 ${sales.amountUnknownCount}件 / カバレッジ ${sales.coverageRate}%`,
+                formatBacklogStatus(sales),
                 '※合計金額は金額確認済分のみ。全体額ではありません',
                 ...backlog
                   .slice()
@@ -471,10 +484,9 @@ export function buildReportDocumentSpec(
       {
         heading: '売上・着地',
         paragraphs: [
-          sales.accountingConnected
-            ? `当月確定売上は${yen(sales.confirmedSales)}、着地予測は${yen(sales.landingForecast)}です（対象月 ${sales.month}。当月完工予定のみ算入）。`
-            : `確定売上は判定不能です（会計・請求Source未接続。完工案件ベース参考値 ${yen(sales.confirmedSales)}）。着地予測（参考値）は${yen(sales.landingForecast)}（当月完工予定のみ算入）。`,
-          `受注扱い${sales.orderedCount}件のうち金額確認済${sales.amountKnownCount}件（${yen(sales.orderBacklog)}）、金額未入力${sales.amountUnknownCount}件（カバレッジ${sales.coverageRate}%）。`,
+          `${formatSalesMonthStatus(sales)}（対象月 ${sales.month}）。`,
+          `${formatSalesLandingStatus(sales)}（当月完工予定のみ算入）。`,
+          `${formatBacklogStatus(sales)}。`,
           ...(scoped.projects.some((p) => p.stage === 'unknown')
             ? [
                 `ステータス未分類 ${scoped.projects.filter((p) => p.stage === 'unknown').length}件（意味監査待ち。営業パイプラインへ含めていません。DATA_SEMANTICS_AUDIT.md参照）。`

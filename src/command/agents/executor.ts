@@ -14,6 +14,11 @@ import { computeCashForecast, horizonBalance } from '../engines/cashForecast.js'
 import { computeSalesSummary } from '../engines/sales.js';
 import { findMarginDeteriorations } from '../engines/margin.js';
 import { yen } from '../brief/generateBrief.js';
+import {
+  formatBacklogStatus,
+  formatSalesLandingStatus,
+  formatSalesMonthStatus
+} from '../domain/semanticFormat.js';
 import type { MemoryService } from '../memory/store.js';
 import type { GeneralReasoner } from '../ai/generalReasoner.js';
 import { ROLES, type RoleId } from './roles.js';
@@ -229,8 +234,8 @@ export class PlanExecutor {
       const sales = computeSalesSummary(ctx.dataset, scope);
       const deteriorations = findMarginDeteriorations(ctx.dataset, scope);
       const facts = [
-        `当月確定売上${yen(sales.confirmedSales)} / 着地予測${yen(sales.landingForecast)}${sales.targetGapRate !== null ? `（目標比${(sales.targetGapRate * 100).toFixed(1)}%）` : ''}`,
-        `受注残${yen(sales.orderBacklog)} / 見積提出済パイプライン${sales.pipeline.length}件 ${yen(sales.pipelineTotal)}`,
+        `${formatSalesMonthStatus(sales)} / ${formatSalesLandingStatus(sales)}${sales.targetGapRate !== null ? `（目標比${(sales.targetGapRate * 100).toFixed(1)}%）` : ''}`,
+        `${formatBacklogStatus(sales)} / 見積提出済パイプライン${sales.pipeline.length}件 ${yen(sales.pipelineTotal)}`,
         ...deteriorations
           .slice(0, 2)
           .map(

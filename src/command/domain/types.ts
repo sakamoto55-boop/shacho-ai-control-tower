@@ -536,8 +536,11 @@ export interface KpiValue {
   label: string;
   value: number | null;
   unit: 'yen' | 'percent' | 'count';
+  /** データ最終更新（Source側レコードの実更新時刻）。freshnessStatusはこれを基準に判定する */
   freshness: Freshness;
   freshnessStatus: FreshnessStatus;
+  /** 同期日時（こちら側がSourceを取得した時刻）。データ最終更新と混同しない（§検収5-5） */
+  syncedAt?: string;
   confidence: DataConfidence;
 }
 

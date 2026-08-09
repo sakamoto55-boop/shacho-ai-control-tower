@@ -6,11 +6,21 @@ import type { CommandAlert, CompanyScope, Decision, ExecutiveBrief } from '../do
 import type { CommandDataset } from '../data/seed.js';
 import { addDaysJst, jstDate } from '../utils/jst.js';
 import { buildAlerts, activeAlerts } from '../engines/alerts.js';
-import { computeCashForecast, horizonBalance } from '../engines/cashForecast.js';
+import { computeCashForecast } from '../engines/cashForecast.js';
 import { computeKpiSnapshot } from '../engines/kpi.js';
+import { computeSalesSummary } from '../engines/sales.js';
 import { detectSalesLeaks } from '../engines/salesLeak.js';
 import { checkInvoices } from '../engines/invoiceChecks.js';
 import { filterDatasetByScope, scopeLabel } from '../domain/scope.js';
+import {
+  formatBacklogStatus,
+  formatCashForecastLine,
+  formatCashStatus,
+  formatInvoiceStatus,
+  formatMarginStatus,
+  formatSalesLandingStatus,
+  formatSalesMonthStatus
+} from '../domain/semanticFormat.js';
 
 export function yen(amount: number): string {
   return `${amount.toLocaleString('ja-JP')}円`;
@@ -76,11 +86,15 @@ export function generateExecutiveBrief(
 
   const recommendedActions: string[] = [];
   if (leaks.length > 0) {
+    const provisionalNote = leaks.every((leak) => leak.provisional)
+      ? '（候補・status意味確認待ち）'
+      : '';
     recommendedActions.push(
-      `営業要対応 ${leaks.length}件のうち最優先: ${leaks[0].title}（${leaks[0].customerName}）`
+      `営業${leaks.every((l) => l.provisional) ? '対応候補' : '要対応'} ${leaks.length}件${provisionalNote}のうち最優先: ${leaks[0].title}（${leaks[0].customerName}）`
     );
   }
-  if (invoiceCheck.uninvoicedCompletedTotal > 0) {
+  // 請求Source未接続時は完工未請求の金額行動を作らない（判定不能のため）
+  if (invoiceCheck.invoicesConnected && invoiceCheck.uninvoicedCompletedTotal > 0) {
     recommendedActions.push(
       `完工未請求 ${yen(invoiceCheck.uninvoicedCompletedTotal)} の請求書発行`
     );
@@ -95,7 +109,9 @@ export function generateExecutiveBrief(
       ? `本日は経営上${decisionsNeeded.length}件確認が必要です。`
       : '本日、即時の経営判断が必要な項目はありません。';
 
-  const kpi = (key: string) => kpiSnapshot.kpis.find((item) => item.key === key)?.value ?? 0;
+  // §検収5-1: value ?? 0 の変換を禁止。KPIごとに接続状態を確認して文章を作る（Semantic Formatter共通化）
+  const sales = computeSalesSummary(dataset, scope);
+  const marginKpi = kpiSnapshot.kpis.find((item) => item.key === 'margin_forecast');
   const lines: string[] = [
     `おはようございます。${scopeLabel(dataset, scope)}の朝Briefです。`,
     '',
@@ -105,11 +121,11 @@ export function generateExecutiveBrief(
     ),
     '',
     '【主要数値】',
-    `現預金 ${yen(cash.currentBalance)}（${cash.freshness.source}）`,
-    `現金予測 30日後${yen(horizonBalance(cash, 30))} / 60日後${yen(horizonBalance(cash, 60))} / 90日後${yen(horizonBalance(cash, 90))}`,
-    `当月売上 ${yen(kpi('sales_month'))} / 着地予測 ${yen(kpi('sales_landing'))}`,
-    `受注残 ${yen(kpi('order_backlog'))} / 全社予測粗利率 ${kpi('margin_forecast')}%`,
-    `完工未請求 ${yen(invoiceCheck.uninvoicedCompletedTotal)} / 期日超過未入金 ${yen(invoiceCheck.overdueReceivableTotal)}`,
+    formatCashStatus(cash),
+    formatCashForecastLine(cash),
+    `${formatSalesMonthStatus(sales)} / ${formatSalesLandingStatus(sales)}`,
+    `${formatBacklogStatus(sales)} / ${formatMarginStatus(marginKpi?.value ?? null)}`,
+    formatInvoiceStatus(invoiceCheck),
     '',
     '【昨日からの変化】',
     ...(changes.length > 0

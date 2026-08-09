@@ -146,7 +146,7 @@ export function buildAlerts(
       'WARNING',
       companyIdForScope,
       `当月売上着地が目標比${(sales.targetGapRate * 100).toFixed(1)}%`,
-      `着地予測${sales.landingForecast.toLocaleString()}円 / 目標${(sales.target as number).toLocaleString()}円。不足額${(sales.shortfall as number).toLocaleString()}円。`,
+      `着地予測${(sales.landingForecast as number).toLocaleString()}円 / 目標${(sales.target as number).toLocaleString()}円。不足額${(sales.shortfall as number).toLocaleString()}円。`,
       sales.evidence.slice(0, 6)
     );
   }
@@ -167,7 +167,9 @@ export function buildAlerts(
 
   // 営業漏れ
   for (const leak of detectSalesLeaks(dataset, scope, thresholds.leak)) {
-    const severity: AlertSeverity = leak.kind === 'inquiry_unanswered' ? 'WARNING' : 'WATCH';
+    // §検収5-6: PROVISIONAL status由来は確定Alertに昇格させない（候補=WATCH止まり）
+    const severity: AlertSeverity =
+      leak.kind === 'inquiry_unanswered' && !leak.provisional ? 'WARNING' : 'WATCH';
     const companyId =
       dataset.projects.find((project) => project.projectId === leak.projectId)?.companyId ??
       companyIdForScope;

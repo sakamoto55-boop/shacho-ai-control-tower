@@ -36,6 +36,13 @@ import { detectSalesLeaks } from '../engines/salesLeak.js';
 import { buildAlerts, activeAlerts } from '../engines/alerts.js';
 import { generateExecutiveBrief, yen } from '../brief/generateBrief.js';
 import {
+  formatBacklogStatus,
+  formatCashStatus,
+  formatInvoiceStatus,
+  formatSalesLandingStatus,
+  formatSalesMonthStatus
+} from '../domain/semanticFormat.js';
+import {
   createTaskCandidate,
   requestApproval,
   requestResearch,
@@ -981,11 +988,19 @@ export class CommandOrchestrator {
         const cash = callTool('get_cash_forecast', () =>
           computeCashForecast(ctx.dataset, ctx.scope)
         );
+        // §検収5-2: 接続フラグを確認せずyen(0)を出さない（Semantic Formatter共通化）
         sections.push(
-          `【資金繰り】現預金${yen(cash.currentBalance)}、30日後${yen(horizonBalance(cash, 30))}、期間最低${yen(cash.minBalance.balance)}（${cash.minBalance.date}）。`
+          cash.balanceKnown
+            ? `【資金繰り】${formatCashStatus(cash)}、30日後${yen(horizonBalance(cash, 30))}、期間最低${yen(cash.minBalance.balance)}（${cash.minBalance.date}）。`
+            : `【資金繰り】${formatCashStatus(cash)}。`
         );
         evidence.push(...cash.evidence.slice(0, 3));
-        if (cash.minBalance.balance < 0)
+        if (!cash.balanceKnown)
+          dangers.push({
+            score: 90,
+            text: '銀行残高が不明のため資金繰りを「問題なし」と判断できない'
+          });
+        else if (cash.minBalance.balance < 0)
           dangers.push({
             score: 100,
             text: `資金ショートの恐れ（${cash.minBalance.date}に${yen(cash.minBalance.balance)}）`
@@ -1001,7 +1016,7 @@ export class CommandOrchestrator {
           computeSalesSummary(ctx.dataset, ctx.scope)
         );
         sections.push(
-          `【売上】確定${yen(sales.confirmedSales)} / 着地予測${yen(sales.landingForecast)}${
+          `【売上】${formatSalesMonthStatus(sales)} / ${formatSalesLandingStatus(sales)}${
             sales.targetGapRate !== null ? `（目標比${pct(sales.targetGapRate)}）` : ''
           }。`
         );
@@ -1017,10 +1032,8 @@ export class CommandOrchestrator {
         const invoices = callTool('get_invoice_status', () =>
           checkInvoices(ctx.dataset, ctx.scope)
         );
-        sections.push(
-          `【請求】要確認${invoices.issues.length}件（完工未請求${yen(invoices.uninvoicedCompletedTotal)}）。`
-        );
-        if (invoices.uninvoicedCompletedTotal > 0)
+        sections.push(`【請求】要確認${invoices.issues.length}件。${formatInvoiceStatus(invoices)}。`);
+        if (invoices.invoicesConnected && invoices.uninvoicedCompletedTotal > 0)
           dangers.push({ score: 40, text: `完工未請求${yen(invoices.uninvoicedCompletedTotal)}` });
       }
       const alerts = callTool('get_alerts', () =>
@@ -1123,10 +1136,9 @@ export class CommandOrchestrator {
     const sales = computeSalesSummary(ctx.dataset, ctx.scope);
     const lines = [
       '【確認できた事実】',
-      sales.accountingConnected
-        ? `${scopeLabel(ctx.dataset, ctx.scope)}: ${sales.month}の確定売上は${yen(sales.confirmedSales)}、着地予測は${yen(sales.landingForecast)}です。`
-        : `${scopeLabel(ctx.dataset, ctx.scope)}: ${sales.month}の確定売上は判定不能です（会計・請求Source未接続。完工案件ベース参考値${yen(sales.confirmedSales)}）。着地予測（参考値・当月完工予定のみ）は${yen(sales.landingForecast)}です。`,
-      `受注扱い${sales.orderedCount}件（金額確認済${sales.amountKnownCount}件 / 未入力${sales.amountUnknownCount}件 / カバレッジ${sales.coverageRate}%）`
+      `${scopeLabel(ctx.dataset, ctx.scope)}（${sales.month}）: ${formatSalesMonthStatus(sales)}`,
+      formatSalesLandingStatus(sales),
+      formatBacklogStatus(sales)
     ];
     if (sales.target !== null && sales.targetGapRate !== null) {
       lines.push(

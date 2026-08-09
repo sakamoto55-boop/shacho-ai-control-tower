@@ -33,6 +33,9 @@ export interface SalesLeak {
   detail: string;
   /** 優先順位付け用スコア（大きいほど優先） */
   score: number;
+  /** §検収5-6: stageが未確定（PROVISIONAL/UNKNOWN）の案件由来。確定Alertとして扱わない */
+  provisional: boolean;
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
   evidence: Evidence[];
 }
 
@@ -62,6 +65,9 @@ export function detectSalesLeaks(
 
   for (const project of scoped.projects) {
     const interaction = lastInteraction(project.projectId);
+    // §検収5-6: PROVISIONAL/UNKNOWN stage由来の検出は「候補」（status意味の承認後にCONFIRMED化）
+    const provisional = project.stageConfidence !== 'CONFIRMED';
+    const leakConfidence: SalesLeak['confidence'] = provisional ? 'MEDIUM' : 'HIGH';
     const evidenceBase: Evidence[] = [
       {
         label: '案件ステージ',
@@ -96,6 +102,8 @@ export function detectSalesLeaks(
           title: `問い合わせ${Math.floor(hours)}時間未対応`,
           detail: `${customerName(project.customerId)}からの問い合わせに${Math.floor(hours)}時間対応記録がありません。`,
           score: 100 + hours,
+          provisional,
+          confidence: leakConfidence,
           evidence: evidenceBase
         });
       }
@@ -116,6 +124,8 @@ export function detectSalesLeaks(
           title: `現調後${Math.floor(days)}日、見積未提出`,
           detail: `${project.name}は現調後${Math.floor(days)}日経過していますが見積が提出されていません。`,
           score: 80 + days,
+          provisional,
+          confidence: leakConfidence,
           evidence: evidenceBase
         });
       }
@@ -139,6 +149,8 @@ export function detectSalesLeaks(
           title: `${Math.floor(days)}日停滞`,
           detail: `${project.name}は最終接点から${Math.floor(days)}日経過しています。継続可否の判断が必要です。`,
           score: 40 + days / 10,
+          provisional,
+          confidence: leakConfidence,
           evidence: evidenceBase
         });
       } else if (estimate && days >= thresholds.followUpDays) {
@@ -150,6 +162,8 @@ export function detectSalesLeaks(
           title: `見積提出後${Math.floor(days)}日追客なし`,
           detail: `${customerName(project.customerId)}へ見積${estimate.amount.toLocaleString()}円を提出後、${Math.floor(days)}日接点がありません。`,
           score: 60 + days + (estimate.probability ?? 0) * 20,
+          provisional,
+          confidence: leakConfidence,
           evidence: evidenceBase
         });
       }
@@ -164,9 +178,11 @@ export function detectSalesLeaks(
           projectId: project.projectId,
           projectName: project.name,
           customerName: customerName(project.customerId),
-          title: '受注後の次工程未設定',
-          detail: `${project.name}（受注額${project.orderAmount !== null ? `${project.orderAmount.toLocaleString()}円` : '：不明'}）に着工日・次アクションが設定されていません。`,
+          title: provisional ? '次工程未設定候補' : '受注後の次工程未設定',
+          detail: `${project.name}（受注額${project.orderAmount !== null ? `${project.orderAmount.toLocaleString()}円` : '：不明'}）に着工日・次アクションが設定されていません。${provisional ? '（status=contractの意味確認待ちのため候補扱い）' : ''}`,
           score: 70,
+          provisional,
+          confidence: leakConfidence,
           evidence: evidenceBase
         });
       }

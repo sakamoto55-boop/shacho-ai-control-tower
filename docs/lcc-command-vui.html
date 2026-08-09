@@ -649,13 +649,24 @@ createApp({
         const find = (key) => (body.kpis || []).find(k => k.key === key);
         const fmt = (k, unit) => {
           if (!k) return { v: '—', sub: '' };
+          // §検収5-5: 同期日時（取得）とデータ最終更新（Source実更新）を分けて表示する
+          const dataUpd = (k.freshness && k.freshness.lastUpdatedAt) ? k.freshness.lastUpdatedAt.slice(5, 10).replace('-', '/') : null;
+          const synced = k.syncedAt ? k.syncedAt.slice(5, 16).replace('T', ' ') : null;
+          const fs = k.freshnessStatus || '';
+          const fresh = [
+            dataUpd ? `データ更新${dataUpd}` : null,
+            fs === 'VERY_STALE' ? '⚠ VERY_STALE' : fs === 'STALE' ? 'STALE' : null,
+            synced ? `同期${synced}` : null
+          ].filter(Boolean).join(' / ');
           // §検収6: 未接続の数値は0円ではなく「未接続」を優先する
-          if (k.value === null || k.confidence === 'UNKNOWN' || !(k.freshness && k.freshness.lastUpdatedAt)) {
-            return { v: k.value === null ? '判定不能' : '未接続', sub: '接続後に表示' };
+          if (k.value === null || k.confidence === 'UNKNOWN') {
+            return { v: k.value === null ? '判定不能' : '未接続', sub: fresh || '接続後に表示' };
           }
-          const stale = k.freshness && k.freshness.stale;
+          if (!(k.freshness && k.freshness.lastUpdatedAt)) {
+            return { v: '未接続', sub: '接続後に表示' };
+          }
           const v = unit === 'percent' ? `${k.value}%` : unit === 'count' ? `${k.value}件` : yen(k.value);
-          return { v, sub: (stale ? '⚠ ' : '') + '更新 ' + ((k.freshness && k.freshness.lastUpdatedAt) || '').slice(5, 16).replace('T', ' ') };
+          return { v, sub: fresh };
         };
         const cash = fmt(find('cash_balance')); const c30 = fmt(find('cash_30d'));
         const sales = fmt(find('sales_month')); const landing = fmt(find('sales_landing'));

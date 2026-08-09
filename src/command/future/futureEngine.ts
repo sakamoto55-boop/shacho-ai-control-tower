@@ -51,7 +51,10 @@ export function computeFutureInsights(dataset: CommandDataset, scope: CompanySco
     .filter((p) => (p.stage === 'ordered' || p.stage === 'in_progress') && p.orderAmount !== null && p.orderAmount > 0)
     .reduce((sum, p) => sum + (p.orderAmount as number), 0);
   const sales = computeSalesSummary(dataset, scope);
-  const monthlyPace = sales.landingForecast > 0 ? sales.landingForecast : sales.confirmedSales;
+  const monthlyPace =
+    sales.landingForecast !== null && sales.landingForecast > 0
+      ? sales.landingForecast
+      : sales.confirmedSales;
   if (monthlyPace > 0) {
     const backlogMonths = Math.round((backlog / monthlyPace) * 10) / 10;
     const evidence: Evidence[] = [
@@ -209,18 +212,29 @@ export function runScenario(
   const lines: string[] = [];
   const assumptions: string[] = [];
   const evidence: Evidence[] = [
-    { label: '現在の着地予測', value: yen(sales.landingForecast), source: '決定論エンジン', asOf: asOfDate }
+    {
+      label: '現在の着地予測',
+      value: sales.landingForecast !== null ? yen(sales.landingForecast) : '算出不能（金額カバレッジ0%）',
+      source: '決定論エンジン',
+      asOf: asOfDate
+    }
   ];
 
   if (scenario.salesDeltaPct !== undefined) {
-    const adjusted = Math.round(sales.landingForecast * (1 + scenario.salesDeltaPct / 100));
-    const marginRate = 0.27; // 第13期目標粗利率（候補値）を仮定として明示
-    const profitDelta = Math.round((adjusted - sales.landingForecast) * marginRate);
-    lines.push(
-      `月次着地は${yen(sales.landingForecast)} → ${yen(adjusted)}（${scenario.salesDeltaPct > 0 ? '+' : ''}${scenario.salesDeltaPct}%）になります。`,
-      `粗利影響は概算${yen(profitDelta)}/月（粗利率27%仮定）です。`
-    );
-    assumptions.push('粗利率27%（第13期目標候補値）を仮定', '固定費は不変と仮定');
+    if (sales.landingForecast === null) {
+      lines.push(
+        `現在の着地予測が算出不能（金額確認済${sales.amountKnownCount}/${sales.orderedCount}件・カバレッジ${sales.coverageRate}%）のため、売上変動シナリオは計算できません。契約額の確認後に再計算できます。`
+      );
+    } else {
+      const adjusted = Math.round(sales.landingForecast * (1 + scenario.salesDeltaPct / 100));
+      const marginRate = 0.27; // 第13期目標粗利率（候補値）を仮定として明示
+      const profitDelta = Math.round((adjusted - sales.landingForecast) * marginRate);
+      lines.push(
+        `月次着地は${yen(sales.landingForecast)} → ${yen(adjusted)}（${scenario.salesDeltaPct > 0 ? '+' : ''}${scenario.salesDeltaPct}%）になります。`,
+        `粗利影響は概算${yen(profitDelta)}/月（粗利率27%仮定）です。`
+      );
+      assumptions.push('粗利率27%（第13期目標候補値）を仮定', '固定費は不変と仮定');
+    }
   }
   if (scenario.headcountDelta !== undefined && scenario.headcountDelta < 0) {
     const n = Math.abs(scenario.headcountDelta);
@@ -245,7 +259,7 @@ export function runScenario(
   }
   if (lines.length === 0) {
     lines.push(
-      `現状継続の場合: 月次着地${yen(sales.landingForecast)}、90日最低残高${cash.balanceKnown ? yen(cash.minBalance.balance) : '不明（銀行未接続）'}の見込みです。`
+      `現状継続の場合: 月次着地${sales.landingForecast !== null ? yen(sales.landingForecast) : '算出不能（金額カバレッジ0%）'}、90日最低残高${cash.balanceKnown ? yen(cash.minBalance.balance) : '不明（銀行未接続）'}の見込みです。`
     );
     assumptions.push('入金・支払・受注ペースが現在の登録どおりと仮定');
   }

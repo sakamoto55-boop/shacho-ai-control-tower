@@ -24,13 +24,13 @@ export interface SalesSummary {
   target: number | null;
   /** 当月に完工・請求・入金済み案件の合計（確定売上） */
   confirmedSales: number;
-  /** 確定売上＋当月完工予定の施工中案件（着地予測） */
-  landingForecast: number;
-  /** 目標比（着地予測 ÷ 目標 − 1）。目標未設定時は null */
+  /** 確定売上＋当月完工予定の施工中案件（着地予測）。金額確認済0件（カバレッジ0%）ならnull=算出不能 */
+  landingForecast: number | null;
+  /** 目標比（着地予測 ÷ 目標 − 1）。目標未設定・着地算出不能時は null */
   targetGapRate: number | null;
   shortfall: number | null;
-  /** 受注済み・施工中でまだ売上計上されていない金額（受注残。金額確認済分のみの合計） */
-  orderBacklog: number;
+  /** 受注残（金額確認済分のみの合計）。金額確認済0件ならnull=算出不能（0円と表示しない） */
+  orderBacklog: number | null;
   /** §検収4: 受注扱い件数と金額カバレッジ（合計金額を全体と誤認させないため必ず併記する） */
   orderedCount: number;
   amountKnownCount: number;
@@ -80,7 +80,7 @@ export function computeSalesSummary(dataset: CommandDataset, scope: CompanyScope
       project.dueDate <= monthEnd
   );
   const landingKnown = landingProjects.filter((project) => project.orderAmount !== null);
-  const landingForecast =
+  const landingKnownTotal =
     confirmedSales + landingKnown.reduce((sum, project) => sum + (project.orderAmount as number), 0);
   const landingUnknownAmountCount = landingProjects.length - landingKnown.length;
   const overdueUnfinishedCount = scoped.projects.filter(
@@ -90,20 +90,25 @@ export function computeSalesSummary(dataset: CommandDataset, scope: CompanyScope
       project.dueDate < monthStart
   ).length;
 
-  const targetGapRate = target ? landingForecast / target - 1 : null;
-  const shortfall = target ? Math.max(0, target - landingForecast) : null;
-
   const orderedAll = scoped.projects.filter((project) =>
     ['ordered', 'in_progress'].includes(project.stage)
   );
   const amountKnown = orderedAll.filter(
     (project) => project.orderAmount !== null && project.orderAmount > 0
   );
-  const orderBacklog = amountKnown.reduce((sum, project) => sum + (project.orderAmount as number), 0);
   const orderedCount = orderedAll.length;
   const amountKnownCount = amountKnown.length;
   const amountUnknownCount = orderedCount - amountKnownCount;
   const coverageRate = orderedCount > 0 ? Math.round((amountKnownCount / orderedCount) * 1000) / 10 : 100;
+
+  // §検収5-3: 金額確認済0件（カバレッジ0%）では合計を作らない（0円=実態と誤認させない）
+  const amountsComputable = orderedCount === 0 || amountKnownCount > 0;
+  const orderBacklog = amountsComputable
+    ? amountKnown.reduce((sum, project) => sum + (project.orderAmount as number), 0)
+    : null;
+  const landingForecast = amountsComputable ? landingKnownTotal : null;
+  const targetGapRate = target && landingForecast !== null ? landingForecast / target - 1 : null;
+  const shortfall = target && landingForecast !== null ? Math.max(0, target - landingForecast) : null;
   const invoiceSource = dataset.meta.sources.find((src) => src.sourceName === 'InvoiceSource');
   const accountingConnected = Boolean(invoiceSource && !invoiceSource.errorState);
 
