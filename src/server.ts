@@ -9,6 +9,7 @@ import { createRepository } from './repositories/createRepository.js';
 import { createLineworksConnector, type LineworksWebhookPayload } from './connectors/lineworks.js';
 import { createCommandApp } from './command/server/routes.js';
 import { nowIso } from './utils/date.js';
+import { isMainModule } from './utils/mainModule.js';
 
 export const app = new Hono();
 
@@ -153,7 +154,7 @@ app.post('/webhooks/lineworks', async (c) => {
   }
 });
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   const port = Number(process.env.PORT ?? 8787);
   serve({ fetch: app.fetch, port }, (info) => {
     console.log(`社長AI管制塔 Phase 1 listening on http://localhost:${info.port}`);

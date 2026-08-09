@@ -1,0 +1,2 @@
+# Windowsバッチは常にCRLFでチェックアウト・アーカイブする（検収是正⑤: cmdはLFのバッチを誤解析するため）
+*.bat text eol=crlf
