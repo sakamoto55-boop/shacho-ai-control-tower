@@ -119,7 +119,34 @@ export const tkcLedgerDefinition: ImportDefinition = {
   }
 };
 
-export const TKC_DEFINITIONS = [tkcShiwakeDefinition, tkcTrialBalanceDefinition, tkcLedgerDefinition];
+/**
+ * TKC FX系 仕訳帳export（実ファイル検証済み: 月日・伝票番号・借方/貸方科目名・
+ * 借方取引金額・元帳摘要・入力日 等49列。2026-08-10に実在の仕訳帳.csv 8,243行で確認）
+ */
+export const tkcShiwakeFxDefinition: ImportDefinition = {
+  name: 'tkc-shiwake-fx',
+  requiredHeaders: ['月日', '借方科目名', '貸方科目名', '取引金額'],
+  mapRow: (header, row, ctx) => {
+    const date = pick(header, row, ['月日']);
+    if (!date) return null;
+    const entryDate = pick(header, row, ['入力日']);
+    const entryIso = entryDate ? new Date(entryDate).toISOString() : null;
+    const rec = baseRecord('shiwake', header, row, ctx, Number.isNaN(Date.parse(entryDate)) ? null : entryIso);
+    rec.normalized = {
+      date,
+      voucherNo: pick(header, row, ['伝票番号']),
+      debitAccount: pick(header, row, ['借方科目名']),
+      debitAmount: parseAmount(pick(header, row, ['借方取引金額'])),
+      creditAccount: pick(header, row, ['貸方科目名']),
+      creditAmount: parseAmount(pick(header, row, ['貸方取引金額'])),
+      counterparty: pick(header, row, ['取引先名']),
+      description: pick(header, row, ['元帳摘要'])
+    };
+    return rec;
+  }
+};
+
+export const TKC_DEFINITIONS = [tkcShiwakeFxDefinition, tkcShiwakeDefinition, tkcTrialBalanceDefinition, tkcLedgerDefinition];
 
 export async function syncTkcInbox(baseDir: string, syncedAt: string, knownHashes?: Set<string>) {
   const options: ProcessOptions = {
