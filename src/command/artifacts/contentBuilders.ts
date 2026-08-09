@@ -31,6 +31,10 @@ export interface SnapshotStamp {
   scope: string;
   scopeLabel: string;
   generatedAt: string;
+  /** Sourceからの取得時刻（システムが読んだ時刻） */
+  snapshotFetchedAt: string;
+  /** Source側レコードの最終更新（データ自体の新しさ。取得時刻と区別する） */
+  sourceRecordUpdatedAt: string;
   sources: Array<{ name: string; updatedAt: string; state: string }>;
   freshness: string;
   confidence: string;
@@ -48,11 +52,18 @@ export function buildSnapshotStamp(dataset: CommandDataset, scope: CompanyScope)
     ...sources.filter((src) => src.state !== 'OK').map((src) => `${src.name}: 未接続`),
   ];
   const key = `${dataset.asOf}|${scope}|${connected.map((src) => `${src.name}@${src.updatedAt}`).join(',')}`;
+  const scopedForStamp = filterDatasetByScope(dataset, scope);
+  const sourceRecordUpdatedAt =
+    scopedForStamp.projects.map((p) => p.updatedAt ?? '').sort().at(-1) || '未接続';
+  const snapshotFetchedAt =
+    connected.map((src) => src.updatedAt).sort().at(-1) || '未接続';
   return {
     snapshotId: `snap-${createHash('sha256').update(key).digest('hex').slice(0, 10)}`,
     scope: String(scope),
     scopeLabel: scopeLabel(dataset, scope),
     generatedAt: dataset.asOf,
+    snapshotFetchedAt,
+    sourceRecordUpdatedAt,
     sources,
     freshness: connected.length > 0 ? (connected.map((src) => src.updatedAt).sort()[0] ?? '不明') + ' 以降' : '接続済みソースなし',
     confidence: gaps.length === 0 ? 'OK' : 'PARTIAL（未接続領域あり）',
@@ -64,6 +75,8 @@ export function stampLines(stamp: SnapshotStamp): string[] {
   return [
     `snapshotId: ${stamp.snapshotId} / scope: ${stamp.scopeLabel}（${stamp.scope}）`,
     `generatedAt: ${stamp.generatedAt}`,
+    `snapshotFetchedAt: ${stamp.snapshotFetchedAt}（取得時刻）`,
+    `sourceRecordUpdatedAt: ${stamp.sourceRecordUpdatedAt}（Source側レコード最終更新）`,
     ...stamp.sources.map((src) => `source: ${src.name} / 更新 ${src.updatedAt} / ${src.state}`),
     `freshness: ${stamp.freshness} / confidence: ${stamp.confidence}`,
     ...(stamp.dataGaps.length > 0 ? [`dataGap: ${stamp.dataGaps.join('、')}`] : ['dataGap: なし'])
@@ -83,7 +96,8 @@ const STAGE_LABELS: Record<string, string> = {
   lost: '失注'
 };
 export function stageLabel(stage: string): string {
-  return STAGE_LABELS[stage] ?? stage;
+  // §検収4: 意味を監査していないstatusはUNKNOWNとして明示する（そのまま表示しない）
+  return STAGE_LABELS[stage] ?? `UNKNOWN(${stage})`;
 }
 
 const UNCONNECTED = '未接続';
@@ -131,8 +145,10 @@ export function buildManagementDeckSpec(
       {
         title: '経営サマリー',
         bullets: [
-          `当月確定売上 ${yen(sales.confirmedSales)} / 着地予測 ${yen(sales.landingForecast)}`,
-          `受注残 ${backlog.length}件 ${yen(backlogTotal)}`,
+          sales.accountingConnected
+            ? `当月確定売上 ${yen(sales.confirmedSales)} / 着地予測 ${yen(sales.landingForecast)}`
+            : `確定売上: 判定不能（会計・請求Source未接続。完工案件ベース参考値 ${yen(sales.confirmedSales)}） / 着地予測（参考値） ${yen(sales.landingForecast)}`,
+          `受注扱い ${sales.orderedCount}件（金額確認済 ${sales.amountKnownCount}件 ${yen(sales.orderBacklog)} / 金額未入力 ${sales.amountUnknownCount}件 / カバレッジ ${sales.coverageRate}%）`,
           marginKnown.length > 0
             ? `全社予測粗利率 ${kpiValue('margin_forecast')}%`
             : '粗利率: 原価データ未接続のため算出不能（架空値は表示しません）',
@@ -143,9 +159,14 @@ export function buildManagementDeckSpec(
       {
         title: '売上・着地',
         bullets: [
-          `対象月 ${sales.month}`,
-          `確定売上（完工済） ${yen(sales.confirmedSales)}`,
-          `着地予測（確定+進行中案件） ${yen(sales.landingForecast)}`,
+          `対象月 ${sales.month}（当月完工予定のみを着地に算入。前月以前の期日は含めない）`,
+          sales.accountingConnected
+            ? `確定売上（完工済） ${yen(sales.confirmedSales)}`
+            : `確定売上: 判定不能（会計・請求Source未接続。完工案件ベース参考値 ${yen(sales.confirmedSales)}）`,
+          `着地予測（確定+当月完工予定） ${yen(sales.landingForecast)}`,
+          ...(sales.overdueUnfinishedCount > 0
+            ? [`期日超過のまま未完工 ${sales.overdueUnfinishedCount}件（着地に含めず要対応として扱う）`]
+            : []),
           '売上目標: 正式目標が未承認のため目標比は表示しません（Target Registry承認後に表示）'
         ],
         chart: {
@@ -159,7 +180,8 @@ export function buildManagementDeckSpec(
         bullets:
           backlog.length > 0
             ? [
-                `受注残 ${backlog.length}件 / 合計 ${yen(backlogTotal)}`,
+                `受注扱い ${sales.orderedCount}件 / 金額確認済 ${sales.amountKnownCount}件（${yen(sales.orderBacklog)}） / 金額未入力 ${sales.amountUnknownCount}件 / カバレッジ ${sales.coverageRate}%`,
+                '※合計金額は金額確認済分のみ。全体額ではありません',
                 ...backlog
                   .slice()
                   .sort((a, b) => b.orderAmount - a.orderAmount)
@@ -192,7 +214,10 @@ export function buildManagementDeckSpec(
       },
       {
         title: '営業パイプライン',
-        bullets: stageCounts.map((sc) => `${stageLabel(sc.stage)}: ${sc.count}件`),
+        bullets: [
+          ...stageCounts.map((sc) => `${stageLabel(sc.stage)}: ${sc.count}件`),
+          '※ステージ対応は仮マッピング（Source側status定義の意味監査は未実施）。件数は参考値'
+        ],
         chart: {
           title: 'ステージ別件数',
           labels: stageCounts.map((sc) => stageLabel(sc.stage)),
@@ -201,12 +226,20 @@ export function buildManagementDeckSpec(
       },
       {
         title: '完工未請求・未入金',
-        bullets: [
-          `完工未請求 ${yen(invoices.uninvoicedCompletedTotal)}`,
-          `期日超過未入金 ${yen(invoices.overdueReceivableTotal)}（入金記録が未接続のため請求発行ベース）`,
-          ...invoices.issues.slice(0, 4).map((i) => `${i.title}`),
-          ...(invoices.issues.length === 0 ? ['検出された請求課題はありません'] : [])
-        ]
+        bullets: invoices.invoicesConnected
+          ? [
+              `完工未請求 ${yen(invoices.uninvoicedCompletedTotal)}`,
+              invoices.paymentsConnected
+                ? `期日超過未入金 ${yen(invoices.overdueReceivableTotal)}`
+                : '未入金: 判定不能（入金Source未接続。0円ではありません）',
+              ...invoices.issues.slice(0, 4).map((i) => `${i.title}`),
+              ...(invoices.issues.length === 0 ? ['検出された請求課題はありません'] : [])
+            ]
+          : [
+              '完工未請求: 判定不能（請求Source未接続。0円ではありません）',
+              '未入金: 判定不能（入金Source未接続。0円ではありません)',
+              '請求・入金の実測は経理ソース接続後に表示します（案件台帳からの推定はしません）'
+            ]
       },
       {
         title: '要対応事項',
@@ -337,7 +370,7 @@ export function buildProjectLedgerWorkbookSpec(
       estimateDate: null, // 見積日はソース列未接続（UNKNOWN）
       orderDate: project.startDate ?? null,
       dueDate: project.dueDate ?? null,
-      owner: employeeName.get(project.ownerEmployeeId ?? '') ?? '',
+      owner: employeeName.get(project.ownerEmployeeId ?? '') ?? (scoped.employees.length === 0 ? '未接続（担当列未マッピング）' : '未設定'),
       updatedAt: project.updatedAt?.slice(0, 10) ?? '',
       source: '統合業務システムDB',
       confidence: costsConnected ? 'HIGH' : '原価UNKNOWN'
@@ -427,7 +460,13 @@ export function buildReportDocumentSpec(
       {
         heading: '売上・着地',
         paragraphs: [
-          `当月確定売上は${yen(sales.confirmedSales)}、着地予測は${yen(sales.landingForecast)}です（対象月 ${sales.month}）。`,
+          sales.accountingConnected
+            ? `当月確定売上は${yen(sales.confirmedSales)}、着地予測は${yen(sales.landingForecast)}です（対象月 ${sales.month}。当月完工予定のみ算入）。`
+            : `確定売上は判定不能です（会計・請求Source未接続。完工案件ベース参考値 ${yen(sales.confirmedSales)}）。着地予測（参考値）は${yen(sales.landingForecast)}（当月完工予定のみ算入）。`,
+          `受注扱い${sales.orderedCount}件のうち金額確認済${sales.amountKnownCount}件（${yen(sales.orderBacklog)}）、金額未入力${sales.amountUnknownCount}件（カバレッジ${sales.coverageRate}%）。`,
+          ...(sales.overdueUnfinishedCount > 0
+            ? [`期日超過のまま未完工の案件が${sales.overdueUnfinishedCount}件あります（着地には含めていません）。`]
+            : []),
           '売上目標は正式承認前のため、目標比は表示しません。'
         ]
       },
@@ -439,9 +478,11 @@ export function buildReportDocumentSpec(
       },
       {
         heading: '請求・入金',
-        paragraphs: [
-          `完工未請求 ${yen(invoices.uninvoicedCompletedTotal)} / 期日超過未入金 ${yen(invoices.overdueReceivableTotal)}（入金記録が未接続のため請求発行ベース）。`
-        ]
+        paragraphs: invoices.invoicesConnected
+          ? [
+              `完工未請求 ${yen(invoices.uninvoicedCompletedTotal)}${invoices.paymentsConnected ? ` / 期日超過未入金 ${yen(invoices.overdueReceivableTotal)}` : ' / 未入金: 判定不能（入金Source未接続）'}。`
+            ]
+          : ['完工未請求・未入金: 判定不能（請求・入金Source未接続。0円ではありません）。']
       },
       {
         heading: `要対応（アラート${alerts.length}件・営業${leaks.length}件）`,

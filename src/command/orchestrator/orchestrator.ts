@@ -1113,7 +1113,10 @@ export class CommandOrchestrator {
     const sales = computeSalesSummary(ctx.dataset, ctx.scope);
     const lines = [
       '【確認できた事実】',
-      `${scopeLabel(ctx.dataset, ctx.scope)}: ${sales.month}の確定売上は${yen(sales.confirmedSales)}、着地予測は${yen(sales.landingForecast)}です。`
+      sales.accountingConnected
+        ? `${scopeLabel(ctx.dataset, ctx.scope)}: ${sales.month}の確定売上は${yen(sales.confirmedSales)}、着地予測は${yen(sales.landingForecast)}です。`
+        : `${scopeLabel(ctx.dataset, ctx.scope)}: ${sales.month}の確定売上は判定不能です（会計・請求Source未接続。完工案件ベース参考値${yen(sales.confirmedSales)}）。着地予測（参考値・当月完工予定のみ）は${yen(sales.landingForecast)}です。`,
+      `受注扱い${sales.orderedCount}件（金額確認済${sales.amountKnownCount}件 / 未入力${sales.amountUnknownCount}件 / カバレッジ${sales.coverageRate}%）`
     ];
     if (sales.target !== null && sales.targetGapRate !== null) {
       lines.push(

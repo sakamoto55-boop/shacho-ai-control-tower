@@ -29,8 +29,18 @@ export interface SalesSummary {
   /** 目標比（着地予測 ÷ 目標 − 1）。目標未設定時は null */
   targetGapRate: number | null;
   shortfall: number | null;
-  /** 受注済み・施工中でまだ売上計上されていない金額（受注残） */
+  /** 受注済み・施工中でまだ売上計上されていない金額（受注残。金額確認済分のみの合計） */
   orderBacklog: number;
+  /** §検収4: 受注扱い件数と金額カバレッジ（合計金額を全体と誤認させないため必ず併記する） */
+  orderedCount: number;
+  amountKnownCount: number;
+  amountUnknownCount: number;
+  /** 金額確認済 ÷ 受注扱い（%） */
+  coverageRate: number;
+  /** 期日超過のまま未完工の件数（当月着地には含めない） */
+  overdueUnfinishedCount: number;
+  /** 会計・請求ソースの接続状態。未接続時、確定売上は「判定不能（完工案件ベース参考値）」 */
+  accountingConnected: boolean;
   /** 見積提出済みで受注可能性のある案件（受注確度降順） */
   pipeline: PipelineItem[];
   pipelineTotal: number;
@@ -54,21 +64,38 @@ export function computeSalesSummary(dataset: CommandDataset, scope: CompanyScope
   );
   const confirmedSales = confirmedProjects.reduce((sum, project) => sum + project.orderAmount, 0);
 
+  // §検収4: 当月着地は当月完工予定のみ（前月期日の未完工案件を当月へ混入させない）
+  const monthStart = `${month}-01`;
   const landingProjects = scoped.projects.filter(
     (project) =>
       ['ordered', 'in_progress'].includes(project.stage) &&
       project.dueDate !== undefined &&
+      project.dueDate >= monthStart &&
       project.dueDate <= monthEnd
   );
   const landingForecast =
     confirmedSales + landingProjects.reduce((sum, project) => sum + project.orderAmount, 0);
+  const overdueUnfinishedCount = scoped.projects.filter(
+    (project) =>
+      ['ordered', 'in_progress'].includes(project.stage) &&
+      project.dueDate !== undefined &&
+      project.dueDate < monthStart
+  ).length;
 
   const targetGapRate = target ? landingForecast / target - 1 : null;
   const shortfall = target ? Math.max(0, target - landingForecast) : null;
 
-  const orderBacklog = scoped.projects
-    .filter((project) => ['ordered', 'in_progress'].includes(project.stage))
-    .reduce((sum, project) => sum + project.orderAmount, 0);
+  const orderedAll = scoped.projects.filter((project) =>
+    ['ordered', 'in_progress'].includes(project.stage)
+  );
+  const amountKnown = orderedAll.filter((project) => project.orderAmount > 0);
+  const orderBacklog = amountKnown.reduce((sum, project) => sum + project.orderAmount, 0);
+  const orderedCount = orderedAll.length;
+  const amountKnownCount = amountKnown.length;
+  const amountUnknownCount = orderedCount - amountKnownCount;
+  const coverageRate = orderedCount > 0 ? Math.round((amountKnownCount / orderedCount) * 1000) / 10 : 100;
+  const invoiceSource = dataset.meta.sources.find((src) => src.sourceName === 'InvoiceSource');
+  const accountingConnected = Boolean(invoiceSource && !invoiceSource.errorState);
 
   const pipeline: PipelineItem[] = scoped.estimates
     .filter((estimate) => estimate.status === 'submitted')
@@ -127,6 +154,12 @@ export function computeSalesSummary(dataset: CommandDataset, scope: CompanyScope
     targetGapRate,
     shortfall,
     orderBacklog,
+    orderedCount,
+    amountKnownCount,
+    amountUnknownCount,
+    coverageRate,
+    overdueUnfinishedCount,
+    accountingConnected,
     pipeline,
     pipelineTotal,
     evidence

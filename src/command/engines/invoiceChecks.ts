@@ -18,6 +18,9 @@ export interface InvoiceIssue {
 }
 
 export interface InvoiceCheckResult {
+  /** §検収4: 請求・入金Sourceの接続状態。未接続時、金額は判定不能（0円と表示しない） */
+  invoicesConnected: boolean;
+  paymentsConnected: boolean;
   scope: CompanyScope;
   issues: InvoiceIssue[];
   /** 完工未請求の合計額（KPI: 完工未請求額） */
@@ -27,6 +30,10 @@ export interface InvoiceCheckResult {
 }
 
 export function checkInvoices(dataset: CommandDataset, scope: CompanyScope): InvoiceCheckResult {
+  const invSrc = dataset.meta.sources.find((src) => src.sourceName === 'InvoiceSource');
+  const paySrc = dataset.meta.sources.find((src) => src.sourceName === 'PaymentSource');
+  const invoicesConnected = Boolean(invSrc && !invSrc.errorState);
+  const paymentsConnected = Boolean(paySrc && !paySrc.errorState);
   const scoped = filterDatasetByScope(dataset, scope);
   const today = jstDate(dataset.asOf); // 期日判定はJST基準
   const issues: InvoiceIssue[] = [];
@@ -118,5 +125,7 @@ export function checkInvoices(dataset: CommandDataset, scope: CompanyScope): Inv
     }
   }
 
-  return { scope, issues, uninvoicedCompletedTotal, overdueReceivableTotal };
+  return {
+    invoicesConnected,
+    paymentsConnected, scope, issues, uninvoicedCompletedTotal, overdueReceivableTotal };
 }
