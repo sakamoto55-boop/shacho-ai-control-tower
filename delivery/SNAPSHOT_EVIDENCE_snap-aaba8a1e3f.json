@@ -1,0 +1,47 @@
+{
+  "snapshotId": "snap-aaba8a1e3f",
+  "previousSnapshotId": "snap-df4dca5099",
+  "previousSnapshotStatus": "HISTORICAL / SUPERSEDED FOR DELIVERY",
+  "scope": "lcc",
+  "syncedAt": "2026-08-09T15:46:35.585Z",
+  "sourceRecordUpdatedAt": "2026-06-29T09:30:07.000Z",
+  "generatedAt": "2026-08-09T15:46:33.167Z",
+  "applicationCodeCommit": "b6c48b041cf2198446d231b59e668597c5060f92",
+  "rendererCommit": "b6c48b041cf2198446d231b59e668597c5060f92",
+  "productionMode": true,
+  "demoFallback": false,
+  "rowLevelComparisonWithOldSnapshot": "NOT VERIFIED（旧snapshot生データは永続化されておらず検証不能）",
+  "note": "件数およびSource実更新日時は旧観測値と一致した。旧snapshotとのrow-level完全一致は検証不能。",
+  "sources": {
+    "customers": {
+      "rowCount": 2268,
+      "columnCount": 6,
+      "columnStructureSha256": "34b89ab1c21f6585a1d41819845060ac03f8d7bb6745ee3871302eb3c251b994",
+      "canonicalContentSha256": "100888fd1a8b1a02d80a7d6d07aff2e3cdf0428c4b8da984e707d4d43b8cbc28"
+    },
+    "projects": {
+      "rowCount": 2459,
+      "columnCount": 20,
+      "columnStructureSha256": "f533f301841f37abed0a0294eff2f50591e856d64ced5949d3d73a5132c09b3a",
+      "canonicalContentSha256": "86bfbac6888553f18615b10318f626485f020174a8ec6f88c8e58563acbe55fa"
+    }
+  },
+  "specValidation": {
+    "forbiddenHits": [],
+    "missingRequired": []
+  },
+  "files": [
+    {
+      "path": "C:\\Users\\sakam\\AppData\\Local\\Temp\\claude\\C--Users-sakam-OneDrive-Desktop-LCC-COMMAND\\3c2199c6-090b-41cc-8341-12ff1345c5db\\scratchpad\\night_autorun\\artifacts\\LCC経営会議デッキ_snap-aaba8a1e3f_v4.pptx",
+      "sha256": "2813ca0e597e726aaff53f83c5ff43228c6cb5f21a117c02f75f6b302bf8b024"
+    },
+    {
+      "path": "C:\\Users\\sakam\\AppData\\Local\\Temp\\claude\\C--Users-sakam-OneDrive-Desktop-LCC-COMMAND\\3c2199c6-090b-41cc-8341-12ff1345c5db\\scratchpad\\night_autorun\\artifacts\\LCC案件台帳_snap-aaba8a1e3f_v4.xlsx",
+      "sha256": "d6c972a4b0ce1273080789b8bb3576b65a36ea9b92c5d31cb4738d18b1e5c09b"
+    },
+    {
+      "path": "C:\\Users\\sakam\\AppData\\Local\\Temp\\claude\\C--Users-sakam-OneDrive-Desktop-LCC-COMMAND\\3c2199c6-090b-41cc-8341-12ff1345c5db\\scratchpad\\night_autorun\\artifacts\\LCC経営報告_snap-aaba8a1e3f_v4.pdf",
+      "sha256": "6a1a51a788070d129fe798bc16b3366d97ea8dbc1ca9b47f8df867398dc3d07d"
+    }
+  ]
+}

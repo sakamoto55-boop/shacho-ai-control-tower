@@ -42,6 +42,11 @@ let entries = 0;
 let nonAscii = 0;
 let nonAsciiFlagged = 0;
 let backslash = 0;
+let absolutePaths = 0;
+let traversal = 0;
+let emptyNames = 0;
+const seenNames = new Set();
+let duplicates = 0;
 for (let i = 0; i + 4 <= data.length; i++) {
   if (data.readUInt32LE(i) === 0x02014b50) {
     entries += 1;
@@ -51,6 +56,11 @@ for (let i = 0; i + 4 <= data.length; i++) {
     const isAscii = nameBytes.every((b) => b < 0x80);
     const name = nameBytes.toString('utf8');
     if (name.includes('\\')) backslash += 1;
+    if (name.startsWith('/') || /^[A-Za-z]:/.test(name)) absolutePaths += 1;
+    if (name.split('/').includes('..')) traversal += 1;
+    if (name.trim() === '') emptyNames += 1;
+    if (seenNames.has(name)) duplicates += 1;
+    seenNames.add(name);
     if (!isAscii) {
       nonAscii += 1;
       if (flags & 0x0800) nonAsciiFlagged += 1;
@@ -71,9 +81,11 @@ for (const [, f] of Object.entries(reload.files)) {
 }
 
 const sha = createHash('sha256').update(data).digest('hex');
-console.log(`[verify] entries=${entries} nonAscii=${nonAscii} nonAsciiWithUtf8Flag=${nonAsciiFlagged} backslashEntries=${backslash} integrity=${integrityOk ? 'PASS' : 'FAIL'}`);
+console.log(
+  `[verify] entries=${entries} nonAscii=${nonAscii} nonAsciiWithUtf8Flag=${nonAsciiFlagged} backslashEntries=${backslash} absolute=${absolutePaths} traversal=${traversal} empty=${emptyNames} duplicates=${duplicates} integrity=${integrityOk ? 'PASS' : 'FAIL'}`
+);
 console.log(`[sha256] ${sha}`);
-if (backslash > 0 || nonAscii !== nonAsciiFlagged || !integrityOk) {
+if (backslash > 0 || nonAscii !== nonAsciiFlagged || absolutePaths > 0 || traversal > 0 || emptyNames > 0 || duplicates > 0 || !integrityOk) {
   console.error('[verify] FAILED');
   process.exit(3);
 }
