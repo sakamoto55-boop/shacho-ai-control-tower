@@ -165,7 +165,7 @@ export function detectSalesLeaks(
           projectName: project.name,
           customerName: customerName(project.customerId),
           title: '受注後の次工程未設定',
-          detail: `${project.name}（受注額${(project.orderAmount ?? 0).toLocaleString()}円）に着工日・次アクションが設定されていません。`,
+          detail: `${project.name}（受注額${project.orderAmount !== null ? `${project.orderAmount.toLocaleString()}円` : '：不明'}）に着工日・次アクションが設定されていません。`,
           score: 70,
           evidence: evidenceBase
         });

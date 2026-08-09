@@ -148,7 +148,9 @@ describe('§8 Canonical意味論: 未接続・不明の非0化', () => {
     const report = buildReportDocumentSpec(dataset, 'lcc');
     const reportText = report.sections.flatMap((s) => s.paragraphs).join('\n');
     expect(reportText).toContain('判定不能');
+    expect(reportText).toContain('ステータス未分類 2件'); // PPTXと同じ意味をPDFにも表示
     expect(reportText).not.toMatch(/完工未請求 0円/);
+    expect(reportText).not.toMatch(/受注額0円/); // 金額不明を0円と書かない（アラート文含む）
 
     const ledger = buildProjectLedgerWorkbookSpec(dataset, 'lcc');
     const row1 = (ledger.sheets[0].rows as Array<Record<string, unknown>>).find(

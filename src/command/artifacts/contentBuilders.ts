@@ -453,7 +453,9 @@ export function buildReportDocumentSpec(
 
   const leakDetail = (leak: (typeof leaks)[number]): string[] => {
     const project = projectById.get(leak.projectId);
-    const owner = project?.ownerEmployeeId ? (employeeName.get(project.ownerEmployeeId) ?? '担当未設定') : '担当未設定';
+    const owner =
+      project?.ownerName ??
+      (project?.ownerEmployeeId ? (employeeName.get(project.ownerEmployeeId) ?? '担当未設定') : '担当未設定');
     return [
       `■ ${leak.title} — ${leak.projectName}（${leak.customerName}）`,
       `  projectId: ${leak.projectId} / 担当: ${owner} / 現在工程: ${project ? stageLabel(project.stage) : '不明'}`,
@@ -473,6 +475,11 @@ export function buildReportDocumentSpec(
             ? `当月確定売上は${yen(sales.confirmedSales)}、着地予測は${yen(sales.landingForecast)}です（対象月 ${sales.month}。当月完工予定のみ算入）。`
             : `確定売上は判定不能です（会計・請求Source未接続。完工案件ベース参考値 ${yen(sales.confirmedSales)}）。着地予測（参考値）は${yen(sales.landingForecast)}（当月完工予定のみ算入）。`,
           `受注扱い${sales.orderedCount}件のうち金額確認済${sales.amountKnownCount}件（${yen(sales.orderBacklog)}）、金額未入力${sales.amountUnknownCount}件（カバレッジ${sales.coverageRate}%）。`,
+          ...(scoped.projects.some((p) => p.stage === 'unknown')
+            ? [
+                `ステータス未分類 ${scoped.projects.filter((p) => p.stage === 'unknown').length}件（意味監査待ち。営業パイプラインへ含めていません。DATA_SEMANTICS_AUDIT.md参照）。`
+              ]
+            : []),
           ...(sales.overdueUnfinishedCount > 0
             ? [`期日超過のまま未完工の案件が${sales.overdueUnfinishedCount}件あります（着地には含めていません）。`]
             : []),
@@ -500,7 +507,7 @@ export function buildReportDocumentSpec(
             const project = a.projectId ? projectById.get(a.projectId) : undefined;
             return [
               `■ [${a.severity}] ${a.title}`,
-              `  ${project ? `案件: ${project.name} / projectId: ${project.projectId} / 担当: ${project.ownerEmployeeId ? (employeeName.get(project.ownerEmployeeId) ?? '担当未設定') : '担当未設定'} / 工程: ${stageLabel(project.stage)} / 期限: ${project.dueDate ?? '未設定'}` : a.detail}`,
+              `  ${project ? `案件: ${project.name} / projectId: ${project.projectId} / 担当: ${project.ownerName ?? (project.ownerEmployeeId ? (employeeName.get(project.ownerEmployeeId) ?? '担当未設定') : '担当未設定')} / 工程: ${stageLabel(project.stage)} / 期限: ${project.dueDate ?? '未設定'}` : a.detail}`,
               `  根拠: ${a.evidence.map((e) => `${e.label}=${e.value}`).join(' / ') || '—'}`
             ];
           }),
