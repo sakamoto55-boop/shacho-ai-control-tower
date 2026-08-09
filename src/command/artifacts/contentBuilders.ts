@@ -415,6 +415,8 @@ export function buildProjectLedgerWorkbookSpec(
           { k: 'snapshotId', v: stamp.snapshotId },
           { k: 'scope', v: `${stamp.scopeLabel}（${stamp.scope}）` },
           { k: 'generatedAt', v: stamp.generatedAt },
+          { k: 'snapshotFetchedAt', v: `${stamp.snapshotFetchedAt}（取得時刻）` },
+          { k: 'sourceRecordUpdatedAt', v: `${stamp.sourceRecordUpdatedAt}（Source側レコード最終更新）` },
           ...stamp.sources.map((src) => ({ k: 'source', v: `${src.name} / 更新 ${src.updatedAt} / ${src.state}` })),
           { k: 'freshness', v: stamp.freshness },
           { k: 'confidence', v: stamp.confidence },
