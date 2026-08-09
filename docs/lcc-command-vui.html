@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#050a18">
+<meta name="description" content="LCC COMMAND Visual Intelligence Interface — 粒子AI COREと対話するAI経営管制OS。">
+<title>LCC COMMAND — Visual Intelligence</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' rx='14' fill='%23050a18'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='%237ab8ff' stroke-width='2' opacity='0.9'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%23ffb46a'/%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  /* ============ Design Tokens（§38。値の直書きを避け、ここで一元管理） ============ */
+  :root{
+    --bg-0:#050a18; --bg-1:#0a1228; --bg-2:#0f1b38;
+    --glass:rgba(255,255,255,0.055); --glass-strong:rgba(255,255,255,0.10);
+    --line:rgba(255,255,255,0.10); --line-strong:rgba(255,255,255,0.20);
+    --text-hi:#eef4ff; --text-mid:#a9bbd8; --text-low:#67789a;
+    --accent:#ffb46a; --accent-deep:#ff7a18;
+    --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --info:#7ab8ff;
+    --radius-s:10px; --radius-m:16px; --radius-l:22px;
+    --shadow-soft:0 8px 30px rgba(0,0,0,0.35);
+    /* AI CORE 状態トークン（src/command/vui/visualSpec.ts と同期） */
+    --core-idle:#7ab8ff; --core-listen:#9ecbff; --core-think:#c3d8ff;
+    --core-search:#7af0d8; --core-analyze:#8fd0ff; --core-research:#6ee7f5;
+    --core-memory:#c9a7ff; --core-critic:#ffd27a; --core-innovate:#ff9ecb;
+    --core-approval:#ffb46a; --core-respond:#a5e3ff; --core-warning:#fbbf24; --core-error:#f87171;
+  }
+  html,body{background:radial-gradient(120% 90% at 50% 0%, var(--bg-2) 0%, var(--bg-1) 45%, var(--bg-0) 100%);min-height:100dvh;color:var(--text-hi);}
+  .glass{background:var(--glass);border:1px solid var(--line);border-radius:var(--radius-m);backdrop-filter:blur(10px);}
+  .glass-strong{background:var(--glass-strong);border:1px solid var(--line-strong);border-radius:var(--radius-m);}
+  .no-scrollbar::-webkit-scrollbar{display:none}
+  .chat-scroll::-webkit-scrollbar{width:4px}
+  .chat-scroll::-webkit-scrollbar-thumb{background:#ffffff2a;border-radius:2px}
+  .pre-wrap{white-space:pre-wrap;word-break:break-word}
+  .fade-enter-active{transition:opacity .25s ease, transform .25s ease}
+  .fade-enter-from{opacity:0;transform:translateY(8px)}
+  .role-chip{transition:all .45s ease;opacity:.28;filter:saturate(.4)}
+  .role-chip.active{opacity:1;filter:none;box-shadow:0 0 18px -2px var(--info);border-color:var(--info)}
+  .core-wrap{transition:height .4s ease}
+  @keyframes softpulse{0%,100%{opacity:.75}50%{opacity:1}}
+  .softpulse{animation:softpulse 2.2s ease-in-out infinite}
+  /* Reduced Motion（§29）: アニメーション停止・静的CORE。情報はラベルで保持 */
+  @media (prefers-reduced-motion: reduce){
+    *{animation:none !important;transition:none !important}
+  }
+  .core-static{background:radial-gradient(circle at 50% 45%, var(--core-tint,#7ab8ff) 0%, transparent 55%);opacity:.5}
+  button:focus-visible, input:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--info);outline-offset:2px}
+</style>
+</head>
+<body>
+<div id="app" class="mx-auto flex flex-col lg:flex-row" style="height:100dvh;max-width:1440px">
+
+  <!-- ============ LEFT: 最小Navigation（Desktopのみ・§6） ============ -->
+  <nav class="hidden lg:flex flex-col items-center gap-3 pt-5 px-3 w-16 shrink-0" aria-label="メインナビゲーション">
+    <div class="w-10 h-10 rounded-xl glass-strong flex items-center justify-center font-black text-[color:var(--accent)]" title="LCC COMMAND">司</div>
+    <button @click="focusInput" class="w-10 h-10 rounded-xl glass text-lg" title="会話" aria-label="会話">💬</button>
+    <button @click="send('おはよう')" class="w-10 h-10 rounded-xl glass text-lg" title="朝Brief" aria-label="朝Brief">☀️</button>
+    <button @click="send('今日何を覚えた？')" class="w-10 h-10 rounded-xl glass text-lg" title="今日の学習" aria-label="今日の学習">🧠</button>
+    <button @click="detailOpen = !detailOpen" class="w-10 h-10 rounded-xl glass text-lg" title="詳細モード" aria-label="詳細モード">⚙️</button>
+  </nav>
+
+  <!-- ============ CENTER ============ -->
+  <div class="flex flex-col flex-1 min-w-0" style="height:100dvh">
+
+    <!-- TOP: ステータス + 重要KPI（§7。未接続は正直に表示） -->
+    <header class="px-4 pt-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="lg:hidden w-8 h-8 rounded-lg glass-strong flex items-center justify-center font-black text-[color:var(--accent)]">司</div>
+          <div class="min-w-0">
+            <h1 class="font-bold leading-tight tracking-wide">LCC COMMAND</h1>
+            <p class="text-[10px] leading-tight truncate" :class="statusClass">{{ statusLine }}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <select v-model="scope" class="bg-white/10 text-xs rounded-lg px-2 py-1.5 border border-white/20" aria-label="法人スコープ">
+            <option value="lcc" class="text-black">LCC</option>
+            <option value="group" class="text-black">グループ全体</option>
+          </select>
+          <button @click="detailOpen = !detailOpen" class="lg:hidden w-8 h-8 rounded-lg glass" aria-label="詳細モード">⚙️</button>
+        </div>
+      </div>
+      <div class="no-scrollbar flex gap-2 overflow-x-auto pt-2 pb-1 pr-4 snap-x snap-mandatory" role="list" aria-label="重要KPI">
+        <div v-for="k in kpiBar" :key="k.label" role="listitem"
+             class="glass shrink-0 px-3 py-1.5 min-w-[104px] snap-start">
+          <p class="text-[9px] text-[color:var(--text-low)]">{{ k.label }}</p>
+          <p class="text-sm font-bold" :class="k.cls">{{ k.value }}</p>
+          <p class="text-[8px] text-[color:var(--text-low)]">{{ k.sub }}</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- AI CORE（§2-§4） -->
+    <section class="core-wrap relative shrink-0 select-none" :style="{height: coreHeight}" aria-label="AI CORE">
+      <canvas v-if="!reducedMotion" ref="coreCanvas" class="absolute inset-0 w-full h-full" @click="coreDetailOpen = !coreDetailOpen" role="button" tabindex="0"
+              :aria-label="'AI CORE。現在: ' + coreSpec.label" @keydown.enter="coreDetailOpen = !coreDetailOpen"></canvas>
+      <div v-else class="core-static absolute inset-0" :style="{'--core-tint': coreTint}" @click="coreDetailOpen = !coreDetailOpen"></div>
+
+      <!-- Role Ring（§4。活動中Roleのみ反応） -->
+      <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+        <div class="relative" :style="{width: ringSize, height: ringSize}">
+          <span v-for="(r, i) in roleRing" :key="r.role"
+                class="role-chip absolute text-[9px] px-1.5 py-0.5 rounded-full border border-white/15 bg-black/30 text-[color:var(--text-mid)]"
+                :class="{active: activeRoles.includes(r.role)}"
+                :style="ringPos(i)">{{ r.label }}</span>
+        </div>
+      </div>
+
+      <!-- 状態ラベル（aria-liveでスクリーンリーダーにも伝える・§31） -->
+      <div class="absolute bottom-1 inset-x-0 text-center pointer-events-none">
+        <p class="text-[11px] text-[color:var(--text-mid)]" aria-live="polite">{{ coreSpec.label }}<span v-if="activeRoles.length > 1">（{{ activeRoles.length }}つの能力を使って確認しています）</span></p>
+      </div>
+    </section>
+
+    <!-- CORE Detail（§34） -->
+    <transition name="fade">
+      <div v-if="coreDetailOpen" class="mx-4 mb-2 glass px-3 py-2 text-xs">
+        <p class="font-bold text-[color:var(--text-hi)]">AI COREの現在の活動</p>
+        <p class="text-[color:var(--text-mid)] mt-1">状態: {{ coreSpec.label }}</p>
+        <p class="text-[color:var(--text-mid)]">稼働中の能力: {{ activeRoles.length ? activeRoles.map(roleLabel).join('・') : 'なし（待機中）' }}</p>
+      </div>
+    </transition>
+
+    <!-- CENTER: Conversation（§8。画面の主役はチャット） -->
+    <main ref="chatArea" class="chat-scroll flex-1 overflow-y-auto px-4 space-y-3 pb-2 relative z-10" role="log" aria-label="会話">
+      <transition-group name="fade">
+        <div v-for="(m, i) in messages" :key="i" class="flex" :class="m.role === 'user' ? 'justify-end' : 'justify-start'">
+          <div :class="m.role === 'user' ? 'bg-[color:var(--accent-deep)]/85 text-white' : 'glass-strong'"
+               class="max-w-[92%] lg:max-w-[80%] rounded-2xl px-4 py-3 text-sm">
+            <p class="pre-wrap leading-relaxed">{{ m.text }}</p>
+
+            <!-- Generative UI（§11-§12） -->
+            <div v-if="m.ui" class="mt-2 space-y-2">
+              <component-renderer v-for="(c, j) in m.ui.components" :key="j" :comp="c" @approve="decideApproval(m, $event)"></component-renderer>
+            </div>
+
+            <!-- Evidence（§13） -->
+            <div v-if="m.evidence && m.evidence.length" class="mt-2">
+              <button @click="m.showEvidence = !m.showEvidence" class="text-[11px] font-bold text-[color:var(--info)]">
+                {{ m.showEvidence ? '根拠を閉じる ▲' : '根拠を見る ▼' }}
+              </button>
+              <div v-if="m.showEvidence" class="mt-1.5 rounded-lg bg-black/25 p-2 space-y-1.5">
+                <div v-for="(ev, j) in m.evidence" :key="j" class="text-[11px] leading-snug">
+                  <span class="font-bold">{{ ev.label }}</span>: {{ ev.value }}
+                  <span class="text-[color:var(--text-low)]">（{{ ev.source }} / 更新 {{ (ev.asOf || '').slice(0, 10) || '不明' }}）</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Confidence / Freshness（§14-§15。重要な時だけ） -->
+            <p v-if="m.role === 'ai' && m.confidence && m.confidence !== 'HIGH'" class="mt-1.5 text-[10px]"
+               :class="{'text-[color:var(--warn)]': m.confidence === 'MEDIUM' || m.confidence === 'LOW', 'text-[color:var(--text-low)]': m.confidence === 'UNKNOWN'}">
+              確信度: {{ m.confidence }}{{ m.confidence === 'UNKNOWN' ? '（データ未接続または不明）' : '' }}
+            </p>
+
+            <!-- Suggested Actions（§17・§25。文脈で動的） -->
+            <div v-if="m.role === 'ai' && m.actions && m.actions.length && i === messages.length - 1" class="mt-2 flex flex-wrap gap-1.5">
+              <button v-for="a in m.actions" :key="a.label"
+                      @click="a.message.endsWith('。今は') ? prefill(a.message) : send(a.message)"
+                      class="text-[11px] px-2.5 py-1 rounded-full border border-white/20 bg-white/5 text-[color:var(--text-mid)] hover:bg-white/10">
+                {{ a.label }}
+              </button>
+            </div>
+
+            <!-- Feedback -->
+            <div v-if="m.role === 'ai' && !demoMode && m.done" class="mt-1.5 flex gap-3 items-center">
+              <button @click="feedback(m, 'good')" :class="m.fb === 'good' ? '' : 'opacity-40'" class="text-[13px]" aria-label="良い回答">👍</button>
+              <button @click="feedback(m, 'bad')" :class="m.fb === 'bad' ? '' : 'opacity-40'" class="text-[13px]" aria-label="改善が必要">👎</button>
+              <span v-if="m.fb" class="text-[9px] text-[color:var(--text-low)]">改善の参考として保存しました</span>
+            </div>
+          </div>
+        </div>
+      </transition-group>
+      <div v-if="thinking" class="flex justify-start">
+        <div class="glass rounded-2xl px-4 py-2.5 text-sm text-[color:var(--text-mid)] softpulse">{{ coreSpec.label }}…</div>
+      </div>
+    </main>
+
+    <!-- BOTTOM: 入力（§23・§25・§27） -->
+    <footer class="px-4 pb-4 pt-1">
+      <div class="flex items-end gap-2">
+        <textarea ref="inputBox" v-model="draft" rows="1" enterkeyhint="send"
+                  @keydown.enter.exact.prevent="send(draft)"
+                  placeholder="会社について何でも聞いてください…"
+                  aria-label="メッセージ入力"
+                  class="flex-1 rounded-2xl bg-white/95 text-slate-900 px-4 py-3 text-sm outline-none resize-none"></textarea>
+        <button @click="send(draft)" class="w-11 h-11 rounded-full bg-[color:var(--accent-deep)] text-white font-bold flex items-center justify-center shrink-0" aria-label="送信">↑</button>
+        <button @click="micTap" class="w-11 h-11 rounded-full glass-strong flex items-center justify-center shrink-0" aria-label="音声入力">🎙</button>
+      </div>
+      <p v-if="micNote" class="text-[10px] text-[color:var(--text-mid)] mt-1.5 text-center">{{ micNote }}</p>
+    </footer>
+  </div>
+
+  <!-- ============ RIGHT: Contextual Intelligence（Desktop・§6） ============ -->
+  <aside class="hidden lg:flex flex-col gap-3 w-72 shrink-0 pt-5 pr-4 pb-4 overflow-y-auto no-scrollbar" aria-label="コンテキスト情報">
+    <div class="glass px-3 py-2.5">
+      <p class="text-[10px] font-bold text-[color:var(--text-low)] tracking-wider">現在の活動</p>
+      <p class="text-sm mt-1">{{ coreSpec.label }}</p>
+      <div class="flex flex-wrap gap-1 mt-1.5">
+        <span v-for="r in activeRoles" :key="r" class="text-[10px] px-2 py-0.5 rounded-full border border-[color:var(--info)]/50 text-[color:var(--info)]">{{ roleLabel(r) }}</span>
+        <span v-if="!activeRoles.length" class="text-[10px] text-[color:var(--text-low)]">待機中</span>
+      </div>
+    </div>
+    <div class="glass px-3 py-2.5">
+      <p class="text-[10px] font-bold text-[color:var(--text-low)] tracking-wider">重要Alert</p>
+      <ul class="mt-1 space-y-1">
+        <li v-for="a in sideAlerts" :key="a" class="text-[11px] text-[color:var(--warn)] leading-snug">⚠ {{ a }}</li>
+        <li v-if="!sideAlerts.length" class="text-[11px] text-[color:var(--text-low)]">{{ connectionError ? 'データ取得できません' : '直近の会話から抽出されます' }}</li>
+      </ul>
+    </div>
+    <div class="glass px-3 py-2.5">
+      <p class="text-[10px] font-bold text-[color:var(--text-low)] tracking-wider">記憶・判断</p>
+      <ul class="mt-1 space-y-1">
+        <li v-for="mnote in memoryNotes" :key="mnote" class="text-[11px] text-[color:var(--core-memory)] leading-snug">◈ {{ mnote }}</li>
+        <li v-if="!memoryNotes.length" class="text-[11px] text-[color:var(--text-low)]">会話から学習した内容が表示されます</li>
+      </ul>
+    </div>
+    <div class="glass px-3 py-2.5">
+      <p class="text-[10px] font-bold text-[color:var(--text-low)] tracking-wider">データ接続状態</p>
+      <ul class="mt-1 space-y-0.5 text-[11px] text-[color:var(--text-mid)]">
+        <li>顧客・案件: <span :class="connectionError ? 'text-[color:var(--bad)]' : 'text-[color:var(--ok)]'">{{ connectionError ? '未接続' : (demoMode ? 'デモ' : '接続待ち') }}</span></li>
+        <li>配置・日報: <span class="text-[color:var(--warn)]">実績日報との案件紐付け準備中</span></li>
+        <li>銀行: <span class="text-[color:var(--bad)]">未接続</span></li>
+        <li>会計: <span class="text-[color:var(--bad)]">未接続</span></li>
+      </ul>
+    </div>
+
+    <!-- Detail Mode（§33。通常は隠す） -->
+    <div v-if="detailOpen" class="glass px-3 py-2.5">
+      <p class="text-[10px] font-bold text-[color:var(--text-low)] tracking-wider">詳細（Detail Mode）</p>
+      <div class="mt-1 text-[10px] text-[color:var(--text-mid)] space-y-1">
+        <p>直近応答: {{ lastMeta.toolsUsed.join(', ') || 'なし' }}</p>
+        <p>Data Status: {{ lastMeta.dataStatus || '-' }} / 所要 {{ lastMeta.latencyMs }}ms</p>
+        <p>使用Provider: {{ lastMeta.provider || '（詳細表示でのみ確認できます。通常はLCC COMMANDとして応答）' }}</p>
+        <p v-if="lastMeta.trace.length">AgentTrace: {{ lastMeta.trace.length }}タスク</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Mobile Detail drawer -->
+  <transition name="fade">
+    <div v-if="detailOpen" class="lg:hidden fixed inset-x-3 bottom-24 glass-strong p-3 text-[11px] z-20" role="dialog" aria-label="詳細モード">
+      <div class="flex justify-between items-center">
+        <p class="font-bold">詳細（Detail Mode）</p>
+        <button @click="detailOpen = false" aria-label="閉じる">✕</button>
+      </div>
+      <p class="mt-1 text-[color:var(--text-mid)]">状態: {{ coreSpec.label }} / Tool: {{ lastMeta.toolsUsed.join(', ') || 'なし' }}</p>
+      <p class="text-[color:var(--text-mid)]">Data: {{ lastMeta.dataStatus || '-' }} / {{ lastMeta.latencyMs }}ms / 使用Provider: {{ lastMeta.provider || '未接続' }}</p>
+    </div>
+  </transition>
+</div>
+
+<script>
+const { createApp, defineComponent, h } = Vue;
+
+/* ============================================================
+   AI CORE Visual仕様（src/command/vui/visualSpec.ts と同期・正本はTS側）
+   ============================================================ */
+const CORE_VISUALS = {
+  IDLE:            { label: '待機中',                 motion: 'drift',      speed: 0.15, convergence: 0,    blinkHz: 0,   tint: '--core-idle' },
+  LISTENING:       { label: 'お聞きしています',       motion: 'listen',     speed: 0.35, convergence: 0.2,  blinkHz: 0,   tint: '--core-listen' },
+  THINKING:        { label: '考えています',           motion: 'converge',   speed: 0.5,  convergence: 0.7,  blinkHz: 0,   tint: '--core-think' },
+  SEARCHING:       { label: '社内データを検索中',     motion: 'radiate',    speed: 0.55, convergence: -0.4, blinkHz: 0,   tint: '--core-search' },
+  ANALYZING:       { label: '分析中',                 motion: 'orbit',      speed: 0.5,  convergence: 0.3,  blinkHz: 0,   tint: '--core-analyze' },
+  RESEARCHING:     { label: '外部情報を調査中',       motion: 'stream',     speed: 0.6,  convergence: -0.6, blinkHz: 0,   tint: '--core-research' },
+  REMEMBERING:     { label: '記憶を参照中',           motion: 'link',       speed: 0.4,  convergence: 0.4,  blinkHz: 0,   tint: '--core-memory' },
+  CRITIQUING:      { label: '検証中',                 motion: 'tighten',    speed: 0.45, convergence: 0.8,  blinkHz: 0,   tint: '--core-critic' },
+  INNOVATING:      { label: '新しい案を構想中',       motion: 'reform',     speed: 0.65, convergence: -0.2, blinkHz: 0,   tint: '--core-innovate' },
+  WAITING_APPROVAL:{ label: 'ご承認をお待ちしています', motion: 'hold',      speed: 0.08, convergence: 0.5,  blinkHz: 0,   tint: '--core-approval' },
+  RESPONDING:      { label: '回答しています',         motion: 'pulse',      speed: 0.5,  convergence: 0.5,  blinkHz: 1,   tint: '--core-respond' },
+  WARNING:         { label: '注意が必要です',         motion: 'alert',      speed: 0.4,  convergence: 0.6,  blinkHz: 0.5, tint: '--core-warning' },
+  ERROR:           { label: '接続に問題があります',   motion: 'calm-error', speed: 0.1,  convergence: 0.1,  blinkHz: 0,   tint: '--core-error' },
+  OBSERVING:       { label: '会社を観測しています',   motion: 'drift',      speed: 0.2,  convergence: 0.1,  blinkHz: 0,   tint: '--core-idle' },
+  LEARNING:        { label: '学習しています',         motion: 'link',       speed: 0.3,  convergence: 0.4,  blinkHz: 0,   tint: '--core-memory' },
+  EXPERIMENTING:   { label: '実験を追跡しています',   motion: 'orbit',      speed: 0.3,  convergence: 0.2,  blinkHz: 0,   tint: '--core-analyze' },
+  EVALUATING:      { label: '結果を評価しています',   motion: 'tighten',    speed: 0.3,  convergence: 0.6,  blinkHz: 0,   tint: '--core-critic' }
+};
+const ROLE_RING = [
+  { role: 'STRATEGY', label: '戦略' }, { role: 'FINANCE', label: '資金' },
+  { role: 'SALES', label: '営業' },    { role: 'OPERATIONS', label: '現場' },
+  { role: 'ANALYSIS', label: '分析' }, { role: 'RESEARCH', label: '調査' },
+  { role: 'MEMORY', label: '記憶' },   { role: 'CRITIC', label: '検証' },
+  { role: 'INNOVATION', label: '創発' }, { role: 'SYNTHESIS', label: '統合' }
+];
+function particleBudget(opts){
+  if (opts.reducedMotion) return 0;
+  const cores = opts.hardwareConcurrency || 4;
+  const memory = opts.deviceMemoryGb || 4;
+  const lowEnd = cores <= 2 || memory <= 2;
+  if (opts.mobile) return lowEnd ? 250 : 700;
+  return lowEnd ? 600 : 1600;
+}
+
+/* ============================================================
+   Generative UI Renderer（§11。UI Schema→安全な描画。自由HTMLは描画しない）
+   ============================================================ */
+const yen = (n) => (typeof n === 'number' ? n.toLocaleString('ja-JP') + '円' : '—');
+const ComponentRenderer = defineComponent({
+  props: { comp: { type: Object, required: true } },
+  emits: ['approve'],
+  render(){
+    const c = this.comp || {};
+    const d = c.data;
+    const card = (children, cls) => h('div', { class: 'rounded-xl bg-black/25 border border-white/10 p-2.5 text-[12px] ' + (cls || '') }, children);
+    const title = c.title ? h('p', { class: 'text-[10px] font-bold text-[color:var(--text-low)] mb-1' }, c.title) : null;
+    try {
+      switch (c.type) {
+        case 'TEXT': return null; // 本文はメッセージ側で表示済み
+        case 'EVIDENCE': return null; // 根拠は専用UI（§13）で表示
+        case 'KPI': {
+          const kpis = (d && d.kpiSnapshot && d.kpiSnapshot.kpis) || (d && d.kpis) || [];
+          if (!kpis.length) return null;
+          return card([title, h('div', { class: 'grid grid-cols-2 lg:grid-cols-3 gap-1.5' },
+            kpis.slice(0, 9).map(k => h('div', { class: 'bg-white/5 rounded-lg px-2 py-1.5' }, [
+              h('p', { class: 'text-[9px] text-[color:var(--text-low)]' }, k.label || k.key),
+              h('p', { class: 'text-[13px] font-bold' }, k.value === null ? '判定不能' : k.unit === 'percent' ? `${k.value}%` : k.unit === 'count' ? `${k.value}件` : yen(k.value))
+            ]))
+          )]);
+        }
+        case 'RANKING': {
+          const items = Array.isArray(d) ? d : (d && (d.items || d.projects)) || [];
+          if (!items.length) return null;
+          const max = Math.max(...items.map(it => Math.abs(it.value ?? it.orderAmount ?? 0)), 1);
+          return card([title, ...items.slice(0, 6).map((it, i) => h('div', { class: 'py-1' }, [
+            h('div', { class: 'flex justify-between text-[11px]' }, [
+              h('span', {}, `${i + 1}. ${it.label || it.name || it.title || '項目'}`),
+              h('span', { class: 'font-bold' }, it.display || yen(it.value ?? it.orderAmount))
+            ]),
+            h('div', { class: 'h-1 mt-0.5 rounded bg-white/10' },
+              h('div', { class: 'h-1 rounded', style: `width:${Math.round(Math.abs(it.value ?? it.orderAmount ?? 0) / max * 100)}%;background:var(--info)` }))
+          ]))]);
+        }
+        case 'CASH_FLOW': {
+          const pts = (d && (d.points || d.dailyBalances)) || [];
+          if (!pts.length) return card([title, h('p', { class: 'text-[color:var(--text-low)]' }, '銀行データ未接続のため、完全な資金予測は表示できません')]);
+          const vals = pts.slice(0, 12).map(p => p.balance ?? p.value ?? 0);
+          const max = Math.max(...vals.map(Math.abs), 1);
+          return card([title || h('p', { class: 'text-[10px] font-bold text-[color:var(--text-low)] mb-1' }, '資金推移'),
+            h('div', { class: 'flex items-end gap-1 h-16' }, vals.map(v =>
+              h('div', { class: 'flex-1 rounded-t', style: `height:${Math.max(6, Math.round(Math.abs(v) / max * 100))}%;background:${v < 0 ? 'var(--bad)' : 'var(--info)'}` })))]);
+        }
+        case 'APPROVAL': {
+          if (!d) return null;
+          return card([
+            h('p', { class: 'font-bold text-[color:var(--core-approval)]' }, '⏸ 承認待ち（dry-run。実行はされません）'),
+            h('p', { class: 'text-[11px] mt-1 text-[color:var(--text-mid)] pre-wrap' }, d.summary || d.action || d.approvalId || ''),
+            h('div', { class: 'flex gap-2 mt-2' }, [
+              h('button', { class: 'px-3 py-1 rounded-lg bg-[color:var(--ok)]/80 text-black text-[11px] font-bold', onClick: () => this.$emit('approve', { approval: d, decision: 'approve' }) }, '承認'),
+              h('button', { class: 'px-3 py-1 rounded-lg bg-white/10 text-[11px]', onClick: () => this.$emit('approve', { approval: d, decision: 'revise' }) }, '修正'),
+              h('button', { class: 'px-3 py-1 rounded-lg bg-[color:var(--bad)]/70 text-[11px]', onClick: () => this.$emit('approve', { approval: d, decision: 'reject' }) }, '却下')
+            ])
+          ]);
+        }
+        case 'ALERT': {
+          const alerts = (d && (d.alerts || d)) || [];
+          const list = Array.isArray(alerts) ? alerts : [];
+          if (!list.length) return null;
+          return card([title, ...list.slice(0, 5).map(a =>
+            h('p', { class: 'text-[11px] py-0.5', style: `color:${a.severity === 'CRITICAL' ? 'var(--bad)' : 'var(--warn)'}` }, `⚠ ${a.title || a}`))]);
+        }
+        case 'PROJECT_CARD': case 'CUSTOMER_CARD': case 'MEMORY': case 'DECISION':
+        case 'RESEARCH_RESULT': case 'COMPARISON': case 'PIPELINE': case 'TIMELINE':
+        case 'TABLE': case 'CHART': {
+          if (!d || typeof d !== 'object') return null;
+          // §検収6: 内部ID（projectId/customerId等）は通常画面に出さない（詳細・Evidenceのみ）
+          const STAGE_JP = { inquiry: '問い合わせ', survey: '現地調査', estimating: '見積作成中', following: '追客中', ordered: '受注', in_progress: '施工中', completed: '完工', invoiced: '請求済', paid: '入金済', lost: '失注' };
+          const KEY_JP = { customer: '顧客', stage: 'ステージ', name: '案件', projects: '案件数', active: '進行中', candidates: '候補', current: '正式' };
+          const entries = Object.entries(d)
+            .filter(([k, v]) => ['string', 'number', 'boolean'].includes(typeof v))
+            .filter(([k, v]) => !/id$/i.test(k) && !/^(cus_|prj_|cust:|mem-|inc-)/.test(String(v)))
+            .map(([k, v]) => [KEY_JP[k] || k, STAGE_JP[v] || v])
+            .slice(0, 8);
+          if (!entries.length) return null;
+          return card([title || h('p', { class: 'text-[10px] font-bold text-[color:var(--text-low)] mb-1' }, c.type),
+            ...entries.map(([k, v]) => h('div', { class: 'flex justify-between gap-3 text-[11px] py-0.5' }, [
+              h('span', { class: 'text-[color:var(--text-low)]' }, k),
+              h('span', { class: 'text-right' }, String(v).slice(0, 60))
+            ]))]);
+        }
+        default: return null;
+      }
+    } catch { return null; }
+  }
+});
+
+/* ============================================================
+   App本体
+   ============================================================ */
+createApp({
+  components: { 'component-renderer': ComponentRenderer },
+  data(){
+    return {
+      apiBase: new URLSearchParams(location.search).get('api') || '',
+      apiToken: (() => {
+        // 本番モードはAPIトークン必須（?token=で受け取りlocalStorageへ保存。以後URL不要）
+        const fromUrl = new URLSearchParams(location.search).get('token');
+        if (fromUrl) {
+          try { localStorage.setItem('lcc_command_token', fromUrl); } catch {}
+          // §検収9: トークンをURL・履歴へ残さない
+          try {
+            const cleaned = new URL(location.href);
+            cleaned.searchParams.delete('token');
+            history.replaceState(null, '', cleaned.toString());
+          } catch {}
+        }
+        try { return fromUrl || localStorage.getItem('lcc_command_token') || ''; } catch { return fromUrl || ''; }
+      })(),
+      demoRequested: new URLSearchParams(location.search).get('demo') === '1',
+      demoMode: false,
+      connectionError: false,
+      scope: 'lcc',
+      sessionId: 'vui-' + Math.random().toString(36).slice(2, 10),
+      draft: '',
+      messages: [],
+      thinking: false,
+      coreState: 'IDLE',
+      activeRoles: [],
+      kpis: [],
+      kpiLoaded: false,
+      detailOpen: false,
+      coreDetailOpen: false,
+      micNote: '',
+      scrolled: false,
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      sideAlerts: [],
+      memoryNotes: [],
+      lastMeta: { toolsUsed: [], dataStatus: '', latencyMs: 0, provider: '', trace: [] },
+      _particles: [], _raf: 0, _stateQueue: []
+    };
+  },
+  computed: {
+    coreSpec(){ return CORE_VISUALS[this.coreState] || CORE_VISUALS.IDLE; },
+    coreTint(){ return getComputedStyle(document.documentElement).getPropertyValue(this.coreSpec.tint) || '#7ab8ff'; },
+    roleRing(){ return ROLE_RING; },
+    coreHeight(){
+      const w = window.innerWidth;
+      const ratio = w >= 1024 ? (this.scrolled ? 0.22 : 0.3) : (this.scrolled ? 0.16 : 0.3);
+      return Math.round(window.innerHeight * ratio) + 'px';
+    },
+    ringSize(){ return (window.innerWidth >= 1024 ? 340 : 250) + 'px'; },
+    statusLine(){
+      if (this.demoMode) return 'Visual Intelligence（デモモード）';
+      if (this.connectionError) return 'データ取得できません（API未接続）';
+      return 'COMPANY INTELLIGENCE OS';
+    },
+    statusClass(){ return this.connectionError ? 'text-[color:var(--bad)] font-bold' : 'text-[color:var(--text-low)]'; },
+    kpiBar(){
+      // §7・§41: 未接続データは「未接続」「—」。架空金額を出さない
+      if (!this.kpiLoaded && !this.demoMode) {
+        return [
+          { label: '現預金', value: '未接続', sub: '銀行データ未接続', cls: 'text-[color:var(--text-low)]' },
+          { label: '30日後資金', value: '—', sub: '銀行接続後に予測', cls: 'text-[color:var(--text-low)]' },
+          { label: '当月売上', value: this.connectionError ? '取得不可' : '接続待ち', sub: '統合業務システムDB', cls: 'text-[color:var(--text-low)]' },
+          { label: '着地予測', value: '—', sub: '', cls: 'text-[color:var(--text-low)]' },
+          { label: '重大Alert', value: '—', sub: '', cls: 'text-[color:var(--text-low)]' }
+        ];
+      }
+      return this.kpis;
+    }
+  },
+  methods: {
+    roleLabel(role){ const hit = ROLE_RING.find(r => r.role === role); return hit ? hit.label : role; },
+    ringPos(i){
+      const angle = (i / ROLE_RING.length) * Math.PI * 2 - Math.PI / 2;
+      const x = 50 + Math.cos(angle) * 44, y = 50 + Math.sin(angle) * 40;
+      return { left: `calc(${x}% - 18px)`, top: `calc(${y}% - 9px)` };
+    },
+    focusInput(){ this.$refs.inputBox && this.$refs.inputBox.focus(); },
+    prefill(text){ this.draft = text; this.focusInput(); },
+    micTap(){
+      // §25: VoiceProvider未設定を正直に表示。偽の音声処理をしない
+      this.micNote = '音声機能は準備中です（音声プロバイダ未設定）。テキストでご質問ください。';
+      this.setState('LISTENING');
+      setTimeout(() => { if (this.coreState === 'LISTENING') this.setState('IDLE'); this.micNote = ''; }, 3500);
+    },
+    setState(state){ if (CORE_VISUALS[state]) this.coreState = state; },
+    queueStates(states, stepMs){
+      // Event列を順に可視化（§4）。過剰な高速切替はしない
+      let delay = 0;
+      for (const s of states) {
+        const item = s;
+        setTimeout(() => {
+          if (item.role) { if (!this.activeRoles.includes(item.role)) this.activeRoles.push(item.role); }
+          if (item.state) this.setState(item.state);
+        }, delay);
+        delay += stepMs;
+      }
+      return delay;
+    },
+    scrollDown(){ this.$nextTick(() => { const el = this.$refs.chatArea; if (el) el.scrollTop = el.scrollHeight; }); },
+
+    async send(text){
+      const message = (text || '').trim();
+      if (!message || this.thinking) return;
+      this.draft = '';
+      this.messages.push({ role: 'user', text: message });
+      this.thinking = true;
+      this.activeRoles = [];
+      this.coreDetailOpen = false;
+      this.setState('THINKING');
+      this.scrollDown();
+      const started = Date.now();
+      try {
+        if (this.demoMode) { await this.demoReply(message); }
+        else {
+          const res = await fetch(`${this.apiBase}/command/chat`, {
+            method: 'POST', headers: { 'content-type': 'application/json', ...this.authHeaders() },
+            body: JSON.stringify({ message, scope: this.scope, sessionId: this.sessionId })
+          });
+          if (!res.ok) throw new Error('chat failed');
+          const body = await res.json();
+          await this.visualizeEvents();
+          this.lastMeta = {
+            toolsUsed: body.toolsUsed || [], dataStatus: body.dataStatus || '',
+            latencyMs: Date.now() - started,
+            provider: (body.data && body.data.trace && body.data.trace.length) ? '複数（詳細はAgentTrace）' : '',
+            trace: (body.data && body.data.trace) || []
+          };
+          if (body.dataStatus && body.dataStatus !== 'OK') this.setState('WARNING');
+          await this.streamIn(body);
+          this.harvestContext(body);
+        }
+      } catch {
+        if (this.demoRequested) { this.demoMode = true; await this.demoReply(message); }
+        else {
+          this.connectionError = true;
+          this.setState('ERROR');
+          this.messages.push({ role: 'ai', done: true, confidence: 'UNKNOWN', evidence: [],
+            text: '【CONNECTION ERROR】\nデータ取得できません。APIサーバーへ接続できないため回答できません。\nデモ数値の表示は行いません（接続設定 ?api= を確認してください）。' });
+        }
+      }
+      this.thinking = false;
+      if (this.coreState !== 'ERROR' && this.coreState !== 'WAITING_APPROVAL') this.setState('IDLE');
+      this.scrollDown();
+    },
+
+    authHeaders(){
+      return this.apiToken ? { authorization: `Bearer ${this.apiToken}` } : {};
+    },
+
+    async visualizeEvents(){
+      // B1.5 Event Busを購読しRole活動を可視化（§3-§4・§19）
+      try {
+        const res = await fetch(`${this.apiBase}/command/events?limit=40`, { headers: this.authHeaders() });
+        if (!res.ok) return;
+        const body = await res.json();
+        const recent = (body.events || []).slice(-20);
+        const seq = [];
+        for (const e of recent) {
+          if (e.event === 'PLAN_CREATED') seq.push({ state: 'ANALYZING' });
+          if (e.event === 'ROLE_STARTED' && e.role) {
+            const stateByRole = { RESEARCH: 'RESEARCHING', MEMORY: 'REMEMBERING', CRITIC: 'CRITIQUING', INNOVATION: 'INNOVATING', FINANCE: 'ANALYZING', ANALYSIS: 'ANALYZING' };
+            seq.push({ role: e.role, state: stateByRole[e.role] || 'ANALYZING' });
+          }
+          if (e.event === 'MEMORY_RECALL') seq.push({ state: 'REMEMBERING', role: 'MEMORY' });
+          if (e.event === 'RESEARCH_STARTED') seq.push({ state: 'RESEARCHING', role: 'RESEARCH' });
+          if (e.event === 'CRITIC_STARTED') seq.push({ state: 'CRITIQUING', role: 'CRITIC' });
+          if (e.event === 'INNOVATION_STARTED') seq.push({ state: 'INNOVATING', role: 'INNOVATION' });
+        }
+        if (seq.length) {
+          const total = this.queueStates(seq.slice(0, 6), 350);
+          await new Promise(r => setTimeout(r, Math.min(total, 2100)));
+        }
+      } catch { /* 可視化失敗は会話を止めない */ }
+    },
+
+    async streamIn(body){
+      // Streaming表示（§10）。実LLMストリーミング接続前はチャンク表示で同期
+      this.setState('RESPONDING');
+      const msg = { role: 'ai', text: '', done: false, showEvidence: false, fb: null,
+        confidence: body.confidence, evidence: body.evidence || [],
+        ui: body.ui || null,
+        actions: (body.ui && body.ui.suggestedActions && body.ui.suggestedActions.length)
+          ? body.ui.suggestedActions
+          : [{ label: '覚えて', message: '今のを覚えておいて' }, { label: '訂正', message: 'それ違う。今は' }] };
+      this.messages.push(msg);
+      // Vue3: push後はreactive proxy経由で書き換えないと2チャンク目以降が描画されない
+      const live = this.messages[this.messages.length - 1];
+      const full = body.text || '';
+      const chunk = this.reducedMotion ? full.length : Math.max(8, Math.round(full.length / 24));
+      for (let i = 0; i < full.length; i += chunk) {
+        live.text = full.slice(0, i + chunk);
+        this.scrollDown();
+        if (!this.reducedMotion) await new Promise(r => setTimeout(r, 24));
+      }
+      live.text = full;
+      live.done = true;
+      if (body.approvalRequest) this.setState('WAITING_APPROVAL');
+    },
+
+    harvestContext(body){
+      // 右カラムのContextual Intelligence（§6）を会話から更新
+      const text = body.text || '';
+      for (const line of text.split('\n')) {
+        if (/^[①-⑤⚠]|重大|CRITICAL/.test(line) && line.length > 4 && this.sideAlerts.length < 4 && /危|超過|低下|遅|不足|下回/.test(line)) {
+          this.sideAlerts.push(line.replace(/^[①-⑤⚠\s]+/, '').slice(0, 40));
+        }
+        if (/覚えました|記憶を更新|判断候補として記録/.test(line) && this.memoryNotes.length < 4) {
+          this.memoryNotes.push(line.slice(0, 40));
+        }
+      }
+      if (/過去の(判断|記憶)を参照/.test(text) && !this.memoryNotes.includes('過去の判断を参照しました')) {
+        this.memoryNotes.push('過去の判断を参照しました');
+      }
+      this.sideAlerts = [...new Set(this.sideAlerts)].slice(0, 4);
+    },
+
+    async decideApproval(message, payload){
+      // §22: Phase VUIでは本番実行しない（サーバー側もdry-run固定）
+      const approval = payload.approval || {};
+      if (payload.decision === 'revise') { this.prefill('修正したい点: '); return; }
+      const approve = payload.decision === 'approve';
+      let note = approve ? '承認しました（dry-run実行。外部への実送信は行われません）' : '却下しました';
+      try {
+        if (!this.demoMode && approval.approvalId) {
+          await fetch(`${this.apiBase}/command/approvals/${approval.approvalId}/${approve ? 'approve' : 'reject'}`, { method: 'POST', headers: this.authHeaders() });
+        }
+      } catch { note = '承認APIへ接続できませんでした'; }
+      this.messages.push({ role: 'ai', text: note, done: true, evidence: [], confidence: 'HIGH' });
+      this.setState('IDLE');
+      this.scrollDown();
+    },
+
+    async feedback(message, rating){
+      if (message.fb) return;
+      message.fb = rating;
+      try {
+        await fetch(`${this.apiBase}/command/feedback`, {
+          method: 'POST', headers: { 'content-type': 'application/json', ...this.authHeaders() },
+          body: JSON.stringify({ rating, sessionId: this.sessionId })
+        });
+      } catch { /* 送信失敗で会話は止めない */ }
+    },
+
+    async demoReply(message){
+      // §37: Demo応答は?demo=1明示時のみ。デモ表現も実データと矛盾する断定をしない
+      await new Promise(r => setTimeout(r, 500));
+      this.messages.push({ role: 'ai', done: true, evidence: [], confidence: 'UNKNOWN',
+        text: `（デモモード）「${message}」への応答はAPI接続後に実データで返されます。デモでは経営数値の断定表示を行いません。`,
+        actions: [{ label: '今月どう？', message: '今月どう？' }, { label: '今日何をすべき？', message: '今日何をすべき？' }] });
+    },
+
+    async loadKpi(){
+      try {
+        const res = await fetch(`${this.apiBase}/command/kpi?scope=${this.scope}`, { headers: this.authHeaders() });
+        if (!res.ok) throw new Error('kpi failed');
+        const body = await res.json();
+        const find = (key) => (body.kpis || []).find(k => k.key === key);
+        const fmt = (k, unit) => {
+          if (!k) return { v: '—', sub: '' };
+          // §検収5-5: 同期日時（取得）とデータ最終更新（Source実更新）を分けて表示する
+          const dataUpd = (k.freshness && k.freshness.lastUpdatedAt) ? k.freshness.lastUpdatedAt.slice(5, 10).replace('-', '/') : null;
+          const synced = k.syncedAt ? k.syncedAt.slice(5, 16).replace('T', ' ') : null;
+          const fs = k.freshnessStatus || '';
+          const fresh = [
+            dataUpd ? `データ更新${dataUpd}` : null,
+            fs === 'VERY_STALE' ? '⚠ VERY_STALE' : fs === 'STALE' ? 'STALE' : null,
+            synced ? `同期${synced}` : null
+          ].filter(Boolean).join(' / ');
+          // §検収6: 未接続の数値は0円ではなく「未接続」を優先する
+          if (k.value === null || k.confidence === 'UNKNOWN') {
+            return { v: k.value === null ? '判定不能' : '未接続', sub: fresh || '接続後に表示' };
+          }
+          if (!(k.freshness && k.freshness.lastUpdatedAt)) {
+            return { v: '未接続', sub: '接続後に表示' };
+          }
+          const v = unit === 'percent' ? `${k.value}%` : unit === 'count' ? `${k.value}件` : yen(k.value);
+          return { v, sub: fresh };
+        };
+        const cash = fmt(find('cash_balance')); const c30 = fmt(find('cash_30d'));
+        const sales = fmt(find('sales_month')); const landing = fmt(find('sales_landing'));
+        const margin = fmt(find('margin_forecast'), 'percent'); const alerts = fmt(find('alerts_today'), 'count');
+        this.kpis = [
+          { label: '現預金', value: cash.v, sub: cash.sub || '銀行未接続', cls: 'text-[color:var(--text-hi)]' },
+          { label: '30日後資金', value: c30.v, sub: c30.sub, cls: 'text-[color:var(--text-hi)]' },
+          { label: '当月売上', value: sales.v, sub: sales.sub, cls: 'text-[color:var(--text-hi)]' },
+          { label: '着地予測', value: landing.v, sub: landing.sub, cls: 'text-[color:var(--text-hi)]' },
+          { label: '粗利率', value: margin.v, sub: margin.sub, cls: 'text-[color:var(--text-hi)]' },
+          { label: '重大Alert', value: alerts.v, sub: alerts.sub, cls: alerts.v !== '0件' ? 'text-[color:var(--warn)] softpulse' : 'text-[color:var(--text-hi)]' }
+        ];
+        this.kpiLoaded = true;
+        this.connectionError = false;
+      } catch {
+        if (this.demoRequested) { this.demoMode = true; }
+        else {
+          this.connectionError = true;
+          if (this.kpiLoaded) {
+            // §検収6: 接続断で残す値には必ずSTALEを明示（現在値と誤認させない）
+            this.kpis = this.kpis.map(k => ({ ...k, sub: 'STALE（接続断・最終取得値）', cls: 'text-[color:var(--warn)]' }));
+          } else {
+            this.kpiLoaded = false;
+          }
+        }
+      }
+    },
+
+    morningGreeting(){
+      // §35 Morning Experience。データ未取得時は件数等を捏造しない
+      const hour = new Date().getHours();
+      const hello = hour < 11 ? 'おはようございます。' : hour < 18 ? 'お疲れさまです。' : 'お疲れさまです。';
+      const text = this.connectionError || (!this.kpiLoaded && !this.demoMode)
+        ? `${hello}\nデータ接続の準備中です。接続済みの範囲でお答えしますので、何でも聞いてください。`
+        : `${hello}\n昨日からの変化を確認できます。まず何を確認しますか？`;
+      this.messages.push({ role: 'ai', text, done: true, evidence: [], confidence: 'HIGH',
+        actions: [
+          { label: '最優先を見る', message: '今日何をすべき？' },
+          { label: '朝Brief', message: 'おはよう' },
+          { label: '売上', message: '今月どう？' },
+          { label: '危ない案件', message: '一番危ないのは？' },
+          { label: 'あとで', message: 'あとで確認する' }
+        ] });
+    },
+
+    /* ============ Particle AI CORE（Canvas 2D・§2-§3・§28・§30） ============ */
+    initCore(){
+      if (this.reducedMotion) return;
+      const canvas = this.$refs.coreCanvas;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const count = particleBudget({
+        reducedMotion: this.reducedMotion,
+        mobile: window.innerWidth < 1024,
+        hardwareConcurrency: navigator.hardwareConcurrency,
+        deviceMemoryGb: navigator.deviceMemory
+      });
+      const rand = (a, b) => a + Math.random() * (b - a);
+      this._particles = Array.from({ length: count }, () => ({
+        a: rand(0, Math.PI * 2), r: rand(0.08, 1), sp: rand(0.4, 1),
+        drift: rand(-0.5, 0.5), size: rand(0.6, 1.8), layer: Math.random() < 0.5 ? 1 : -1
+      }));
+      let t = 0;
+      const frame = () => {
+        this._raf = requestAnimationFrame(frame);
+        if (document.hidden) return; // §30: 非表示時は描画しない
+        const w = canvas.clientWidth, hgt = canvas.clientHeight;
+        if (canvas.width !== w * dpr) { canvas.width = w * dpr; canvas.height = hgt * dpr; }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, hgt);
+        const spec = CORE_VISUALS[this.coreState] || CORE_VISUALS.IDLE;
+        const tint = getComputedStyle(document.documentElement).getPropertyValue(spec.tint).trim() || '#7ab8ff';
+        const cx = w / 2, cy = hgt / 2;
+        const base = Math.min(w, hgt) * 0.34;
+        t += 0.016 * (0.3 + spec.speed);
+        const glow = spec.blinkHz > 0 ? 0.75 + 0.25 * Math.sin(t * Math.PI * 2 * spec.blinkHz) : 1;
+
+        // 中心グロー
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, base * 1.15);
+        grad.addColorStop(0, tint + 'cc'); grad.addColorStop(0.35, tint + '33'); grad.addColorStop(1, 'transparent');
+        ctx.globalAlpha = 0.5 * glow;
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, hgt);
+        ctx.globalAlpha = 1;
+
+        for (const p of this._particles) {
+          // 状態別挙動（visualSpec正本と同じmotion分類）
+          let targetR = p.r;
+          if (spec.motion === 'converge' || spec.motion === 'tighten') targetR = p.r * (1 - spec.convergence * 0.75);
+          if (spec.motion === 'radiate' || spec.motion === 'stream') targetR = p.r * (1 - spec.convergence * 0.9) + (Math.sin(t * 2 + p.a * 3) + 1) * 0.12;
+          if (spec.motion === 'reform') targetR = p.r * (0.55 + 0.45 * Math.abs(Math.sin(t * 0.7 + p.a)));
+          if (spec.motion === 'hold') targetR = p.r * 0.8;
+          if (spec.motion === 'pulse') targetR = p.r * (0.82 + 0.1 * Math.sin(t * Math.PI * 2 * Math.max(spec.blinkHz, 0.5)));
+          const orbit = spec.motion === 'orbit' ? p.layer : 1;
+          p.a += 0.0025 * spec.speed * 6 * p.sp * orbit;
+          const wobble = spec.motion === 'drift' || spec.motion === 'listen' ? Math.sin(t + p.a * 2) * 0.05 : 0;
+          const rr = Math.max(0.04, Math.min(1.15, targetR + wobble)) * base;
+          const x = cx + Math.cos(p.a) * rr * (spec.motion === 'stream' ? 1.25 : 1);
+          const y = cy + Math.sin(p.a) * rr * 0.82;
+          ctx.globalAlpha = (0.25 + 0.5 * (1 - p.r)) * glow;
+          ctx.fillStyle = tint;
+          ctx.beginPath();
+          ctx.arc(x, y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      };
+      frame();
+    }
+  },
+  async mounted(){
+    if (this.demoRequested) this.demoMode = true;
+    await this.loadKpi();
+    this.morningGreeting();
+    this.initCore();
+    this.$refs.chatArea && this.$refs.chatArea.addEventListener('scroll', () => {
+      this.scrolled = this.$refs.chatArea.scrollTop > 40;
+    });
+    window.addEventListener('beforeunload', () => cancelAnimationFrame(this._raf));
+  }
+}).mount('#app');
+</script>
+</body>
+</html>

@@ -4,7 +4,12 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.demo.example
 data/*.json
 data/*.db
+data/*.jsonl
 *.log
 .DS_Store
+data/snapshots/
+data/artifacts/
+secure/

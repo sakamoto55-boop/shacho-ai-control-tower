@@ -1,0 +1,36 @@
+[
+  {
+    "_comment": "LCC統合業務システムDB customers タブ（実測スキーマ 2026-08-08）。LCC_SHEETS_SOURCESへこの配列をJSONで設定する",
+    "sourceName": "CustomerSource",
+    "spreadsheetId": "1jOU-Kq8vh7Meaa7auNQqVflseRAPCcGzksAsvG-16HY",
+    "tabName": "customers",
+    "companyId": "lcc",
+    "columns": {
+      "customerId": "id",
+      "name": "name",
+      "phone": "tel"
+    }
+  },
+  {
+    "_comment": "LCC統合業務システムDB projects。契約額列が無いためorderAmount=null（見積額を受注額として集計しない）。status=quoteは意味監査（DATA_SEMANTICS_AUDIT.md）完了までステータス未分類",
+    "sourceName": "ProjectSource",
+    "spreadsheetId": "1jOU-Kq8vh7Meaa7auNQqVflseRAPCcGzksAsvG-16HY",
+    "tabName": "projects",
+    "companyId": "lcc",
+    "columns": {
+      "projectId": "id",
+      "customerId": "customerId",
+      "name": "name",
+      "stage": "status",
+      "startDate": "workStart",
+      "dueDate": "deliveryDate",
+      "completedDate": "workEnd",
+      "estimateAmount": "estimateTotal",
+      "sourceUpdatedAt": "updatedAt",
+      "ownerName": "staff"
+    },
+    "stageMap": {
+      "contract": "ordered"
+    }
+  }
+]

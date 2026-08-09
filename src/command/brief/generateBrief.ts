@@ -1,0 +1,176 @@
+/**
+ * 社長Brief。毎朝自動生成し、単なる数字羅列ではなく
+ * 「昨日から何が変わったか」「本日の判断事項」「AI推奨アクション」を優先する。
+ */
+import type { CommandAlert, CompanyScope, Decision, ExecutiveBrief } from '../domain/types.js';
+import type { CommandDataset } from '../data/seed.js';
+import { addDaysJst, jstDate } from '../utils/jst.js';
+import { buildAlerts, activeAlerts } from '../engines/alerts.js';
+import { computeCashForecast } from '../engines/cashForecast.js';
+import { computeKpiSnapshot } from '../engines/kpi.js';
+import { computeSalesSummary } from '../engines/sales.js';
+import { detectSalesLeaks } from '../engines/salesLeak.js';
+import { checkInvoices } from '../engines/invoiceChecks.js';
+import { filterDatasetByScope, scopeLabel } from '../domain/scope.js';
+import {
+  formatBacklogStatus,
+  formatCashForecastLine,
+  formatCashStatus,
+  formatInvoiceStatus,
+  formatMarginStatus,
+  formatSalesLandingStatus,
+  formatSalesMonthStatus
+} from '../domain/semanticFormat.js';
+
+export function yen(amount: number): string {
+  return `${amount.toLocaleString('ja-JP')}円`;
+}
+
+/** 昨日以降に動いた事実（原価計上・入金・請求・接点）を変化点として列挙する */
+function collectChangesSinceYesterday(dataset: CommandDataset, scope: CompanyScope): string[] {
+  const scoped = filterDatasetByScope(dataset, scope);
+  const yesterday = addDaysJst(jstDate(dataset.asOf), -1);
+  const changes: string[] = [];
+
+  for (const cost of scoped.costs.filter((c) => c.kind === 'actual' && c.date >= yesterday)) {
+    const project = scoped.projects.find((p) => p.projectId === cost.projectId);
+    changes.push(
+      `${project?.name ?? cost.projectId}で原価${yen(cost.amount)}を計上${cost.note ? `（${cost.note}）` : ''}`
+    );
+  }
+  for (const payment of scoped.payments.filter(
+    (p) => p.direction === 'in' && p.date >= yesterday
+  )) {
+    changes.push(`入金${yen(payment.amount)}を確認${payment.note ? `（${payment.note}）` : ''}`);
+  }
+  for (const invoice of scoped.invoices.filter(
+    (i) => i.issuedAt !== undefined && i.issuedAt >= yesterday
+  )) {
+    changes.push(`請求書${yen(invoice.amount)}を発行（${invoice.invoiceId}）`);
+  }
+  for (const interaction of scoped.interactions.filter(
+    (i) => i.datetime >= `${yesterday}T00:00:00.000Z`
+  )) {
+    changes.push(`営業接点: ${interaction.summary}（${interaction.channel}）`);
+  }
+  return changes;
+}
+
+/** Daily Learning Summary（Phase B1 §14/§16）。Memoryと気づきの上位のみをBriefへ載せる */
+export interface BriefLearning {
+  /** 今日Curatorが記憶したこと（statement） */
+  learnedToday: string[];
+  /** 確認待ち（PENDING_REVIEW）の判断候補 */
+  pendingReview: string[];
+  /** ランク付け済みの気づき（上位のみ渡すこと） */
+  topInsights: string[];
+}
+
+export function generateExecutiveBrief(
+  dataset: CommandDataset,
+  scope: CompanyScope,
+  decisions: Decision[] = [],
+  learning?: BriefLearning
+): ExecutiveBrief {
+  const alerts = buildAlerts(dataset, scope, decisions);
+  const visible = activeAlerts(alerts);
+  const kpiSnapshot = computeKpiSnapshot(dataset, scope, alerts);
+  const cash = computeCashForecast(dataset, scope);
+  const leaks = detectSalesLeaks(dataset, scope);
+  const invoiceCheck = checkInvoices(dataset, scope);
+
+  const decisionsNeeded = visible
+    .filter((alert) => alert.severity === 'CRITICAL' || alert.severity === 'WARNING')
+    .slice(0, 5)
+    .map((alert) => alert.title);
+
+  const recommendedActions: string[] = [];
+  if (leaks.length > 0) {
+    const provisionalNote = leaks.every((leak) => leak.provisional)
+      ? '（候補・status意味確認待ち）'
+      : '';
+    recommendedActions.push(
+      `営業${leaks.every((l) => l.provisional) ? '対応候補' : '要対応'} ${leaks.length}件${provisionalNote}のうち最優先: ${leaks[0].title}（${leaks[0].customerName}）`
+    );
+  }
+  // 請求Source未接続時は完工未請求の金額行動を作らない（判定不能のため）
+  if (invoiceCheck.invoicesConnected && invoiceCheck.uninvoicedCompletedTotal > 0) {
+    recommendedActions.push(
+      `完工未請求 ${yen(invoiceCheck.uninvoicedCompletedTotal)} の請求書発行`
+    );
+  }
+  for (const alert of visible.filter((a) => a.kind === 'margin_drop').slice(0, 1)) {
+    recommendedActions.push(`${alert.title.split(' の')[0]} の追加請求可能性の確認`);
+  }
+
+  const changes = collectChangesSinceYesterday(dataset, scope);
+  const headline =
+    decisionsNeeded.length > 0
+      ? `本日は経営上${decisionsNeeded.length}件確認が必要です。`
+      : '本日、即時の経営判断が必要な項目はありません。';
+
+  // §検収5-1: value ?? 0 の変換を禁止。KPIごとに接続状態を確認して文章を作る（Semantic Formatter共通化）
+  const sales = computeSalesSummary(dataset, scope);
+  const marginKpi = kpiSnapshot.kpis.find((item) => item.key === 'margin_forecast');
+  const lines: string[] = [
+    `おはようございます。${scopeLabel(dataset, scope)}の朝Briefです。`,
+    '',
+    headline,
+    ...decisionsNeeded.map(
+      (item, index) => `${['①', '②', '③', '④', '⑤'][index] ?? `${index + 1}.`}${item}`
+    ),
+    '',
+    '【主要数値】',
+    formatCashStatus(cash),
+    formatCashForecastLine(cash),
+    `${formatSalesMonthStatus(sales)} / ${formatSalesLandingStatus(sales)}`,
+    `${formatBacklogStatus(sales)} / ${formatMarginStatus(marginKpi?.value ?? null)}`,
+    formatInvoiceStatus(invoiceCheck),
+    '',
+    '【昨日からの変化】',
+    ...(changes.length > 0
+      ? changes.map((change) => `・${change}`)
+      : ['・記録された変化はありません']),
+    '',
+    '【AI推奨アクション】',
+    ...(recommendedActions.length > 0
+      ? recommendedActions.map((action) => `・${action}`)
+      : ['・特になし'])
+  ];
+
+  if (learning) {
+    if (learning.learnedToday.length > 0 || learning.pendingReview.length > 0) {
+      lines.push('', '【今日AIが学んだこと】');
+      lines.push(...learning.learnedToday.slice(0, 5).map((item) => `・${item}`));
+      lines.push(
+        ...learning.pendingReview.slice(0, 3).map((item) => `・（確認待ち）${item} — 正式方針にするかご確認ください`)
+      );
+    }
+    if (learning.topInsights.length > 0) {
+      lines.push('', '【AIの気づき（上位のみ）】');
+      lines.push(...learning.topInsights.slice(0, 2).map((item) => `・${item}`));
+    }
+  }
+
+  const suppressed = alerts.filter((alert) => alert.suppressedByDecisionId);
+  if (suppressed.length > 0) {
+    lines.push(
+      '',
+      `※経営判断Memoryにより${suppressed.length}件の警告を表示していません（期限到来後に再評価します）。`
+    );
+  }
+
+  return {
+    scope,
+    generatedAt: dataset.asOf,
+    headline,
+    changes,
+    decisionsNeeded,
+    recommendedActions,
+    kpiSnapshot,
+    alerts: visible,
+    text: lines.join('\n')
+  };
+}
+
+export type { CommandAlert };
