@@ -17,7 +17,13 @@
     "command:real-eval": "tsx scripts/real-evaluation.ts",
     "command:benchmark": "tsx scripts/provider-benchmark.ts",
     "command:growth": "tsx scripts/growth-observe.ts",
-    "command:beta": "tsx scripts/beta-gate.ts"
+    "command:beta": "tsx scripts/beta-gate.ts",
+    "sync:all": "tsx scripts/sync-integrations.ts all",
+    "sync:board": "tsx scripts/sync-integrations.ts board",
+    "sync:drive": "tsx scripts/sync-integrations.ts drive",
+    "sync:freee": "tsx scripts/sync-integrations.ts freee",
+    "sync:tkc": "tsx scripts/sync-integrations.ts tkc",
+    "sync:conversations": "tsx scripts/sync-integrations.ts conversations"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
