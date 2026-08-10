@@ -49,11 +49,22 @@ function classifyError(message: string): FetchOutcome {
 }
 
 /**
- * vault追記（IDENTITY設計 v2）。
- * - recordKey = sourceSystem|companyId|sourceRecordId（月次サマリ等はrow.idにemployeeId+対象期間を含める）
+ * vault追記（IDENTITY設計 v3・CLOSURE CHECKPOINT A）。
+ * - recordKey = sourceSystem|companyId|entityType|sourceRecordId
+ *   （月次サマリのsourceRecordIdは employeeId:対象年月。companyIdはkey第2要素）
  * - payloadHash = canonical化（キー昇順）したraw内容のSHA-256
  * - 同recordKey+同payloadHash=duplicate / 同recordKeyで内容変化=新version（旧はSUPERSEDED扱い・行は保持）
  */
+export const ENTITY_TYPE: Record<string, string> = {
+  companies: 'company',
+  employees: 'employee',
+  'group-memberships': 'groupMembership',
+  groups: 'department',
+  positions: 'position',
+  'time-clocks': 'timeClock',
+  'work-record-summaries': 'monthlySummary',
+  'holiday-pools': 'holidayPool'
+};
 function canonicalStringify(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalStringify).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -71,9 +82,10 @@ function appendRecords(
   const rawDir = join(vaultDir, 'raw');
   mkdirSync(rawDir, { recursive: true });
   const vaultFile = join(rawDir, `freee-${kind}.jsonl`);
-  const keyFile = join(rawDir, `freee-${kind}.keys.json`);
+  const keyFile = join(rawDir, `freee-${kind}.keys.v3.json`);
   const sourceSystem = `freee-hr:${kind}`;
-  // keyIndex: recordKey -> payloadHash（初回は既存vault行から再構築＝旧hash方式からの移行）
+  const entityType = ENTITY_TYPE[kind] ?? kind;
+  // keyIndex: recordKey -> payloadHash（初回は既存vault行から再構築＝旧key形式からのmigration。旧行は削除しない）
   const keyIndex: Record<string, string> = existsSync(keyFile)
     ? (JSON.parse(readFileSync(keyFile, 'utf8')) as Record<string, string>)
     : {};
@@ -82,7 +94,7 @@ function appendRecords(
       if (!line.trim()) continue;
       try {
         const r = JSON.parse(line) as IntegrationRecord;
-        keyIndex[`${r.sourceSystem}|${r.companyId}|${r.sourceRecordId}`] = createHash('sha256')
+        keyIndex[`freee-hr|${r.companyId}|${entityType}|${r.sourceRecordId}`] = createHash('sha256')
           .update(canonicalStringify(r.raw))
           .digest('hex');
       } catch { /* 壊れた行はスキップ */ }
@@ -91,7 +103,7 @@ function appendRecords(
   let imported = 0;
   let duplicates = 0;
   for (const row of rows) {
-    const recordKey = `${sourceSystem}|lcc|${row.id}`;
+    const recordKey = `freee-hr|lcc|${entityType}|${row.id}`;
     const payloadHash = createHash('sha256').update(canonicalStringify(row.raw)).digest('hex');
     const known = keyIndex[recordKey];
     if (known === payloadHash) {

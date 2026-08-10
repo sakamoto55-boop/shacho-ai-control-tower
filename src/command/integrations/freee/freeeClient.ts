@@ -182,8 +182,16 @@ export class FreeeClient {
   }
 
   async getTimeClocks(companyId: number, employeeId: number, fromDate: string, toDate: string) {
-    return this.get<Array<Record<string, unknown>>>(
-      `/employees/${employeeId}/time_clocks?company_id=${companyId}&from_date=${fromDate}&to_date=${toDate}`
-    );
+    // freee既定limit(50)による切り詰め防止: limit=100でoffsetページングし全件回収
+    const all: Array<Record<string, unknown>> = [];
+    const limit = 100;
+    for (let offset = 0; offset < 10_000; offset += limit) {
+      const page = await this.get<Array<Record<string, unknown>>>(
+        `/employees/${employeeId}/time_clocks?company_id=${companyId}&from_date=${fromDate}&to_date=${toDate}&limit=${limit}&offset=${offset}`
+      );
+      all.push(...page);
+      if (page.length < limit) break;
+    }
+    return all;
   }
 }
