@@ -12,7 +12,7 @@ import { maskSensitive } from '../security/security.js';
 
 export interface ObservabilityEntry {
   timestamp: string;
-  kind: 'chat' | 'feedback' | 'llm_call';
+  kind: 'chat' | 'feedback' | 'llm_call' | 'llm_incident';
   sessionId?: string;
   scope?: string;
   actor?: string;
@@ -27,6 +27,10 @@ export interface ObservabilityEntry {
   /** feedback用 */
   rating?: 'good' | 'bad';
   comment?: string;
+  /** llm_incident用（是正⑦）: Provider障害の診断。APIキー・会話本文は入れない */
+  providerStatus?: string;
+  reasonCode?: string;
+  retryable?: boolean;
 }
 
 const MAX_ENTRIES = 2000;

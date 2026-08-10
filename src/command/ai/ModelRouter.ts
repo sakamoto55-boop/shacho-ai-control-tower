@@ -64,8 +64,15 @@ export class ModelRouter {
         lastError = error;
       }
     }
-    throw new Error(
-      `利用可能なモデルProviderがありません: ${String(lastError ?? 'no provider registered')}`
-    );
+    // 是正⑦: 元エラーのstatus（401/429等）を失わずに伝播する（AUTH_FAILED等の区別に必要）。
+    // エラーメッセージへAPIキーが混入しないよう、メッセージ本文は固定文言とする。
+    const wrapped = new Error('利用可能なモデルProviderがありません');
+    if (typeof lastError === 'object' && lastError !== null && 'status' in lastError) {
+      (wrapped as Error & { status?: unknown }).status = (
+        lastError as { status?: unknown }
+      ).status;
+    }
+    (wrapped as Error & { cause?: unknown }).cause = lastError;
+    throw wrapped;
   }
 }

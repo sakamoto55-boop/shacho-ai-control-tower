@@ -97,6 +97,7 @@ import {
 import { classifyConversation } from './universalRouter.js';
 import { buildInnovationProposal, formatInnovationProposal } from '../memory/innovation.js';
 import { GeneralReasoner, createGeneralRouter } from '../ai/generalReasoner.js';
+import { classifyProviderError } from '../ai/providerVerification.js';
 import { assessInput, buildPlan } from '../agents/rolePlanner.js';
 import { AgentTraceLog, PlanExecutor } from '../agents/executor.js';
 import { createDefaultRegistry } from '../agents/providerRegistry.js';
@@ -122,6 +123,23 @@ export const ORCHESTRATOR_LIMITS = {
 const DEFAULT_PRINCIPAL: Principal = { role: 'PRESIDENT', companyIds: [], label: 'demo-president' };
 
 /** 金額の表示（不明は0円ではなく「不明」） */
+/**
+ * 是正⑦ 修正3: Memory想起Intent判定。
+ * 「私が希望している回答の順番を教えて」「会社の原則を教えて」「前回の判断を教えて」等、
+ * Preference・方針・原則・過去の判断への質問はMemory検索を先に試す対象とする。
+ * 「一般論として…」のような一般質問は対象外（過剰なMemory検索の強制はしない）。
+ * このIntentにヒットしてもMemoryが無ければgeneral_reasoningへフォールバックするため、
+ * やや広めの判定でも会話は壊れない設計。
+ */
+export function isMemoryRecallIntent(message: string): boolean {
+  if (/^一般論|一般論として/.test(message)) return false;
+  if (/これまで(に)?覚えた|何を覚えて|何を記憶して/.test(message)) return true;
+  const topic =
+    /(希望|好み|方針|原則|ルール|重視|大事にして|大切にして|前回の判断|決めたこと|決めた方針|約束|優先順位)/;
+  const ask = /(教えて|何(だった|でしたか|ですか)?|どれ|どう|は[？?]|[？?]$)/;
+  return topic.test(message) && ask.test(message);
+}
+
 function yenOrUnknown(amount: number | null): string {
   return amount !== null ? yen(amount) : '不明';
 }
@@ -225,7 +243,16 @@ export class CommandOrchestrator {
     this.constitutionService = new ConstitutionService(repository);
     this.artifactService = new ArtifactService(repository);
     this.growthService = new GrowthService(repository);
-    this.reasoner = new GeneralReasoner(createGeneralRouter());
+    // 是正⑦: LLM障害を無言で握りつぶさず、observabilityへ診断のみ記録する（キー・本文なし）
+    this.reasoner = new GeneralReasoner(createGeneralRouter(), (diagnostic) => {
+      void this.options.observability?.record({
+        kind: 'llm_incident',
+        provider: 'general_reasoning',
+        providerStatus: diagnostic.providerStatus,
+        reasonCode: diagnostic.reasonCode,
+        retryable: diagnostic.retryable
+      });
+    });
     this.executor = new PlanExecutor(
       createDefaultRegistry(),
       this.memoryService,
@@ -336,6 +363,16 @@ export class CommandOrchestrator {
           sessionId,
           this.options.curatorExtractor
         );
+        if (curation.llmFailure) {
+          // 是正⑦: LLM Curator障害を無言にしない（diagnosticsのみ。会話は続行）
+          void this.options.observability?.record({
+            kind: 'llm_incident',
+            provider: 'memory_curator',
+            providerStatus: curation.llmFailure.reasonCode.replace('AI_', ''),
+            reasonCode: curation.llmFailure.reasonCode,
+            retryable: curation.llmFailure.retryable
+          });
+        }
         if (curation.notices.length > 0) {
           result.response.text += `\n\n${curation.notices.join('\n')}`;
         }
@@ -370,8 +407,16 @@ export class CommandOrchestrator {
             // Growth候補の登録失敗で会話を止めない
           }
         }
-      } catch {
-        // 記憶抽出の失敗で会話を止めない
+      } catch (error) {
+        // 記憶抽出の失敗で会話を止めない（是正⑦: ただし無言にせずdiagnosticsへ記録する）
+        const reasonCode = classifyProviderError(error);
+        void this.options.observability?.record({
+          kind: 'llm_incident',
+          provider: 'memory_curator',
+          providerStatus: reasonCode.replace('AI_', ''),
+          reasonCode,
+          retryable: reasonCode !== 'AI_AUTH_FAILED'
+        });
       }
     }
 
@@ -539,6 +584,13 @@ export class CommandOrchestrator {
       )
     ) {
       return this.handleMemoryRecall(ctx, message, context, principal, dataStatus);
+    }
+    // 是正⑦ 修正3: Preference・方針・原則・過去の判断などの想起質問はMemory検索を先に試す。
+    // 関連Memoryがあればその内容＋Evidenceで回答し、無い場合のみ一般推論へ進む。
+    if (isMemoryRecallIntent(message)) {
+      return this.handleMemoryRecall(ctx, message, context, principal, dataStatus, {
+        fallbackToGeneral: true
+      });
     }
     if (
       /(アイデア|新しい事業|工夫|いいやり方|改善案|対策).{0,8}(考えて|ない？|ある？|出して)|考えて$/.test(
@@ -2247,7 +2299,8 @@ export class CommandOrchestrator {
     message: string,
     context: ConversationContext,
     principal: Principal,
-    dataStatus: DataStatus
+    dataStatus: DataStatus,
+    opts: { fallbackToGeneral?: boolean } = {}
   ): Promise<HandlerResult> {
     this.emitEvent('MEMORY_RECALL', {});
     // 「いつ変更した？」「なぜ変えた？」→ 変遷履歴で答える
@@ -2280,7 +2333,7 @@ export class CommandOrchestrator {
     const validAt = yearMatch ? `${yearMatch[1]}-07-01` : undefined;
     const q = message
       .replace(
-        /前に|以前|昨日の話|この間|何だっけ|何て言ってた|言ってた|覚えてる|覚えている|どうなった|について|の件|[？?]/g,
+        /前に|以前|昨日の話|この間|何だっけ|何て言ってた|言ってた|覚えてる|覚えている|覚えて|どうなった|について|の件|教えて(ください)?|私が|私の|私は|私へ|自分の|[？?]/g,
         ' '
       )
       .replace(/(20\d{2})年(当時|時点|の頃|は)/, ' ')
@@ -2296,6 +2349,10 @@ export class CommandOrchestrator {
       principal
     );
     if (results.length === 0) {
+      // 是正⑦ 修正3: 想起Intentでも関連Memoryが無い場合のみ一般推論へ進む
+      if (opts.fallbackToGeneral) {
+        return this.handleGeneral(ctx, message, principal, dataStatus);
+      }
       return this.simpleText(
         [
           '該当する記憶が見つかりませんでした。推測では補いません。',

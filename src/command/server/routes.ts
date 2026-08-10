@@ -54,6 +54,11 @@ import { buildUiResponse } from '../domain/uiSchema.js';
 import { DATA_GAPS } from '../domain/dataGaps.js';
 import { assessCapabilities } from '../domain/capability.js';
 import { createDefaultRegistry } from '../agents/providerRegistry.js';
+import {
+  ProviderVerificationService,
+  createDefaultProber,
+  type VerifiedProviderStatus
+} from '../ai/providerVerification.js';
 import { TargetRegistryService, type NewTargetInput } from '../targets/targetRegistry.js';
 import { ConstitutionService } from '../constitution/constitutionRegistry.js';
 import { computeFutureInsights } from '../future/futureEngine.js';
@@ -98,6 +103,8 @@ export interface CommandAppOptions {
   llmHooks?: LlmHooks;
   /** Phase VUI用Event Bus（未指定時は自動生成） */
   eventBus?: CommandEventBus;
+  /** 是正⑦: Provider実疎通検証（テスト注入用。未指定時はfetchベースの既定Prober） */
+  providerVerification?: ProviderVerificationService;
 }
 
 export type CommandApp = Hono<{ Variables: { principal: Principal } }>;
@@ -129,6 +136,12 @@ export function createCommandApp(
   const memoryService = new MemoryService(repository);
   const targetService = new TargetRegistryService(repository);
   const providerRegistry = createDefaultRegistry();
+  // 是正⑦: キー存在だけでACTIVE表示しない。実API疎通の結果を/providersへ反映する
+  const providerVerification =
+    options.providerVerification ??
+    new ProviderVerificationService(createDefaultProber(), (providerId) =>
+      availableProvidersFromEnv().has(providerId)
+    );
   const constitutionService = new ConstitutionService(repository);
   const artifactService = new ArtifactService(repository);
   const growthService = new GrowthService(repository);
@@ -689,12 +702,34 @@ export function createCommandApp(
     }
   });
 
-  app.get('/providers', (c) => {
+  app.get('/providers', async (c) => {
     const principal = c.get('principal');
     if (!canDecideApproval(principal)) {
       return c.json({ error: `ロール${principal.role}はProvider設定を参照できません` }, 403);
     }
-    return c.json({ providers: providerRegistry.describe() });
+    // 是正⑦: 外部LLM Providerは実API疎通の結果でACTIVE/AUTH_FAILED等を表示する
+    // （キーの値・先頭・末尾は応答へ含めない。httpStatusとチェック時刻のみ）
+    const views = await Promise.all(
+      providerRegistry.describe().map(async (view) => {
+        if (
+          view.status === 'CONFIGURED_UNVERIFIED' &&
+          ['anthropic', 'openai', 'gemini'].includes(view.providerId)
+        ) {
+          const probe = await providerVerification.getStatus(view.providerId);
+          return {
+            ...view,
+            status: probe.status,
+            verification: {
+              httpStatus: probe.httpStatus ?? null,
+              checkedAt: probe.checkedAt,
+              retryable: probe.retryable
+            }
+          };
+        }
+        return view;
+      })
+    );
+    return c.json({ providers: views });
   });
 
   app.get('/targets', async (c) => {
@@ -842,13 +877,40 @@ export function createCommandApp(
   });
 
   // AI Capability Registry（§15。データCapability Matrixとは別物）
-  app.get('/ai-capabilities', (c) => {
+  app.get('/ai-capabilities', async (c) => {
     const available = availableProvidersFromEnv();
+    // 是正⑦: LLM Providerはキー存在ではなく実疎通ACTIVEのみ「利用可能」に数える。
+    // キーはあるが疎通未成功のProviderしか無いCapabilityは、その検証状態を表示する。
+    const llmIds = ['anthropic', 'openai', 'gemini'] as const;
+    const verifiedStatuses = new Map<string, VerifiedProviderStatus>();
+    for (const id of llmIds) {
+      if (available.has(id)) {
+        verifiedStatuses.set(id, (await providerVerification.getStatus(id)).status);
+      }
+    }
+    const effectiveAvailable = new Set(
+      [...available].filter(
+        (id) =>
+          !llmIds.includes(id as (typeof llmIds)[number]) || verifiedStatuses.get(id) === 'ACTIVE'
+      )
+    );
     return c.json({
-      capabilities: CAPABILITIES.map((definition) => ({
-        ...definition,
-        status: capabilityStatus(definition, available)
-      }))
+      capabilities: CAPABILITIES.map((definition) => {
+        let status: string = capabilityStatus(definition, effectiveAvailable);
+        if (status === 'NOT_CONFIGURED') {
+          const keyedStatuses = definition.providers
+            .map((p) => verifiedStatuses.get(p))
+            .filter((s): s is VerifiedProviderStatus => s !== undefined);
+          if (keyedStatuses.length > 0) {
+            status =
+              keyedStatuses.find((s) => s === 'AUTH_FAILED') ??
+              keyedStatuses.find((s) => s === 'RATE_LIMITED') ??
+              keyedStatuses.find((s) => s === 'TEMPORARILY_UNAVAILABLE') ??
+              'CONFIGURED_UNVERIFIED';
+          }
+        }
+        return { ...definition, status };
+      })
     });
   });
 

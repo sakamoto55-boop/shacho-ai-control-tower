@@ -105,16 +105,18 @@ describe('B1.5: Live Beta Activation Preparation', () => {
     const registry = createDefaultRegistry({});
     const views = registry.describe();
     const deterministic = views.find((v) => v.providerId === 'deterministic');
-    expect(deterministic?.status).toBe('READY');
+    // Internal Provider（社内実行のみ）は疎通不要のためACTIVE
+    expect(deterministic?.status).toBe('ACTIVE');
     expect(deterministic?.dataPolicy).toBe('SENSITIVE_ALLOWED');
     const anthropic = views.find((v) => v.providerId === 'anthropic');
     expect(anthropic?.status).toBe('NOT_CONFIGURED');
     expect(anthropic?.available).toBe(false);
 
+    // 是正⑦: キーが存在するだけではREADY/ACTIVEにしない（実疎通成功まで未検証扱い）
     const configured = createDefaultRegistry({ ANTHROPIC_API_KEY: 'sk-test' });
     configured.recordOutcome('anthropic', false, '2026-08-08T00:00:00Z');
     const view = configured.describe().find((v) => v.providerId === 'anthropic');
-    expect(view?.status).toBe('READY');
+    expect(view?.status).toBe('CONFIGURED_UNVERIFIED');
     expect(view?.health.lastFailure).toBe('2026-08-08T00:00:00Z');
   });
 

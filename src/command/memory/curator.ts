@@ -30,6 +30,8 @@ export interface CuratorOutcome {
   saved: SaveResult[];
   /** ユーザーへ返す補足（矛盾検出・確認依頼など） */
   notices: string[];
+  /** 是正⑦: LLM抽出の失敗を無言にしない（diagnostics記録用。会話は止めない） */
+  llmFailure?: { reasonCode: string; retryable: boolean; occurredAt: string };
 }
 
 /** 発話から既知Entity（案件・顧客・社員）を拾う */
@@ -206,8 +208,23 @@ export async function curateConversationTurn(
           }
         });
       }
-    } catch {
-      // LLM抽出の失敗はルールベース抽出のみで続行
+    } catch (error) {
+      // LLM抽出の失敗はルールベース抽出のみで続行（是正⑦: ただし失敗を無言にせず返す）
+      const status =
+        typeof error === 'object' && error !== null && 'status' in error
+          ? Number((error as { status?: unknown }).status)
+          : undefined;
+      const reasonCode =
+        status === 401 || status === 403
+          ? 'AI_AUTH_FAILED'
+          : status === 429
+            ? 'AI_RATE_LIMITED'
+            : 'AI_TEMPORARILY_UNAVAILABLE';
+      outcome.llmFailure = {
+        reasonCode,
+        retryable: reasonCode !== 'AI_AUTH_FAILED',
+        occurredAt: new Date().toISOString()
+      };
     }
   }
 

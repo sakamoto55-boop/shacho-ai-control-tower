@@ -54,8 +54,19 @@ export interface ProviderStatusView {
   model: string;
   enabled: boolean;
   available: boolean;
-  /** NOT_CONFIGURED = API Key未設定（正常状態。全体をエラーにしない） */
-  status: 'READY' | 'NOT_CONFIGURED' | 'DEGRADED';
+  /**
+   * NOT_CONFIGURED = API Key未設定（正常状態。全体をエラーにしない）。
+   * 是正⑦: キーが存在するだけではACTIVEにしない。外部Providerは実API疎通成功後のみACTIVE
+   * （疎通結果の反映は ProviderVerificationService が行う）。
+   */
+  status:
+    | 'NOT_CONFIGURED'
+    | 'CONFIGURED_UNVERIFIED'
+    | 'ACTIVE'
+    | 'AUTH_FAILED'
+    | 'RATE_LIMITED'
+    | 'TEMPORARILY_UNAVAILABLE'
+    | 'DISABLED';
   capabilities: Capability[];
   dataPolicy: 'SENSITIVE_ALLOWED' | 'NO_SENSITIVE';
   costClass: CostClass;
@@ -103,7 +114,11 @@ export class ProviderRegistry {
     this.outcomes.set(providerId, outcome);
   }
 
-  /** Provider Configuration一覧（§4）。API Key未設定はNOT_CONFIGUREDとして正常扱い */
+  /**
+   * Provider Configuration一覧（§4）。API Key未設定はNOT_CONFIGUREDとして正常扱い。
+   * 是正⑦: 外部Providerはキー存在のみでは CONFIGURED_UNVERIFIED（READY/ACTIVEにしない）。
+   * 社内実行のみのInternal Providerだけは疎通不要のためACTIVE。
+   */
   describe(): ProviderStatusView[] {
     return this.list().map((spec) => {
       const outcome = this.outcomes.get(spec.providerId);
@@ -111,9 +126,9 @@ export class ProviderRegistry {
       const successRate = this.successRate(spec.providerId);
       const status: ProviderStatusView['status'] = !spec.available
         ? 'NOT_CONFIGURED'
-        : samples >= 3 && successRate < 0.5
-          ? 'DEGRADED'
-          : 'READY';
+        : spec.vendor === 'Internal'
+          ? 'ACTIVE'
+          : 'CONFIGURED_UNVERIFIED';
       return {
         providerId: spec.providerId,
         vendor: spec.vendor,

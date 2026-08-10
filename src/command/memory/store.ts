@@ -268,10 +268,15 @@ export class MemoryService {
         }
         if (terms) {
           const haystack = normalize(`${m.statement} ${m.entities.map((e) => e.name).join(' ')}`);
-          const tokens = (query.q as string)
-            .split(/[\s、。,・]+/)
-            .map((t) => normalize(t))
-            .filter((t) => t.length >= 2);
+          const coarse = (query.q as string).split(/[\s、。,・]+/);
+          // 是正⑦: 日本語は空白で区切られないため、助詞・動詞語尾でも分割した
+          // 内容語トークン（例:「希望している回答の順番」→ 希望/回答/順番）を追加で照合する
+          const fine = coarse.flatMap((seg) =>
+            seg.split(
+              /(?:している|してる|します|した|する|です|ます|を|の|に|へ|が|は|で|と|も|や|から|まで)+/
+            )
+          );
+          const tokens = [...coarse, ...fine].map((t) => normalize(t)).filter((t) => t.length >= 2);
           const tokenHit = tokens.some((t) => haystack.includes(t));
           const score = similarity(query.q as string, m.statement);
           if (!haystack.includes(terms) && !tokenHit && score < 0.15) return false;
