@@ -83,7 +83,8 @@ import { IncidentService, type IncidentKind, type IncidentStatus } from '../live
 import { evaluateBetaGate } from '../livebeta/betaGate.js';
 import { computeAutonomyReview, computePresidentDecisionLoad } from '../growth/autonomyReview.js';
 import { buildReviewSummary, bulkApprove } from '../constitution/reviewSummary.js';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -699,6 +700,31 @@ export function createCommandApp(
       return c.json({ capabilities: assessCapabilities(dataset) });
     } catch (error) {
       return handleError(c, error);
+    }
+  });
+
+  // TRACK B: 統合連携の接続状態（最終同期・件数・エラー・freshness。秘密情報なし）
+  app.get('/integrations', (c) => {
+    const principal = c.get('principal');
+    if (!canDecideApproval(principal)) {
+      return c.json({ error: `ロール${principal.role}は統合状態を参照できません` }, 403);
+    }
+    const statusPath = resolvePath(
+      process.env.LCC_INTEGRATION_DATA_DIR ?? './data',
+      'integration-status.json'
+    );
+    if (!existsSync(statusPath)) {
+      return c.json({
+        updatedAt: null,
+        sources: {},
+        note: 'まだ同期が実行されていません（npm run sync:all）'
+      });
+    }
+    try {
+      const parsed = JSON.parse(readFileSync(statusPath, 'utf8')) as Record<string, unknown>;
+      return c.json(parsed);
+    } catch {
+      return c.json({ error: 'integration-status.jsonを読み取れません' }, 500);
     }
   });
 

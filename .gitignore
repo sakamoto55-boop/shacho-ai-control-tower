@@ -13,3 +13,11 @@ data/*.jsonl
 data/snapshots/
 data/artifacts/
 secure/
+# 統合連携の実データ・原本・アーカイブ（Git禁止: 顧客・会計・勤怠・会話原本）
+data/raw/
+data/normalized/
+data/import/
+data/evidence/
+data/conversation_archive/
+data/locks/
+logs/
