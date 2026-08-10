@@ -59,6 +59,7 @@ import {
   createDefaultProber,
   type VerifiedProviderStatus
 } from '../ai/providerVerification.js';
+import { searchKnowledge } from '../integrations/knowledge/knowledgeSearch.js';
 import { TargetRegistryService, type NewTargetInput } from '../targets/targetRegistry.js';
 import { ConstitutionService } from '../constitution/constitutionRegistry.js';
 import { computeFutureInsights } from '../future/futureEngine.js';
@@ -701,6 +702,21 @@ export function createCommandApp(
     } catch (error) {
       return handleError(c, error);
     }
+  });
+
+  // TRACK B: Knowledge Search V1（Vault横断検索。READ ONLY・Evidence必須・名称一致はLOW候補）
+  app.get('/knowledge/search', (c) => {
+    const principal = c.get('principal');
+    if (!canDecideApproval(principal)) {
+      return c.json({ error: `ロール${principal.role}はKnowledge検索を利用できません` }, 403);
+    }
+    const q = c.req.query('q')?.trim();
+    if (!q || q.length < 2) {
+      return c.json({ error: 'クエリq（2文字以上）を指定してください' }, 400);
+    }
+    const source = c.req.query('source') ?? undefined;
+    const limit = Math.min(Number(c.req.query('limit') ?? 20) || 20, 50);
+    return c.json(searchKnowledge(q, { sourceKey: source, limit }));
   });
 
   // TRACK B: 統合連携の接続状態（最終同期・件数・エラー・freshness。秘密情報なし）
