@@ -195,7 +195,7 @@ export async function syncFreeeData(
   const listKinds: { kind: string; endpoint: string; extract: (d: Record<string, unknown>) => Record<string, unknown>[] }[] = [
     {
       kind: 'employees',
-      endpoint: `/companies/${companyId}/employees?limit=100&with_no_payroll_calculation=true`,
+      endpoint: `/companies/${companyId}/employees?with_no_payroll_calculation=true`,
       extract: (d) => (d.employees as Record<string, unknown>[] | undefined) ?? (Array.isArray(d) ? (d as unknown as Record<string, unknown>[]) : [])
     },
     {
@@ -217,8 +217,18 @@ export async function syncFreeeData(
   const employees: Record<string, unknown>[] = [];
   for (const spec of listKinds) {
     try {
-      const data = await client.get<Record<string, unknown>>(spec.endpoint);
-      const rows = spec.extract(data);
+      // 全一覧APIをlimit=100+offsetでページング（既定limit=50による切り詰め防止・最終ページ=件数<limit）
+      const rows: Record<string, unknown>[] = [];
+      const pageLimit = 100;
+      for (let offset = 0; offset < 100_000; offset += pageLimit) {
+        const sep = spec.endpoint.includes('?') ? '&' : '?';
+        const data = await client.get<Record<string, unknown>>(
+          `${spec.endpoint}${sep}limit=${pageLimit}&offset=${offset}`
+        );
+        const page = spec.extract(data);
+        rows.push(...page);
+        if (page.length < pageLimit) break;
+      }
       if (spec.kind === 'employees') employees.push(...rows);
       const r = appendRecords(vaultDir, spec.kind, syncedAt, rows.map((row, i) => ({
         id: String((row.id as number | string | undefined) ?? `${spec.kind}:${i}`),
