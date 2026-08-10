@@ -169,7 +169,8 @@ export class FreeeClient {
   }
 
   async listCompanies(): Promise<Array<{ id: number; name: string }>> {
-    const data = await this.get<{ companies?: Array<{ id: number; name: string }> }>('/companies');
+    // 人事労務APIの事業所一覧は /users/me が正（/companies は存在しない=404）
+    const data = await this.get<{ companies?: Array<{ id: number; name: string }> }>('/users/me');
     return data.companies ?? [];
   }
 
@@ -182,7 +183,7 @@ export class FreeeClient {
 
   async getTimeClocks(companyId: number, employeeId: number, fromDate: string, toDate: string) {
     return this.get<Array<Record<string, unknown>>>(
-      `/companies/${companyId}/employees/${employeeId}/time_clocks?from_date=${fromDate}&to_date=${toDate}`
+      `/employees/${employeeId}/time_clocks?company_id=${companyId}&from_date=${fromDate}&to_date=${toDate}`
     );
   }
 }

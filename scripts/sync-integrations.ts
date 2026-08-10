@@ -81,9 +81,10 @@ async function syncBoard(syncedAt: string): Promise<SyncResult> {
   }
 }
 
-async function syncFreee(): Promise<SyncResult> {
+async function syncFreee(syncedAt: string): Promise<SyncResult> {
   const startedAt = new Date().toISOString();
-  const state = resolveAuthState(loadFreeeConfig('.'));
+  const config = loadFreeeConfig('.');
+  const state = resolveAuthState(config);
   const base: SyncResult = {
     source: 'freee-hr',
     status: 'ADMIN_SETUP_REQUIRED',
@@ -97,9 +98,29 @@ async function syncFreee(): Promise<SyncResult> {
   };
   if (state.state === 'ADMIN_SETUP_REQUIRED') return { ...base, note: state.reason };
   if (state.state === 'AUTH_REQUIRED') {
-    return { ...base, status: 'AUTH_REQUIRED', note: '認可URLはMORNING_HANDOFF参照（社長のブラウザ承認が必要）' };
+    return { ...base, status: 'AUTH_REQUIRED', note: '認可が必要です（npx tsx scripts/freee-authorize.ts）' };
   }
-  return { ...base, status: 'LIVE_READ_ONLY', note: 'token検証済み（実データ取得は個別sync実装で実施）' };
+  // 実データ同期（READ ONLY・incremental・idempotent）。疎通だけではLIVE_READ_ONLYとしない
+  const { FreeeClient } = await import('../src/command/integrations/freee/freeeClient.js');
+  const { syncFreeeData } = await import('../src/command/integrations/freee/freeeSyncData.js');
+  const client = new FreeeClient(config);
+  const summary = await syncFreeeData(client, { syncedAt });
+  const fetched = summary.kinds.reduce((s, k) => s + k.fetched, 0);
+  const imported = summary.kinds.reduce((s, k) => s + k.imported, 0);
+  const duplicates = summary.kinds.reduce((s, k) => s + k.duplicates, 0);
+  const kindsNote = summary.kinds
+    .map((k) => `${k.kind}=${k.fetched}件(${k.outcome})`)
+    .join(' / ');
+  return {
+    ...base,
+    status: fetched > 0 ? 'LIVE_READ_ONLY' : 'BLOCKED_TECHNICAL',
+    finishedAt: new Date().toISOString(),
+    processed: fetched,
+    imported,
+    duplicates,
+    errors: summary.errors.slice(0, 5),
+    note: `事業所=${summary.companyName ?? '不明'} / ${kindsNote} / Source書き込み0件`
+  };
 }
 
 async function syncConversations(syncedAt: string): Promise<SyncResult> {
@@ -210,7 +231,7 @@ async function main(): Promise<void> {
     if (target === 'all' || target === 'tkc') results.push(await syncTkcInbox(DATA_DIR, syncedAt));
     if (target === 'all' || target === 'conversations' || target === 'ai-history')
       results.push(await syncConversations(syncedAt));
-    if (target === 'all' || target === 'freee') results.push(await syncFreee());
+    if (target === 'all' || target === 'freee') results.push(await syncFreee(syncedAt));
     if (target === 'drive') {
       results.push({
         source: 'gdrive-finance',
