@@ -1,7 +1,7 @@
-# MANIFEST — LCC COMMAND DELIVERY v4（夜間最終走行反映版・DELIVERY CANDIDATE / AWAITING USER ACCEPTANCE）
+# MANIFEST — LCC COMMAND DELIVERY v4（是正⑦反映版・DELIVERY CANDIDATE / AWAITING USER ACCEPTANCE）
 
-- applicationCodeCommit: **b6c48b041cf2198446d231b59e668597c5060f92**（是正⑤=Windows起動是正まで含む。テスト430件PASS）
-- artifactRendererCommit: b6c48b041cf2198446d231b59e668597c5060f92
+- applicationCodeCommit: **3740ae3**（是正⑦=Provider実疎通判定・production正直Fallback・Memory想起Router。テスト451件PASS。branch: claude/lcc-command-llm-safety-v1）
+- artifactRendererCommit: b6c48b041cf2198446d231b59e668597c5060f92（成果物3点は4aa689a時点から無変更・下記SHA-256維持）
 - sourceSnapshotId: **snap-aaba8a1e3f**（3成果物すべて同一Snapshot Object・成果物ごとの再取得なし）
 - previousSnapshotId: snap-df4dca5099
 - previousSnapshotStatus: **HISTORICAL / SUPERSEDED FOR DELIVERY / NOT CURRENT ACCEPTANCE ARTIFACT SET**
@@ -55,7 +55,18 @@
 
 - 是正⑤（adeed1d + b6c48b0）: Windows起動不具合（ESM起動ガード・BAT PIDブロック・UTF-8バッチ誤解析）
 - 是正⑥（cbe6fa6）: 成果物再生成第1版（snap-a8bd8e3e57）とZIP標準化
-- 夜間最終走行（本commit）: snap-aaba8a1e3fで再生成し、出所欄の「更新<取得時刻>」表記をdelivery生成処理で「取得」へ正規化（srcは無変更）。SNAPSHOT_EVIDENCEへcanonical content hash追加
+- 夜間最終走行（4aa689a）: snap-aaba8a1e3fで再生成し、出所欄の「更新<取得時刻>」表記をdelivery生成処理で「取得」へ正規化（srcは無変更）。SNAPSHOT_EVIDENCEへcanonical content hash追加
+- 是正⑦（3740ae3 + 本commit）: LLM実接続・正直Fallback・Memory想起（成果物3点・snapshotは無変更）
+
+## LLM / MEMORY ACCEPTANCE（是正⑦・2026-08-10実機）
+
+- Provider状態: 実API疎通で判定（キー存在だけでACTIVE表示しない）。Anthropic=**ACTIVE**（HTTP 200）/ OpenAI・Gemini=NOT_CONFIGURED
+- 一般相談: 実Anthropic回答・general_reasoning・エコーバックなし・社内事実の捏造なし → PASS
+- production正直Fallback: 無効キー注入テストでAUTH_FAILED表示+「相談AIへ接続できません」応答（mock/エコー/架空回答なし）→ PASS
+- Memory明示保存/永続化/想起: mem-2026-08-09-0を再起動後もmemory_search+Evidenceで回答 → PASS
+- Memory保存先: %LOCALAPPDATA%\LCC_COMMAND\data\lcc-command-local.json（旧OneDrive内ファイルはSHA-256一致コピー後も保持）
+- 自動Curation（実LLM）: PREFERENCE候補 mem-2026-08-10-0 生成（UNVERIFIED・AUTO・秘密情報なし）→ PASS
+- 判定: **LLM / MEMORY: FULLY CONNECTED**（検収OKは社長のみが発行）
 
 ## 未検証（ユーザー受入項目）
 
