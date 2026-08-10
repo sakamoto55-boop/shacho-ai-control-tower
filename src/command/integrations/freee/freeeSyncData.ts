@@ -48,7 +48,20 @@ function classifyError(message: string): FetchOutcome {
   return 'ERROR';
 }
 
-/** vault追記（contentHash重複排除・checkpoint）。書き込み対象はローカルVaultのみ */
+/**
+ * vault追記（IDENTITY設計 v2）。
+ * - recordKey = sourceSystem|companyId|sourceRecordId（月次サマリ等はrow.idにemployeeId+対象期間を含める）
+ * - payloadHash = canonical化（キー昇順）したraw内容のSHA-256
+ * - 同recordKey+同payloadHash=duplicate / 同recordKeyで内容変化=新version（旧はSUPERSEDED扱い・行は保持）
+ */
+function canonicalStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalStringify).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value as object).sort().map((k) => `${JSON.stringify(k)}:${canonicalStringify((value as Record<string, unknown>)[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
 function appendRecords(
   vaultDir: string,
   kind: string,
@@ -58,41 +71,56 @@ function appendRecords(
   const rawDir = join(vaultDir, 'raw');
   mkdirSync(rawDir, { recursive: true });
   const vaultFile = join(rawDir, `freee-${kind}.jsonl`);
-  const hashFile = join(rawDir, `freee-${kind}.hashes.json`);
-  const seen = new Set<string>(
-    existsSync(hashFile) ? (JSON.parse(readFileSync(hashFile, 'utf8')) as string[]) : []
-  );
+  const keyFile = join(rawDir, `freee-${kind}.keys.json`);
+  const sourceSystem = `freee-hr:${kind}`;
+  // keyIndex: recordKey -> payloadHash（初回は既存vault行から再構築＝旧hash方式からの移行）
+  const keyIndex: Record<string, string> = existsSync(keyFile)
+    ? (JSON.parse(readFileSync(keyFile, 'utf8')) as Record<string, string>)
+    : {};
+  if (!existsSync(keyFile) && existsSync(vaultFile)) {
+    for (const line of readFileSync(vaultFile, 'utf8').split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const r = JSON.parse(line) as IntegrationRecord;
+        keyIndex[`${r.sourceSystem}|${r.companyId}|${r.sourceRecordId}`] = createHash('sha256')
+          .update(canonicalStringify(r.raw))
+          .digest('hex');
+      } catch { /* 壊れた行はスキップ */ }
+    }
+  }
   let imported = 0;
   let duplicates = 0;
   for (const row of rows) {
-    const contentHash = createHash('sha256').update(JSON.stringify(row.raw)).digest('hex');
-    if (seen.has(contentHash)) {
+    const recordKey = `${sourceSystem}|lcc|${row.id}`;
+    const payloadHash = createHash('sha256').update(canonicalStringify(row.raw)).digest('hex');
+    const known = keyIndex[recordKey];
+    if (known === payloadHash) {
       duplicates += 1;
       continue;
     }
     const record: IntegrationRecord = {
-      sourceSystem: `freee-hr:${kind}`,
+      sourceSystem,
       sourceRecordId: row.id,
       companyId: 'lcc',
       sourceRecordUpdatedAt: row.updatedAt,
       syncedAt,
       rawStatus: null,
-      normalizedStatus: null,
+      normalizedStatus: known ? 'UPDATED_VERSION' : null,
       confidence: 'HIGH',
       freshnessStatus: row.updatedAt ? 'FRESH' : 'UNKNOWN',
       evidence: [{ source: 'freee-hr-api', locator: row.locator }],
       sourceFile: null,
       sourceSheet: null,
       sourceRow: null,
-      contentHash,
+      contentHash: payloadHash,
       raw: row.raw,
-      normalized: {}
+      normalized: known ? { supersedesPayloadHash: known } : {}
     };
     appendFileSync(vaultFile, `${JSON.stringify(record)}\n`, 'utf8');
-    seen.add(contentHash);
+    keyIndex[recordKey] = payloadHash;
     imported += 1;
   }
-  writeFileSync(hashFile, JSON.stringify([...seen]), 'utf8');
+  writeFileSync(keyFile, JSON.stringify(keyIndex), 'utf8');
   return { imported, duplicates };
 }
 

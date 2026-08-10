@@ -104,7 +104,7 @@ async function syncFreee(syncedAt: string): Promise<SyncResult> {
   const { FreeeClient } = await import('../src/command/integrations/freee/freeeClient.js');
   const { syncFreeeData } = await import('../src/command/integrations/freee/freeeSyncData.js');
   const client = new FreeeClient(config);
-  const summary = await syncFreeeData(client, { syncedAt });
+  const summary = await syncFreeeData(client, { syncedAt, maxEmployeesForDetail: Number(process.env.LCC_FREEE_MAX_DETAIL ?? 30) });
   const fetched = summary.kinds.reduce((s, k) => s + k.fetched, 0);
   const imported = summary.kinds.reduce((s, k) => s + k.imported, 0);
   const duplicates = summary.kinds.reduce((s, k) => s + k.duplicates, 0);
