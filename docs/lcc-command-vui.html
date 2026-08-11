@@ -560,6 +560,7 @@ createApp({
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
       this.audioReactiveState = SR ? 'REAL_AUDIO_REACTIVE' : 'BROWSER_UNSUPPORTED';
       if (!SR) this.dlgSubtitle = 'このブラウザは音声入力非対応です。「⌨ 文字」からテキストで対話できます。';
+      try { window.speechSynthesis && window.speechSynthesis.getVoices(); } catch {} // 音声リストのwarm-up（初回はvoiceschanged後に確定）
       this.$nextTick(() => this.initDialogueCore());
     },
     exitDialogue(){
@@ -634,26 +635,59 @@ createApp({
         this.dlgSubtitle = '聞き取れませんでした。もう一度🎙を押しながら話してください。';
       }
     },
+    pickVoice(){
+      // 高品質日本語音声を優先選択（Google 日本語 > Natural系 > その他ja）。品質はブラウザ内蔵音声に依存
+      const voices = window.speechSynthesis.getVoices() || [];
+      const ja = voices.filter(v => (v.lang || '').startsWith('ja'));
+      return ja.find(v => /Google/i.test(v.name))
+          || ja.find(v => /Natural|Neural|Online/i.test(v.name))
+          || ja.find(v => /Nanami|Keita/i.test(v.name))
+          || ja[0] || null;
+    },
     speakText(text){
       // AI音声（speechSynthesis）。ブラウザ制約でTTS出力はAnalyserNode接続不可のため
       // SPEAKING同期はLEVEL_ONLY_FALLBACK（境界イベント+擬似レベル）と正直に表示する
       if (this.muted) return;
       if (!('speechSynthesis' in window)) { this.audioReactiveState = 'VOICE_PROVIDER_REQUIRED'; return; }
       this.stopSpeak();
-      const clean = (text || '').replace(/[#*|`>]/g, '').replace(/【[^】]*】/g, '。').slice(0, 800);
-      const u = new SpeechSynthesisUtterance(clean);
-      u.lang = 'ja-JP';
-      u.rate = 1.05;
+      // 読み上げ整形: 見出し・記号・箇条書きを除去し、話し言葉として自然な文へ
+      const clean = (text || '')
+        .replace(/【[^】]*】/g, '')
+        .replace(/^[#*>-・◆■○●]+s*/gm, '')
+        .replace(/[#*|`>]/g, '')
+        .replace(/[（(][^）)]{0,24}[）)]/g, '')
+        .replace(/d{4}-d{2}-d{2}T[d:.]+Z?/g, '')
+        .replace(/s*
++s*/g, '。')
+        .replace(/。{2,}/g, '。')
+        .replace(/：/g, '、').replace(/s{2,}/g, ' ')
+        .slice(0, 600);
+      // 文単位で分割して順に読み上げ（長文一括より抑揚・間が自然になる）
+      const sentences = clean.split(/(?<=[。？！?!])/).map(t => t.trim()).filter(t => t.length > 1).slice(0, 14);
+      if (!sentences.length) return;
+      const voice = this.pickVoice();
       this.audioReactiveState = 'LEVEL_ONLY_FALLBACK';
-      u.onstart = () => { this.speaking = true; this.setState('RESPONDING'); };
-      u.onboundary = () => { this._speakPulse = 1; };
-      u.onend = () => {
-        this.speaking = false;
-        this.setState('IDLE');
-        if ((window.SpeechRecognition || window.webkitSpeechRecognition)) this.audioReactiveState = 'REAL_AUDIO_REACTIVE';
+      this.speaking = true;
+      this.setState('RESPONDING');
+      let idx = 0;
+      const speakNext = () => {
+        if (this.muted || !this.speaking || idx >= sentences.length) {
+          this.speaking = false;
+          if (this.coreState === 'RESPONDING') this.setState('IDLE');
+          if ((window.SpeechRecognition || window.webkitSpeechRecognition)) this.audioReactiveState = 'REAL_AUDIO_REACTIVE';
+          return;
+        }
+        const u = new SpeechSynthesisUtterance(sentences[idx++]);
+        u.lang = 'ja-JP';
+        if (voice) u.voice = voice;
+        u.rate = 1.0; u.pitch = 1.0;
+        u.onboundary = () => { this._speakPulse = 1; };
+        u.onend = () => { this._speakPulse = 1; setTimeout(speakNext, 140); };
+        u.onerror = () => { setTimeout(speakNext, 60); };
+        this._utter = u;
+        window.speechSynthesis.speak(u);
       };
-      this._utter = u;
-      window.speechSynthesis.speak(u);
+      speakNext();
     },
 
     /* 対話モード粒子エンジン（高密度・adaptive・実マイク連動） */
