@@ -259,7 +259,7 @@
     <p class="dlg-status">
       <span v-if="micActive" class="mic-live">● マイク使用中</span>
       <span v-else>{{ dlgStateLabel }}</span>
-      <span class="opacity-60">｜音声: {{ audioReactiveLabel }}</span>
+      <span class="opacity-60">｜マイク: {{ audioReactiveLabel }}｜AI音声: イベント連動</span>
     </p>
     <div class="dlg-canvas-wrap">
       <canvas v-if="!reducedMotion" ref="dlgCanvas" class="absolute inset-0 w-full h-full" aria-label="対話モード粒子体"></canvas>
@@ -491,7 +491,9 @@ createApp({
       muted: false,
       speaking: false,
       dlgSubtitle: '',
-      audioReactiveState: 'BROWSER_UNSUPPORTED', // REAL_AUDIO_REACTIVE / LEVEL_ONLY_FALLBACK / VOICE_PROVIDER_REQUIRED / BROWSER_UNSUPPORTED
+      audioReactiveState: 'BROWSER_UNSUPPORTED', // マイク: REAL_AUDIO_REACTIVE 等
+      speechReactiveState: 'UTTERANCE_EVENT_REACTIVE', // AI音声: 実stream解析不可のためboundary/endイベント連動（SIMULATEDやREALと偽らない）
+      voiceList: [], savedVoiceName: (()=>{try{return localStorage.getItem('lcc_voice_name')||''}catch{return ''}})(),
       buildInfo: BUILD_INFO,
       dlgFps: 0,
       _dlgParticles: [], _dlgRaf: 0, _dlgCount: 0,
@@ -524,6 +526,7 @@ createApp({
       return {
         REAL_AUDIO_REACTIVE: 'マイク実音声連動',
         LEVEL_ONLY_FALLBACK: '簡易連動（FALLBACK）',
+        UTTERANCE_EVENT_REACTIVE: 'AI音声イベント連動',
         VOICE_PROVIDER_REQUIRED: '音声プロバイダ必要',
         BROWSER_UNSUPPORTED: 'このブラウザ非対応'
       }[this.audioReactiveState] || this.audioReactiveState;
@@ -635,14 +638,38 @@ createApp({
         this.dlgSubtitle = '聞き取れませんでした。もう一度🎙を押しながら話してください。';
       }
     },
+    saveVoice(name){
+      try { name ? localStorage.setItem('lcc_voice_name', name) : localStorage.removeItem('lcc_voice_name'); } catch {}
+      this.savedVoiceName = name;
+    },
+    refreshVoiceList(){
+      const load=()=>{ this.voiceList = (window.speechSynthesis.getVoices()||[]).filter(v=>(v.lang||'').startsWith('ja')).map(v=>({name:v.name,lang:v.lang,localService:v.localService,default:v.default})); };
+      load();
+      if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = load;
+    },
     pickVoice(){
       // 高品質日本語音声を優先選択（Google 日本語 > Natural系 > その他ja）。品質はブラウザ内蔵音声に依存
       const voices = window.speechSynthesis.getVoices() || [];
       const ja = voices.filter(v => (v.lang || '').startsWith('ja'));
-      return ja.find(v => /Google/i.test(v.name))
+      let saved=''; try { saved = localStorage.getItem('lcc_voice_name') || ''; } catch {}
+      return (saved && ja.find(v => v.name === saved))
+          || ja.find(v => /Google/i.test(v.name))
           || ja.find(v => /Natural|Neural|Online/i.test(v.name))
           || ja.find(v => /Nanami|Keita/i.test(v.name))
           || ja[0] || null;
+    },
+    speechSentencesFor(text){
+      // テスト用: speakTextと同一の整形・分割結果を返す（読み上げ内容の保全検証に使用）
+      const clean = (text || '')
+        .replace(/【([^】]*)】/g, '$1。')
+        .replace(/^[#*>-・◆■○●s]+/gm, '')
+        .replace(/[#*|`>]/g, '')
+        .replace(/s*
++s*/g, '。')
+        .replace(/。{2,}/g, '。')
+        .replace(/s{2,}/g, ' ')
+        .slice(0, 1200);
+      return clean.split(/(?<=[。？！?!])/).map(t => t.trim()).filter(t => t.length > 1).slice(0, 14);
     },
     speakText(text){
       // AI音声（speechSynthesis）。ブラウザ制約でTTS出力はAnalyserNode接続不可のため
@@ -650,23 +677,22 @@ createApp({
       if (this.muted) return;
       if (!('speechSynthesis' in window)) { this.audioReactiveState = 'VOICE_PROVIDER_REQUIRED'; return; }
       this.stopSpeak();
-      // 読み上げ整形: 見出し・記号・箇条書きを除去し、話し言葉として自然な文へ
+      // 読み上げ整形（安全版）: 装飾記号のみ除去し、数値・否定・日付・括弧内・法令番号など
+      // 内容は一切削除・変換しない（字幕は原文のまま。これは読み上げ専用テキスト）
       const clean = (text || '')
-        .replace(/【[^】]*】/g, '')
-        .replace(/^[#*>-・◆■○●]+s*/gm, '')
+        .replace(/【([^】]*)】/g, '$1。')
+        .replace(/^[#*>-・◆■○●s]+/gm, '')
         .replace(/[#*|`>]/g, '')
-        .replace(/[（(][^）)]{0,24}[）)]/g, '')
-        .replace(/d{4}-d{2}-d{2}T[d:.]+Z?/g, '')
         .replace(/s*
 +s*/g, '。')
         .replace(/。{2,}/g, '。')
-        .replace(/：/g, '、').replace(/s{2,}/g, ' ')
-        .slice(0, 600);
+        .replace(/s{2,}/g, ' ')
+        .slice(0, 1200);
       // 文単位で分割して順に読み上げ（長文一括より抑揚・間が自然になる）
-      const sentences = clean.split(/(?<=[。？！?!])/).map(t => t.trim()).filter(t => t.length > 1).slice(0, 14);
+      const sentences = this.speechSentencesFor(text);
       if (!sentences.length) return;
       const voice = this.pickVoice();
-      this.audioReactiveState = 'LEVEL_ONLY_FALLBACK';
+      this.speechReactiveState = 'UTTERANCE_EVENT_REACTIVE';
       this.speaking = true;
       this.setState('RESPONDING');
       let idx = 0;
@@ -1096,6 +1122,8 @@ createApp({
     await this.loadKpi();
     this.morningGreeting();
     this.initCore();
+    if ('speechSynthesis' in window) this.refreshVoiceList();
+    window.__lccSpeechTest = (t) => this.speechSentencesFor(t); // 読み上げ内容保全の検証フック
     this.$refs.chatArea && this.$refs.chatArea.addEventListener('scroll', () => {
       this.scrolled = this.$refs.chatArea.scrollTop > 40;
     });

@@ -122,6 +122,9 @@ export const DIALOGUE_PARTICLES = {
 } as const;
 
 /** 対話モードの音声連動状態（偽の「実音声同期」報告を禁止するための明示分類） */
+/** AI読み上げの連動分類（実stream解析不可のためイベント連動が上限。SIMULATED/REALと偽らない） */
+export type SpeechReactiveState = 'REAL_AUDIO_REACTIVE' | 'UTTERANCE_EVENT_REACTIVE' | 'SIMULATED' | 'NOT_IMPLEMENTED';
+
 export type AudioReactiveState =
   | 'REAL_AUDIO_REACTIVE'
   | 'LEVEL_ONLY_FALLBACK'
