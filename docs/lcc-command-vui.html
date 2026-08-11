@@ -713,7 +713,7 @@ createApp({
         const level = this._micLevel;
         const speakP = this.speaking ? (0.5 + 0.5 * this._speakPulse) * (0.6 + 0.4 * Math.sin(t * 9)) : 0;
         const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, base * 1.1);
-        grad.addColorStop(0, tint + '55'); grad.addColorStop(0.5, tint + '18'); grad.addColorStop(1, 'transparent');
+        grad.addColorStop(0, tint + '77'); grad.addColorStop(0.5, tint + '22'); grad.addColorStop(1, 'transparent');
         ctx.fillStyle = grad; ctx.globalAlpha = 0.6 + 0.4 * (level + speakP);
         ctx.fillRect(0, 0, w, hgt); ctx.globalAlpha = 1;
         const n = this._dlgCount;
@@ -730,6 +730,8 @@ createApp({
             targetR = p.r * 1.05 + (Math.sin(t * 2.2 + p.a * 3) + 1) * 0.08;
           } else if (spec.motion === 'link') {
             targetR = p.r * (0.5 + 0.5 * Math.abs(Math.sin(t * 0.8 + p.ph)));
+          } else if (spec.motion === 'drift') {
+            targetR = p.r * (0.92 + 0.05 * Math.sin(t * 1.4 + p.ph)); // IDLE: ゆっくり呼吸
           } else if (this.speaking || spec.motion === 'pulse') {
             targetR = p.r * (0.86 + 0.18 * speakP * Math.sin(t * 7 + p.ph));
           }
@@ -738,7 +740,7 @@ createApp({
           const rr = Math.max(0.03, Math.min(1.08, targetR)) * base;
           const x = cx + Math.cos(p.a) * rr;
           const y = cy + Math.sin(p.a) * rr * 0.86;
-          ctx.globalAlpha = 0.22 + 0.55 * (1 - p.r) + level * 0.25 + speakP * 0.2;
+          ctx.globalAlpha = Math.min(1, 0.5 + 0.45 * (1 - p.r) + level * 0.3 + speakP * 0.25);
           ctx.fillStyle = tint;
           ctx.fillRect(x, y, p.size, p.size); // 微細粒子は矩形描画（arc比で大幅に高速→高密度化）
         }
