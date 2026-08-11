@@ -115,7 +115,11 @@ describe('VUI: UI実装ファイル（docs/lcc-command-vui.html）の完成条�
   });
 
   it('正直なUnknown State・Demo Isolation・音声準備中の表示がある（§25・§36-§37）', () => {
-    expect(UI_HTML).toContain('音声機能は準備中');
+    // 音声は実装済み（UI-VOICE-V1）。偽の準備中表示ではなく、正直な連動状態分類とマイク使用中表示を検査する
+    expect(UI_HTML).toContain('LEVEL_ONLY_FALLBACK');
+    expect(UI_HTML).toContain('BROWSER_UNSUPPORTED');
+    expect(UI_HTML).toContain('マイク使用中');
+    expect(UI_HTML).toContain('録音データは保存しない');
     expect(UI_HTML).toContain('データ取得できません');
     expect(UI_HTML).toContain('未接続');
     expect(UI_HTML).toContain('銀行データ未接続');

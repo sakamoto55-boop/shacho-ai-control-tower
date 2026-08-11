@@ -103,3 +103,27 @@ export function coreSizeRatio(viewportWidth: number, scrolled: boolean): number 
 
 /** 主画面へ出してはならない内部Provider名（§5。詳細表示のみ許可） */
 export const PROVIDER_NAMES_HIDDEN_IN_MAIN_UI = ['Claude', 'GPT', 'Gemini', 'Manus', 'Anthropic', 'OpenAI'];
+
+/**
+ * 対話モード粒子仕様（SERVED BUILD AUDIT §3C。UI側 docs/lcc-command-vui.html の
+ * DIALOGUE_PARTICLES と同期させる。変更時は両方更新すること）。
+ * - 粒子数はFPS実測でmin側へ自動削減（Desktop目標60fps・Mobile目標30fps）
+ * - 粒子サイズは0.4〜1.2 CSS px（高DPIはdevicePixelRatioで補正）
+ */
+export const DIALOGUE_PARTICLES = {
+  desktopMin: 4000,
+  desktopMax: 8000,
+  mobileMin: 1200,
+  mobileMax: 3000,
+  sizeMinPx: 0.4,
+  sizeMaxPx: 1.2,
+  fpsTargetDesktop: 60,
+  fpsTargetMobile: 30
+} as const;
+
+/** 対話モードの音声連動状態（偽の「実音声同期」報告を禁止するための明示分類） */
+export type AudioReactiveState =
+  | 'REAL_AUDIO_REACTIVE'
+  | 'LEVEL_ONLY_FALLBACK'
+  | 'VOICE_PROVIDER_REQUIRED'
+  | 'BROWSER_UNSUPPORTED';
