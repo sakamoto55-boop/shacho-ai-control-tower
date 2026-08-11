@@ -659,35 +659,24 @@ createApp({
           || ja[0] || null;
     },
     speechSentencesFor(text){
-      // テスト用: speakTextと同一の整形・分割結果を返す（読み上げ内容の保全検証に使用）
+      // 読み上げ専用整形（安全版）: 装飾記号のみ除去し、数値・否定・日付・括弧内・法令番号など
+      // 内容は一切削除・変換しない（字幕は原文のまま）。テスト用フックからも使用
       const clean = (text || '')
         .replace(/【([^】]*)】/g, '$1。')
-        .replace(/^[#*>-・◆■○●s]+/gm, '')
+        .replace(/^[#*>・◆■○●\s\-]+/gm, '')
         .replace(/[#*|`>]/g, '')
-        .replace(/s*
-+s*/g, '。')
+        .replace(/\s*\n+\s*/g, '。')
         .replace(/。{2,}/g, '。')
-        .replace(/s{2,}/g, ' ')
+        .replace(/ {2,}/g, ' ')
         .slice(0, 1200);
       return clean.split(/(?<=[。？！?!])/).map(t => t.trim()).filter(t => t.length > 1).slice(0, 14);
     },
     speakText(text){
       // AI音声（speechSynthesis）。ブラウザ制約でTTS出力はAnalyserNode接続不可のため
-      // SPEAKING同期はLEVEL_ONLY_FALLBACK（境界イベント+擬似レベル）と正直に表示する
+      // SPEAKING同期はUTTERANCE_EVENT_REACTIVE（boundary/endイベント連動）と正直に表示する
       if (this.muted) return;
       if (!('speechSynthesis' in window)) { this.audioReactiveState = 'VOICE_PROVIDER_REQUIRED'; return; }
       this.stopSpeak();
-      // 読み上げ整形（安全版）: 装飾記号のみ除去し、数値・否定・日付・括弧内・法令番号など
-      // 内容は一切削除・変換しない（字幕は原文のまま。これは読み上げ専用テキスト）
-      const clean = (text || '')
-        .replace(/【([^】]*)】/g, '$1。')
-        .replace(/^[#*>-・◆■○●s]+/gm, '')
-        .replace(/[#*|`>]/g, '')
-        .replace(/s*
-+s*/g, '。')
-        .replace(/。{2,}/g, '。')
-        .replace(/s{2,}/g, ' ')
-        .slice(0, 1200);
       // 文単位で分割して順に読み上げ（長文一括より抑揚・間が自然になる）
       const sentences = this.speechSentencesFor(text);
       if (!sentences.length) return;
