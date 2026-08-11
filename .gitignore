@@ -21,3 +21,6 @@ data/evidence/
 data/conversation_archive/
 data/locks/
 logs/
+lcc-ui-token.txt
+staff-token.txt
+lcc-command.pid
