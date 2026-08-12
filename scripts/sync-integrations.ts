@@ -232,18 +232,26 @@ async function main(): Promise<void> {
     if (target === 'all' || target === 'conversations' || target === 'ai-history')
       results.push(await syncConversations(syncedAt));
     if (target === 'all' || target === 'freee') results.push(await syncFreee(syncedAt));
-    if (target === 'drive') {
+    if (target === 'all' || target === 'drive') {
+      // 実probe: 環境変数の存在だけでLIVE扱いしない。実取得成功のみLIVE_API
+      const { DriveClient } = await import('../src/command/integrations/drive/driveClient.js');
+      const client = DriveClient.fromEnv();
+      const check = client ? await client.checkConnection() : null;
       results.push({
-        source: 'gdrive-finance',
-        status: 'ADMIN_SETUP_REQUIRED',
+        source: 'gdrive',
+        status: !check ? 'ADMIN_SETUP_REQUIRED' : check.state === 'LIVE_API' ? 'LIVE_API' : check.state,
         startedAt: syncedAt,
         finishedAt: new Date().toISOString(),
-        processed: 0,
+        processed: check?.state === 'LIVE_API' ? check.visibleFiles : 0,
         imported: 0,
         rejected: 0,
         duplicates: 0,
-        errors: [],
-        note: 'Service AccountはSheets読み取りのみ。経理xlsx群はSA共有+Driveスコープ付与、またはdata/import経由'
+        errors: check && check.state === 'ERROR' ? [check.reason] : [],
+        note: !check
+          ? 'Service Account資格情報が未設定'
+          : check.state === 'LIVE_API'
+            ? `SAへ共有されたファイル${check.visibleFiles}件が検索可能（metadata READ ONLY）`
+            : `${check.reason}${check.state === 'ERROR' && 'fix' in check && check.fix ? `／解除方法: ${check.fix}` : ''}`
       });
     }
     for (const r of results) {

@@ -744,6 +744,95 @@ export function createCommandApp(
     }
   });
 
+  // REAL USE 75%: 接続ヘルス診断（正直分類語彙: LIVE_API/SHEET_INGESTED/MANUAL_IMPORT/NOT_CONNECTED/ERROR）
+  // シート取込を本体API接続と表現しない。環境変数の存在だけではLIVE_APIにしない
+  app.get('/health/connections', async (c) => {
+    const principal = c.get('principal');
+    if (!canDecideApproval(principal)) {
+      return c.json({ error: `ロール${principal.role}は接続診断を参照できません` }, 403);
+    }
+    const statusPath = resolvePath(
+      process.env.LCC_INTEGRATION_DATA_DIR ?? './data',
+      'integration-status.json'
+    );
+    const raw = existsSync(statusPath)
+      ? (JSON.parse(readFileSync(statusPath, 'utf8')) as {
+          updatedAt?: string;
+          sources?: Record<string, { status: string; processed: number; imported: number; errors: string[]; lastSyncedAt?: string; note?: string }>;
+        })
+      : { sources: {} };
+    const src = raw.sources ?? {};
+    const pick = (key: string) => src[key] ?? null;
+    const asEntry = (
+      system: string,
+      classification: string,
+      base: { processed?: number; lastSyncedAt?: string; errors?: string[]; note?: string } | null,
+      extraNote?: string
+    ) => ({
+      system,
+      classification,
+      records: base?.processed ?? 0,
+      lastSyncedAt: base?.lastSyncedAt ?? null,
+      errors: base?.errors ?? [],
+      note: extraNote ?? base?.note ?? ''
+    });
+    const { DriveClient } = await import('../integrations/drive/driveClient.js');
+    const driveClient = DriveClient.fromEnv();
+    const driveCheck = driveClient ? await driveClient.checkConnection() : null;
+    const connections = [
+      asEntry('freee（人事労務API）', pick('freee-hr')?.status === 'LIVE_READ_ONLY' ? 'LIVE_API' : (pick('freee-hr')?.status ?? 'NOT_CONNECTED'), pick('freee-hr')),
+      asEntry('デジタル配置板/BOARD（カンバン正本シート）', pick('sheets:lcc-integrated-db') ? 'SHEET_INGESTED' : 'NOT_CONNECTED', pick('sheets:lcc-integrated-db'), 'Sheets SA READ ONLY取込。本体API接続ではない'),
+      asEntry('日報（AI読み取りシート）', pick('sheets:daily-report-ai') ? 'SHEET_INGESTED' : 'NOT_CONNECTED', pick('sheets:daily-report-ai'), 'Sheets SA READ ONLY取込。確定チェック済み行のみ実績候補'),
+      asEntry('LINE WORKS（受信箱シート）', pick('sheets:lineworks-inbox') ? 'SHEET_INGESTED' : 'NOT_CONNECTED', pick('sheets:lineworks-inbox'), 'Webhook→シート経由の取込。本体API接続ではない'),
+      asEntry('法定書類DB（DERIVED）', pick('sheets:lcc-case-db') ? 'SHEET_INGESTED' : 'NOT_CONNECTED', pick('sheets:lcc-case-db')),
+      {
+        system: 'Google Drive（資料検索）',
+        classification: !driveCheck ? 'NOT_CONNECTED' : driveCheck.state === 'LIVE_API' ? 'LIVE_API' : 'ERROR',
+        records: driveCheck?.state === 'LIVE_API' ? driveCheck.visibleFiles : 0,
+        lastSyncedAt: driveCheck?.state === 'LIVE_API' ? driveCheck.checkedAt : null,
+        errors: driveCheck && driveCheck.state === 'ERROR' ? [driveCheck.reason] : [],
+        note:
+          driveCheck && driveCheck.state === 'ERROR' && driveCheck.fix
+            ? `解除方法: ${driveCheck.fix}`
+            : driveCheck?.state === 'LIVE_API'
+              ? 'SAへ共有された範囲のみ・metadata READ ONLY'
+              : 'Service Account未設定'
+      },
+      asEntry('AnyONE', 'MANUAL_IMPORT', pick('anyone(historical-export)'), '公式APIなし。data/import/anyone/inboxへのCSV/Excel投入経路は実装済み・実データ未投入（0件）'),
+      asEntry('TKC', 'MANUAL_IMPORT', pick('tkc'), '公式APIなし。data/import/tkc inbox経路は実装済み・実データ未投入（0件）')
+    ];
+    return c.json({
+      generatedAt: new Date().toISOString(),
+      statusUpdatedAt: raw.updatedAt ?? null,
+      vocabulary: 'LIVE_API=今回実取得成功のみ / SHEET_INGESTED=シート経由取込（本体API接続ではない） / MANUAL_IMPORT=手動投入経路のみ / NOT_CONNECTED / ERROR',
+      connections,
+      writePolicy: '外部システムへの書き込みはデフォルト無効（GET+OAuth token交換POSTのみ）'
+    });
+  });
+
+  // REAL USE 75%: Drive検索（LIVE_API化後に利用可能。未接続時は正直にERRORを返す）
+  app.get('/drive/search', async (c) => {
+    const principal = c.get('principal');
+    if (!canDecideApproval(principal)) {
+      return c.json({ error: `ロール${principal.role}はDrive検索を利用できません` }, 403);
+    }
+    const q = c.req.query('q')?.trim();
+    if (!q || q.length < 2) return c.json({ error: 'クエリq（2文字以上）を指定してください' }, 400);
+    const { DriveClient } = await import('../integrations/drive/driveClient.js');
+    const client = DriveClient.fromEnv();
+    if (!client) return c.json({ state: 'NOT_CONNECTED', reason: 'Service Account未設定' }, 503);
+    try {
+      const hits = await client.searchByName(q, Math.min(Number(c.req.query('limit') ?? 20) || 20, 50));
+      return c.json({ state: 'LIVE_API', query: q, hits });
+    } catch (error) {
+      const check = await client.checkConnection();
+      return c.json(
+        { state: 'ERROR', reason: check.state === 'ERROR' ? check.reason : String(error), fix: check.state === 'ERROR' ? check.fix : undefined },
+        503
+      );
+    }
+  });
+
   app.get('/providers', async (c) => {
     const principal = c.get('principal');
     if (!canDecideApproval(principal)) {

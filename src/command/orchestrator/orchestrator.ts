@@ -71,6 +71,7 @@ import {
 import { ArtifactService, planArtifactCreation } from '../artifacts/artifactRegistry.js';
 import { buildSoftwarePlan } from '../build/softwareBuild.js';
 import { unifiedSearch } from '../search/unifiedSearch.js';
+import { dailyOps, projectFinance, actionItems } from '../integrations/knowledge/vaultInsights.js';
 import { draftEstimate } from '../estimate/estimateCapability.js';
 import { parsePreferredProvider } from '../ai/liveProviders.js';
 import {
@@ -648,6 +649,9 @@ export class CommandOrchestrator {
     // --- Read系 ---
     if (/おはよう|ブリーフ|朝の報告|今日の報告|今日.{0,4}会社.{0,4}どう/i.test(message))
       return this.runIntent('brief', ctx, dataStatus);
+    // 縦断フロー1: 今日の配置・欠員・未提出日報（vault実データ）
+    if (/(今日|本日).{0,6}(配置|欠員)|未提出.{0,3}日報|(今日|本日).{0,4}日報/.test(message))
+      return this.handleDailyOps(ctx, dataStatus);
     if (/今日の現場|今日.{0,4}(どこ|配置)/.test(message))
       return this.handleTodaySites(ctx, dataStatus);
     if (/昨日.{0,6}(誰|どこ|行った)/.test(message))
@@ -662,12 +666,27 @@ export class CommandOrchestrator {
       return this.runIntent('risky', ctx, dataStatus);
     if (/(営業|追客|見積).{0,6}(漏|も)れ|漏れて(る|いる)(の|ところ)?は/.test(message))
       return this.runIntent('today', ctx, dataStatus);
-    if (/今日.{0,6}(やる|すべき|何)|やること|要対応/.test(message))
+    // 縦断フロー3: 要対応リスト（vault実データを重要度順・根拠付き）
+    if (/要対応|重要度順|対応が必要|対応リスト/.test(message))
+      return this.handleActionItems(ctx, dataStatus);
+    if (/今日.{0,6}(やる|すべき|何)|やること/.test(message))
       return this.runIntent('today', ctx, dataStatus);
     if (/来月|仕事.{0,4}足り|パイプライン|見込み案件/.test(message))
       return this.runIntent('pipeline', ctx, dataStatus);
     if (/現金|資金|キャッシュ|銀行残高/.test(message))
       return this.runIntent('cash', ctx, dataStatus);
+
+    // 縦断フロー2: 案件の財務カード（受注額・原価・粗利・請求・入金をvault実データから）
+    if (/受注額|受注金額|入金状況|請求.{0,2}状況|(原価|粗利).{0,6}(請求|入金)/.test(message)) {
+      const financeQuery = message
+        .replace(/(の)?(受注額|受注金額|原価|粗利|請求|入金|状況|関連|資料|Drive|ドライブ|教えて|ください|について|を|は|と|・|、|。|？|\?)/g, ' ')
+        .trim()
+        .split(/\s+/)
+        .filter((t) => t.length >= 2)[0] ?? '';
+      const financeCard = financeQuery ? projectFinance(financeQuery) : null;
+      if (financeCard && financeCard.totalMatched > 0)
+        return this.handleProjectFinance(financeCard, dataStatus);
+    }
 
     const project = findProject(ctx.dataset, message);
     if (project && /なぜ|why|利益|粗利|原価/.test(message))
@@ -726,6 +745,10 @@ export class CommandOrchestrator {
       case 'project_card':
         if (project) return this.handleProjectCard(ctx, project, dataStatus);
         return this.handleUnknown(ctx, '', dataStatus);
+      case 'daily_ops':
+        return this.handleDailyOps(ctx, dataStatus);
+      case 'action_items':
+        return this.handleActionItems(ctx, dataStatus);
       default:
         return this.handleUnknown(ctx, '', dataStatus);
     }
@@ -1012,6 +1035,8 @@ export class CommandOrchestrator {
       { key: 'invoices', pattern: /請求|入金/ },
       { key: 'risky', pattern: /粗利|案件リスク/ }
     ];
+    // 特定案件の財務照会（受注額・入金状況など）は全社集計ではなく案件カードへ回す
+    if (/受注額|受注金額|入金状況/.test(message)) return null;
     const matched = domains.filter((domain) => domain.pattern.test(message));
     const needsSynthesis = /一番|最も|まとめ|総合|教えて/.test(message);
     if (matched.length < 2 || !needsSynthesis) return null;
@@ -1122,6 +1147,128 @@ export class CommandOrchestrator {
   // ------------------------------------------------------------------
   // 個別ハンドラ
   // ------------------------------------------------------------------
+
+  /** vaultのevidence（source/locator）をUI用Evidence型へ変換する */
+  private vaultEvidence(
+    entries: Array<{ source: string; locator: string; note?: string }>,
+    asOf: string,
+    limit: number
+  ): Evidence[] {
+    return entries.slice(0, limit).map((e) => ({
+      label: e.note ?? '根拠レコード',
+      value: e.locator,
+      source: e.source,
+      asOf
+    }));
+  }
+
+  /** 縦断フロー1: 今日の配置・欠員・日報（vault実データ・決定論集計） */
+  private handleDailyOps(ctx: ToolContext, dataStatus: DataStatus): HandlerResult {
+    const today = jstDate(ctx.dataset.asOf);
+    const ops = dailyOps(today);
+    const lines: string[] = [];
+    lines.push('【確認できた事実】');
+    if (ops.targetDate === null) {
+      lines.push('日報データに集計可能な行がありません。');
+    } else {
+      const siteNames = [...new Set(ops.sites.filter((s) => s.kubun !== '休').map((s) => s.site))];
+      lines.push(`${ops.targetDate}の日報: ${ops.sites.length}行（区分: ${Object.entries(ops.kubunBreakdown).map(([k, n]) => `${k}${n}件`).join('・')}）`);
+      lines.push(`稼働現場: ${siteNames.length}カ所（${siteNames.slice(0, 8).join('、')}${siteNames.length > 8 ? ' ほか' : ''}）／工数計: ${ops.kosuTotal}人工`);
+      lines.push(`日報の確定状況: 確定${ops.confirmedCount}件・未確定${ops.unconfirmedCount}件（全行が確定チェック待ち）`);
+    }
+    lines.push('');
+    lines.push('【未取得・判定不能】');
+    lines.push(`- 欠員: ${ops.assignments.reason}`);
+    lines.push('- 「未提出」の判定: 配置予定と日報の突合が必要なため、配置予定接続後に可能になります');
+    lines.push('');
+    lines.push(`参照元: ${ops.dataBasis.source}／データ基準: 最終同期 ${ops.dataBasis.syncedAt ?? '不明'}／回答生成: ${ops.generatedAt}`);
+    if (ops.notes.length) lines.push(`注記: ${ops.notes.join('。')}`);
+    lines.push('AIの推測: 含まれていません（決定論集計のみ）');
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        confidence: 'HIGH',
+        evidence: this.vaultEvidence(ops.evidence, ops.dataBasis.syncedAt ?? ops.generatedAt, 6),
+        toolsUsed: ['vault_daily_ops']
+      },
+      intent: 'daily_ops'
+    };
+  }
+
+  /** 縦断フロー2: 案件の受注額・原価・粗利・請求・入金カード（vault実データ） */
+  private handleProjectFinance(
+    card: ReturnType<typeof projectFinance>,
+    dataStatus: DataStatus
+  ): HandlerResult {
+    const fmt = (n: number | null) => (n === null ? '未入力' : `${n.toLocaleString('ja-JP')}円`);
+    const stageJp: Record<string, string> = { lead: '見込', survey: '現調', quote: '見積提出', contract: '受注', working: '施工中', done: '完工', lost: '失注' };
+    const lines: string[] = [];
+    lines.push('【確認できた事実】');
+    for (const p of card.matched) {
+      lines.push(`■ ${p.name}（${p.customerName || '顧客名なし'}／${p.type}／${stageJp[p.status] ?? p.status}）`);
+      lines.push(`  見積税込: ${fmt(p.estimateTotal)}（受注額の専用列なし・代表金額）／原価: ${fmt(p.cost)}／粗利: ${fmt(p.grossProfit)}${p.grossProfitRate !== null ? `（${p.grossProfitRate}%）` : ''}`);
+      lines.push(`  請求: ${fmt(p.invoiceTotal)}（請求状態: ${p.billingStatus === 'none' ? '未請求' : p.billingStatus}）`);
+      if (p.legalDocs) {
+        lines.push(`  法定書類: ${p.legalDocs.total}件（${Object.entries(p.legalDocs.byType).map(([t, n]) => `${t}${n}`).join('・')}／状態: ${Object.entries(p.legalDocs.byState).map(([s, n]) => `${s}${n}`).join('・')}）`);
+      }
+    }
+    if (card.totalMatched > card.candidatesShown)
+      lines.push(`（該当${card.totalMatched}件中${card.candidatesShown}件を表示。名称を絞るとさらに特定できます）`);
+    lines.push('');
+    lines.push('【未取得】');
+    lines.push(`- 入金状況: ${card.matched[0]?.payments.reason ?? '入金データ未接続'}`);
+    lines.push(`- 関連Drive資料: ${card.driveMaterials.reason}`);
+    lines.push('');
+    lines.push(`参照元: ${card.dataBasis.source}／データ基準: 最終同期 ${card.dataBasis.syncedAt ?? '不明'}／回答生成: ${card.generatedAt}`);
+    lines.push(`注記: ${card.notes.join('。')}`);
+    lines.push('AIの推測: 含まれていません（シート記載値のみ。金額の再計算もしていません）');
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'text',
+        confidence: 'HIGH',
+        evidence: this.vaultEvidence(card.matched.flatMap((p) => p.evidence), card.dataBasis.syncedAt ?? card.generatedAt, 8),
+        toolsUsed: ['vault_project_finance']
+      },
+      intent: 'project_finance',
+      projectId: card.matched[0]?.projectId ?? null
+    };
+  }
+
+  /** 縦断フロー3: 要対応リスト（重要度順・根拠付き・決定論ルール） */
+  private handleActionItems(ctx: ToolContext, dataStatus: DataStatus): HandlerResult {
+    const result = actionItems();
+    const lines: string[] = [];
+    lines.push('【要対応（重要度順・決定論ルール）】');
+    if (!result.items.length) {
+      lines.push('現在、接続済みソースから抽出できる要対応はありません。');
+    }
+    result.items.forEach((item, i) => {
+      lines.push(`${i + 1}. [${item.category}] ${item.title}`);
+      lines.push(`   ${item.detail}${item.receivedAt ? `（受信: ${item.receivedAt}）` : ''}｜出典: ${item.source}`);
+    });
+    lines.push('');
+    lines.push('【未取得】');
+    lines.push(`- ${result.notes[1]}`);
+    lines.push('');
+    lines.push(`参照元: ${result.dataBasis.map((b) => `${b.source}（${b.scanned}件走査・同期${b.syncedAt ?? '不明'}）`).join('／')}`);
+    lines.push(`回答生成: ${result.generatedAt}`);
+    lines.push(`注記: ${result.notes[0]}`);
+    return {
+      response: {
+        text: lines.join('\n'),
+        dataStatus,
+        uiHint: 'ranking',
+        confidence: 'HIGH',
+        evidence: this.vaultEvidence(result.items.flatMap((i) => i.evidence), result.generatedAt, 8),
+        toolsUsed: ['vault_action_items']
+      },
+      intent: 'action_items'
+    };
+  }
 
   private simpleText(
     text: string,

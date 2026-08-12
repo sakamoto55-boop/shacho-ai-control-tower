@@ -40,7 +40,23 @@ export interface IntegrationRecord<TRaw = Record<string, unknown>, TNorm = Recor
 
 export interface SyncResult {
   source: string;
-  status: 'LIVE_READ_ONLY' | 'LOCAL_IMPORT_READY' | 'AUTH_REQUIRED' | 'ADMIN_SETUP_REQUIRED' | 'SOURCE_NOT_FOUND' | 'UNSUPPORTED_OFFICIAL_METHOD' | 'BLOCKED_TECHNICAL' | 'NOT_STARTED';
+  status:
+    | 'LIVE_READ_ONLY'
+    | 'LOCAL_IMPORT_READY'
+    | 'AUTH_REQUIRED'
+    | 'ADMIN_SETUP_REQUIRED'
+    | 'SOURCE_NOT_FOUND'
+    | 'UNSUPPORTED_OFFICIAL_METHOD'
+    | 'BLOCKED_TECHNICAL'
+    | 'NOT_STARTED'
+    // REAL USE 75% SPRINT語彙（実取得成功のみLIVE_API。envの存在だけでは使わない）
+    | 'LIVE_API'
+    | 'SCHEDULED_EXPORT'
+    | 'SHEET_INGESTED'
+    | 'MANUAL_IMPORT'
+    | 'MOCK_ONLY'
+    | 'NOT_CONNECTED'
+    | 'ERROR';
   startedAt: string;
   finishedAt: string;
   processed: number;
