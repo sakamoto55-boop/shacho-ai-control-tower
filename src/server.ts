@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { execSync } from 'node:child_process';
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { analyzeMessage } from './ai/analyzeMessage.js';
@@ -17,10 +18,36 @@ export const app = new Hono();
 app.route('/command', createCommandApp());
 
 // UI配信（スマホ等の実機からも http://<PCのIP>:8787/vui で利用できるようにする）
+// 配信buildの診断情報は配信時にサーバーが実測値を注入する（UI側の手動stampに依存しない。
+// git不在の環境ではLCC_BUILD_*環境変数、なければ'unknown'を注入し、偽のcommitを表示しない）
+let vuiBuildInfo: { branch: string; commit: string; servedFrom: string } | null = null;
+function resolveVuiBuildInfo(): { branch: string; commit: string; servedFrom: string } {
+  if (vuiBuildInfo) return vuiBuildInfo;
+  let branch = process.env.LCC_BUILD_BRANCH ?? 'unknown';
+  let commit = process.env.LCC_BUILD_COMMIT ?? 'unknown';
+  try {
+    const cwd = new URL('..', import.meta.url);
+    branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() || branch;
+    commit = execSync('git rev-parse --short HEAD', { cwd, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() || commit;
+    const dirty = execSync('git status --porcelain', { cwd, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    if (dirty) commit += '+dirty';
+  } catch {
+    // gitが使えない配備環境では環境変数値または'unknown'のまま（推測でcommitを出さない）
+  }
+  const servedFrom = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', hour12: false });
+  vuiBuildInfo = { branch, commit, servedFrom };
+  return vuiBuildInfo;
+}
 app.get('/vui', async (c) => {
   const { readFile } = await import('node:fs/promises');
   const html = await readFile(new URL('../docs/lcc-command-vui.html', import.meta.url), 'utf8');
-  return c.html(html);
+  const info = resolveVuiBuildInfo();
+  return c.html(
+    html
+      .replace('__LCC_BUILD_BRANCH__', info.branch)
+      .replace('__LCC_BUILD_COMMIT__', info.commit)
+      .replace('__LCC_SERVED_AT__', `${info.servedFrom} JST起動`)
+  );
 });
 
 const devEnabled = () => process.env.ENABLE_DEV_ENDPOINTS !== 'false' && process.env.NODE_ENV !== 'production';

@@ -347,8 +347,14 @@ function dialogueParticleBudget(opts){
   if (opts.mobile) return lowEnd ? DIALOGUE_PARTICLES.mobileMin : Math.round((DIALOGUE_PARTICLES.mobileMin + DIALOGUE_PARTICLES.mobileMax) / 2);
   return lowEnd ? DIALOGUE_PARTICLES.desktopMin : Math.round((DIALOGUE_PARTICLES.desktopMin + DIALOGUE_PARTICLES.desktopMax) / 2);
 }
-/* 配信commit診断（§6。build時にcommit短縮IDを記録。秘密情報なし） */
-const BUILD_INFO = { branch: 'claude/lcc-command-ui-voice-v1', commit: 'c475205', builtAt: '2026-08-12 08:41 JST', mode: 'vui' };
+/* 配信commit診断（§6。値はサーバーが配信時にgit実測から注入する。手動stamp不使用・秘密情報なし） */
+const BUILD_INFO = { branch: '__LCC_BUILD_BRANCH__', commit: '__LCC_BUILD_COMMIT__', builtAt: '__LCC_SERVED_AT__', mode: 'vui' };
+if (BUILD_INFO.commit.indexOf('__') === 0) {
+  /* サーバー経由でない直接表示（file://等）。偽commitを出さず未配信と明示する */
+  BUILD_INFO.branch = '未配信';
+  BUILD_INFO.commit = 'ローカル直接表示';
+  BUILD_INFO.builtAt = '—';
+}
 
 /* ============================================================
    Generative UI Renderer（§11。UI Schema→安全な描画。自由HTMLは描画しない）

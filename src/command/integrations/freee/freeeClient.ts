@@ -6,7 +6,7 @@
  * - 許可HTTP: GET + token交換POSTのみ。書き込みAPIは呼ばない。
  * - 秘密情報（token・Client Secret）はログ・例外メッセージへ出さない。
  */
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const TOKEN_ENDPOINT = 'https://accounts.secure.freee.co.jp/public_api/token';
@@ -33,7 +33,8 @@ export function loadFreeeConfig(rootDir = '.'): FreeeConfig {
     clientId: process.env.FREEE_CLIENT_ID,
     clientSecret: process.env.FREEE_CLIENT_SECRET,
     redirectUri: process.env.FREEE_REDIRECT_URI ?? 'http://127.0.0.1:8790/freee/callback',
-    tokenFile: join(rootDir, 'secure', 'freee-tokens.json')
+    // 複数worktreeでtoken正本が分裂しないよう、FREEE_TOKEN_FILEで単一ファイルを指定できる
+    tokenFile: process.env.FREEE_TOKEN_FILE ?? join(rootDir, 'secure', 'freee-tokens.json')
   };
 }
 
@@ -65,7 +66,10 @@ export function loadTokens(config: FreeeConfig): FreeeTokens | null {
 
 export function saveTokens(config: FreeeConfig, tokens: FreeeTokens): void {
   mkdirSync(dirname(config.tokenFile), { recursive: true });
-  writeFileSync(config.tokenFile, `${JSON.stringify(tokens, null, 2)}\n`, { encoding: 'utf8' });
+  // refresh tokenは1回限り有効のため、書き込み途中のクラッシュで失われないようtemp+renameで原子的に保存する
+  const tmpFile = `${config.tokenFile}.tmp`;
+  writeFileSync(tmpFile, `${JSON.stringify(tokens, null, 2)}\n`, { encoding: 'utf8' });
+  renameSync(tmpFile, config.tokenFile);
 }
 
 /** 認証状態を判定する（tokenがなければ認可URLを返す。値はログへ出さない） */
