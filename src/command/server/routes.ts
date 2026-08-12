@@ -810,6 +810,17 @@ export function createCommandApp(
     });
   });
 
+  // EXECUTIVE UI: ホームの「今日の意思決定」実データ（決定論actionItemsの上位。捏造なし）
+  app.get('/today/decisions', async (c) => {
+    const principal = c.get('principal');
+    if (!canDecideApproval(principal)) {
+      return c.json({ error: `ロール${principal.role}は意思決定一覧を参照できません` }, 403);
+    }
+    const { actionItems } = await import('../integrations/knowledge/vaultInsights.js');
+    const result = actionItems();
+    return c.json({ generatedAt: result.generatedAt, items: result.items, dataBasis: result.dataBasis, notes: result.notes });
+  });
+
   // REAL USE 75%: Drive検索（LIVE_API化後に利用可能。未接続時は正直にERRORを返す）
   app.get('/drive/search', async (c) => {
     const principal = c.get('principal');

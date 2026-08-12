@@ -123,7 +123,8 @@ describe('VUI: UI実装ファイル（docs/lcc-command-vui.html）の完成条�
     expect(UI_HTML).toContain('データ取得できません');
     expect(UI_HTML).toContain('未接続');
     expect(UI_HTML).toContain('銀行データ未接続');
-    expect(UI_HTML).toContain('実績日報との案件紐付け準備中');
+    // UI REBUILD: 接続の詳細（未接続理由・データギャップ）は専用データ接続画面へ集約
+    expect(UI_HTML).toContain('接続状態の詳細を見る');
     expect(UI_HTML).toContain('デモ数値の表示は行いません');
   });
 

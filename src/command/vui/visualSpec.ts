@@ -121,6 +121,19 @@ export const DIALOGUE_PARTICLES = {
   fpsTargetMobile: 30
 } as const;
 
+/**
+ * AI CORE集合体仕様（EXECUTIVE UI REBUILD）。UI側 docs/lcc-command-vui.html の
+ * CORE_CLUSTER と同期させる。完全球体・原子模型にせず、複数核の不規則集合体+
+ * 近接粒子の緩い接続線+depthLayersによる奥行きで「思考する知能」を表現する。
+ */
+export const CORE_CLUSTER = {
+  nuclei: 4,
+  nucleusSpread: 0.34,
+  linkCount: 46,
+  linkMaxDist: 0.22,
+  depthLayers: 3
+} as const;
+
 /** 対話モードの音声連動状態（偽の「実音声同期」報告を禁止するための明示分類） */
 /** AI読み上げの連動分類（実stream解析不可のためイベント連動が上限。SIMULATED/REALと偽らない） */
 export type SpeechReactiveState = 'REAL_AUDIO_REACTIVE' | 'UTTERANCE_EVENT_REACTIVE' | 'SIMULATED' | 'NOT_IMPLEMENTED';
