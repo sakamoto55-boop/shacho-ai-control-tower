@@ -250,6 +250,22 @@
         <p>Data Status: {{ lastMeta.dataStatus || '-' }} / 所要 {{ lastMeta.latencyMs }}ms</p>
         <p>使用Provider: {{ lastMeta.provider || '（詳細表示でのみ確認できます。通常はLCC COMMANDとして応答）' }}</p>
         <p v-if="lastMeta.trace.length">AgentTrace: {{ lastMeta.trace.length }}タスク</p>
+        <div class="pt-1 border-t border-white/10">
+          <label class="block">AI音声（実在リストから選択・保存されます）
+            <select :value="savedVoiceName" @change="saveVoice($event.target.value)" class="mt-0.5 w-full bg-white/10 rounded px-1.5 py-1 border border-white/20" aria-label="AI読み上げ音声の選択">
+              <option value="" class="text-black">自動（Google 日本語を優先）</option>
+              <option v-for="v in voiceList" :key="v.name" :value="v.name" class="text-black">{{ v.name }}{{ v.localService ? '' : '（ネットワーク）' }}</option>
+            </select>
+          </label>
+          <label class="block mt-1">話す速さ（保存されます）
+            <select :value="String(speechRate())" @change="saveRate($event.target.value)" class="mt-0.5 w-full bg-white/10 rounded px-1.5 py-1 border border-white/20" aria-label="AI読み上げの速さ">
+              <option value="1" class="text-black">ふつう（1.0）</option>
+              <option value="1.2" class="text-black">やや早口（1.2・既定）</option>
+              <option value="1.4" class="text-black">早口（1.4）</option>
+              <option value="1.6" class="text-black">かなり早口（1.6）</option>
+            </select>
+          </label>
+        </div>
       </div>
     </div>
   </aside>
@@ -675,8 +691,19 @@ createApp({
         .replace(/。{2,}/g, '。')
         .replace(/ {2,}/g, ' ')
         .slice(0, 1200);
-      return clean.split(/(?<=[。？！?!])/).map(t => t.trim()).filter(t => t.length > 1).slice(0, 14);
+      const all = clean.split(/(?<=[。？！?!])/).map(t => t.trim()).filter(t => t.length > 1);
+      // 読み上げは先頭6文まで（結論→事実の順で先頭に核心が来る構成のため）。
+      // 打ち切り時はその旨を正直に告げる。字幕・画面は常に全文表示（内容の削除ではない）
+      const MAX_SPOKEN = 6;
+      if (all.length > MAX_SPOKEN) return all.slice(0, MAX_SPOKEN).concat(['続きは画面に表示しています。']);
+      return all;
     },
+    speechRate(){
+      let saved = ''; try { saved = localStorage.getItem('lcc_voice_rate') || ''; } catch {}
+      const r = Number(saved);
+      return (r >= 0.8 && r <= 2.0) ? r : 1.2; // 既定はやや早口（社長フィードバック 2026-08-12）
+    },
+    saveRate(v){ try { localStorage.setItem('lcc_voice_rate', String(v)); } catch {} },
     speakText(text){
       // AI音声（speechSynthesis）。ブラウザ制約でTTS出力はAnalyserNode接続不可のため
       // SPEAKING同期はUTTERANCE_EVENT_REACTIVE（boundary/endイベント連動）と正直に表示する
@@ -701,7 +728,7 @@ createApp({
         const u = new SpeechSynthesisUtterance(sentences[idx++]);
         u.lang = 'ja-JP';
         if (voice) u.voice = voice;
-        u.rate = 1.0; u.pitch = 1.0;
+        u.rate = this.speechRate(); u.pitch = 1.0;
         u.onboundary = () => { this._speakPulse = 1; };
         u.onend = () => { this._speakPulse = 1; setTimeout(speakNext, 140); };
         u.onerror = () => { setTimeout(speakNext, 60); };
