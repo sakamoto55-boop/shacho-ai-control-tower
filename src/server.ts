@@ -38,16 +38,46 @@ function resolveVuiBuildInfo(): { branch: string; commit: string; servedFrom: st
   vuiBuildInfo = { branch, commit, servedFrom };
   return vuiBuildInfo;
 }
+// CODEX是正2: UI配信へセキュリティヘッダーを付与（inline script/styleを使う単一HTML構成のため
+// script-src/style-srcは'self'+'unsafe-inline'。外部originは全ブロック=CDN依存ゼロを強制）
+const UI_SECURITY_HEADERS: Record<string, string> = {
+  // 注: 単一HTML+Vue runtimeテンプレートの制約でinline/evalを許可（Vueのテンプレートcompileがnew Functionを使用）。
+  // 主目的の「外部originの全遮断=CDN依存ゼロの強制」はdefault-src 'self'で維持される
+  'Content-Security-Policy':
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Frame-Options': 'DENY'
+};
+
 app.get('/vui', async (c) => {
   const { readFile } = await import('node:fs/promises');
   const html = await readFile(new URL('../docs/lcc-command-vui.html', import.meta.url), 'utf8');
   const info = resolveVuiBuildInfo();
+  for (const [k, v] of Object.entries(UI_SECURITY_HEADERS)) c.header(k, v);
   return c.html(
     html
       .replace('__LCC_BUILD_BRANCH__', info.branch)
       .replace('__LCC_BUILD_COMMIT__', info.commit)
       .replace('__LCC_SERVED_AT__', `${info.servedFrom} JST起動`)
   );
+});
+
+// ローカルbundle配信（vue/tailwind。ディレクトリトラバーサル禁止・許可ファイルのみ）
+const VENDOR_FILES: Record<string, string> = {
+  'vue.global.prod.js': 'text/javascript; charset=utf-8',
+  'tw.css': 'text/css; charset=utf-8'
+};
+app.get('/vendor/:file', async (c) => {
+  const file = c.req.param('file');
+  const type = VENDOR_FILES[file];
+  if (!type) return c.notFound();
+  const { readFile } = await import('node:fs/promises');
+  const body = await readFile(new URL(`../docs/vendor/${file}`, import.meta.url));
+  for (const [k, v] of Object.entries(UI_SECURITY_HEADERS)) c.header(k, v);
+  c.header('Content-Type', type);
+  c.header('Cache-Control', 'public, max-age=86400');
+  return c.body(body);
 });
 
 const devEnabled = () => process.env.ENABLE_DEV_ENDPOINTS !== 'false' && process.env.NODE_ENV !== 'production';

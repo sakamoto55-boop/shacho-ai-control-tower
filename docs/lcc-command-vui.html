@@ -7,8 +7,9 @@
 <meta name="description" content="LCC COMMAND Visual Intelligence Interface — 粒子AI COREと対話するAI経営管制OS。">
 <title>LCC COMMAND — Visual Intelligence</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' rx='14' fill='%23050a18'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='%237ab8ff' stroke-width='2' opacity='0.9'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%23ffb46a'/%3E%3C/svg%3E">
-<script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
+<!-- CODEX是正2: 外部CDN依存廃止（オフライン/回線不調でもLAN内で起動する。実体はdocs/vendor/） -->
+<script src="vendor/vue.global.prod.js"></script>
+<link rel="stylesheet" href="vendor/tw.css">
 <style>
   /* ============ Design Tokens（§38。値の直書きを避け、ここで一元管理） ============ */
   :root{
