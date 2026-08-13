@@ -56,11 +56,16 @@ describe('EXECUTIVE COMMAND CENTER UI（UI REBUILD検収）', () => {
     expect(UI_HTML).not.toContain('会話から学習した内容が表示されます');
   });
 
-  it('認証エラー(401)を接続エラーと区別して表示する（MOBILE VISUAL CORRECTION）', () => {
+  it('認証エラー(401)を接続エラーと区別し、端末認証画面で案内する（?token=手入力を通常導線に出さない）', () => {
     expect(UI_HTML).toContain('authRequired');
-    expect(UI_HTML).toContain('認証が必要です');
     expect(UI_HTML).toContain('接続は正常');
     expect(UI_HTML).toContain("markAuth(res.status)");
+    expect(UI_HTML).toContain('このiPhoneをLCC COMMANDに接続します');
+    expect(UI_HTML).toContain('端末を認証');
+    expect(UI_HTML).toContain('iPhoneを接続');
+    expect(UI_HTML).toContain('/command/pair/claim');
+    // 認証前画面・通常表示に ?token= やファイル名の技術案内を出さない（設定/接続の技術欄以外）
+    expect(UI_HTML).not.toContain('?token=（PCのlcc-ui-token.txt');
   });
 
   it('モバイルは縦書き禁止・単一ステータスバー・AI CORE重複なし・ホームで入力バー非表示', () => {
@@ -68,8 +73,7 @@ describe('EXECUTIVE COMMAND CENTER UI（UI REBUILD検収）', () => {
     expect(UI_HTML).toContain('whitespace-nowrap'); // ヘッダーボタンの1文字折返し防止
     expect(UI_HTML).toContain('単一ステータスバー');
     expect(UI_HTML).toContain('hidden lg:block'); // AI CORE詳細カードはPCのみ
-    expect(UI_HTML).toContain("view === 'chat' || (view === 'home' && isDesktop)"); // モバイルホームは入力バー非表示
-    expect(UI_HTML).toContain('AIに聞く（質問・音声入力はこちら）');
+    expect(UI_HTML).toContain("view === 'chat' || (view === 'home' && isDesktop)"); // モバイルホームは入力バー非表示（入口は下部ナビAI）
     expect(UI_HTML).toMatch(/max-width:1023px[\s\S]*?\.role-chip\{display:none\}/); // モバイルはRole Ring非表示
   });
 

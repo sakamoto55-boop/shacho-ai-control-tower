@@ -116,17 +116,16 @@
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <span v-if="!connectionError && !authRequired" class="hidden lg:flex items-center gap-1 text-[10px] text-[color:var(--ok)] whitespace-nowrap"><span class="w-1.5 h-1.5 rounded-full bg-[color:var(--ok)]"></span>接続正常</span>
-          <button @click="enterDialogue" class="text-xs font-bold rounded-lg px-3 min-h-[44px] lg:min-h-0 lg:py-1.5 border border-[color:var(--info)]/60 text-[color:var(--info)] bg-white/5 hover:bg-white/10 whitespace-nowrap shrink-0" aria-label="対話モードへ切替"><span class="hidden lg:inline">🎙 対話モード</span><span class="lg:hidden">🎙 対話</span></button>
+          <button @click="enterDialogue" class="text-xs font-bold rounded-lg min-h-[44px] min-w-[44px] lg:min-h-0 lg:min-w-0 lg:px-3 lg:py-1.5 border border-[color:var(--info)]/60 text-[color:var(--info)] bg-white/5 hover:bg-white/10 whitespace-nowrap shrink-0" aria-label="対話モードへ切替"><span class="hidden lg:inline">🎙 対話モード</span><span class="lg:hidden">🎙</span></button>
           <select v-model="scope" class="bg-white/10 text-xs rounded-lg px-2 min-h-[44px] lg:min-h-0 lg:py-1.5 border border-white/20 shrink-0" aria-label="法人スコープ">
             <option value="lcc" class="text-black">LCC</option>
             <option value="group" class="text-black">グループ全体</option>
           </select>
         </div>
       </div>
-      <!-- 異常時のみの単一ステータスバー（認証と接続を区別・二重表示禁止） -->
-      <div v-if="authRequired || connectionError" class="mt-2 flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[11px]"
-           :class="authRequired ? 'bg-[color:var(--warn)]/15 text-[color:var(--warn)]' : 'bg-[color:var(--bad)]/15 text-[color:var(--bad)]'">
-        <span class="whitespace-normal">{{ authRequired ? '認証が必要です。URL末尾に ?token=（PCのlcc-ui-token.txtの1行）を付けて開き直してください' : '一部データを取得できません（サーバー接続に問題）' }}</span>
+      <!-- 異常時のみの単一ステータスバー（接続障害のみ。認証は専用画面で案内し技術用語を出さない） -->
+      <div v-if="connectionError && !authRequired" class="mt-2 flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[11px] bg-[color:var(--bad)]/15 text-[color:var(--bad)]">
+        <span class="whitespace-normal">一部データを取得できません（サーバー接続に問題）</span>
         <button @click="view = 'connections'; loadHealth()" class="font-bold underline shrink-0 min-h-[44px] lg:min-h-0">詳細</button>
       </div>
     </header>
@@ -162,8 +161,22 @@
       </div>
     </transition>
 
+    <!-- ============ 認証前: 端末接続画面（本画面を半端に表示しない） ============ -->
+    <section v-if="authRequired" class="flex-1 overflow-y-auto px-4 pb-28 lg:pb-4" aria-label="端末の認証">
+      <div class="surface p-5 max-w-md mx-auto mt-2 text-center">
+        <p class="text-base font-bold">このiPhoneをLCC COMMANDに接続します</p>
+        <p class="text-[12px] text-[color:var(--text-mid)] mt-2">PCの接続画面に表示された6桁コードを入力してください</p>
+        <input v-model="pairInput" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="000000"
+               class="mt-4 w-44 mx-auto block text-center tracking-[0.4em] text-2xl font-bold bg-white/10 border border-white/25 rounded-xl py-3 outline-none"
+               aria-label="6桁の認証コード" @keydown.enter="claimPairing">
+        <button @click="claimPairing" :disabled="pairBusy" class="mt-4 w-full min-h-[48px] rounded-xl bg-[color:var(--accent-deep)] text-white font-bold disabled:opacity-50">端末を認証</button>
+        <p v-if="pairError" class="mt-3 text-[12px] text-[color:var(--warn)]">{{ pairError }}</p>
+        <p class="mt-4 text-[10px] text-[color:var(--text-low)]">PC側: 「データ接続」画面の「iPhoneを接続」でコードを表示できます（5分有効・1回限り）</p>
+      </div>
+    </section>
+
     <!-- ============ HOME: 朝の管制（MORNING COMMAND BRIEF） ============ -->
-    <section v-if="view === 'home'" class="flex-1 overflow-y-auto px-4 pb-28 lg:pb-4 space-y-3" aria-label="朝の管制">
+    <section v-if="view === 'home' && !authRequired" class="flex-1 overflow-y-auto px-4 pb-28 lg:pb-4 space-y-3" aria-label="朝の管制">
       <div class="grid lg:grid-cols-3 gap-3">
         <div class="surface lg:col-span-2 p-4">
           <p class="text-[10px] tracking-widest text-[color:var(--text-low)] font-bold">MORNING COMMAND BRIEF</p>
@@ -239,7 +252,14 @@
       <div class="surface p-4">
         <div class="flex items-center justify-between">
           <p class="font-bold text-sm">データ接続状態</p>
-          <button @click="loadHealth" class="text-[11px] font-bold text-[color:var(--info)]">再読込</button>
+          <div class="flex gap-3">
+            <button @click="startPairing" class="text-[11px] font-bold text-[color:var(--accent)]">📱 iPhoneを接続</button>
+            <button @click="loadHealth" class="text-[11px] font-bold text-[color:var(--info)]">再読込</button>
+          </div>
+        </div>
+        <div v-if="pairCode || pairCodeNote" class="mt-2 rounded-lg bg-black/30 border border-white/10 p-3 text-center">
+          <p v-if="pairCode" class="text-3xl font-black tracking-[0.35em]">{{ pairCode }}</p>
+          <p class="text-[10px] text-[color:var(--text-low)] mt-1">{{ pairCodeNote }}｜iPhoneのSafariで http://192.168.128.198:8787/vui を開き、「端末を認証」にこのコードを入力してください</p>
         </div>
         <p class="text-[10px] text-[color:var(--text-low)] mt-1">状態は実取得の結果です。シート取込（SHEET_INGESTED）は本体API接続と表現しません。</p>
         <div v-if="health.loaded" class="mt-3 space-y-2">
@@ -339,13 +359,8 @@
       </div>
     </main>
 
-    <!-- モバイルのホームはCOMMANDバー非表示（本文を覆わない）。AIに聞く導線のみ -->
-    <div v-if="view === 'home' && !isDesktop" class="px-4 pb-[calc(64px+env(safe-area-inset-bottom))]">
-      <button @click="view = 'chat'; $nextTick(() => focusInput())" class="w-full min-h-[44px] rounded-xl border border-white/15 bg-white/5 text-[12px] text-[color:var(--text-mid)]">💬 AIに聞く（質問・音声入力はこちら）</button>
-    </div>
-
-    <!-- BOTTOM: COMMAND入力（暗色統一サーフェス・IME誤送信防止・エラー時入力保持） -->
-    <footer v-show="view === 'chat' || (view === 'home' && isDesktop)" class="px-4 pt-1 pb-[calc(64px+env(safe-area-inset-bottom))] lg:pb-4">
+    <!-- BOTTOM: COMMAND入力（暗色統一サーフェス・IME誤送信防止・エラー時入力保持。モバイル入口は下部ナビAI） -->
+    <footer v-show="!authRequired && (view === 'chat' || (view === 'home' && isDesktop))" class="px-4 pt-1 pb-[calc(64px+env(safe-area-inset-bottom))] lg:pb-4">
       <div v-if="view === 'chat'" class="flex flex-wrap gap-1.5 mb-1.5">
         <button v-for="q in presetQuestions" :key="q" @click="send(q)"
                 class="text-[11px] px-2.5 py-1.5 rounded-full border border-white/15 bg-white/5 text-[color:var(--text-mid)] hover:bg-white/10">{{ q }}</button>
@@ -647,6 +662,9 @@ createApp({
       connectionError: false,
       authRequired: false, // 401時にtrue。認証エラーを接続エラーと混同表示しない
       isDesktop: window.matchMedia('(min-width: 1024px)').matches,
+      /* 端末ペアリング（?token=手入力の通常導線廃止） */
+      pairInput: '', pairBusy: false, pairError: '',
+      pairCode: '', pairCodeNote: '',
       /* EXECUTIVE COMMAND CENTER: 画面切替とホーム実データ */
       view: 'home',
       composing: false, // 日本語IME変換中の誤送信防止（compositionstart/end）
@@ -793,6 +811,36 @@ createApp({
       if (this.composing || ev.isComposing || ev.keyCode === 229) return;
       ev.preventDefault();
       this.send(this.draft);
+    },
+    async claimPairing(){
+      // iPhone側: 6桁コード→HttpOnlyセッション。成功時はAI COREが一度だけ収束→拡散
+      if (this.pairBusy) return;
+      this.pairBusy = true; this.pairError = '';
+      try {
+        const res = await fetch(`${this.apiBase}/command/pair/claim`, {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ code: (this.pairInput || '').trim() })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) { this.pairError = body.error || 'コードが違います'; return; }
+        this.authRequired = false; this.pairInput = '';
+        this.setState('THINKING');
+        setTimeout(() => this.setState('RESPONDING'), 700);
+        setTimeout(() => { if (this.coreState === 'RESPONDING') this.setState('IDLE'); }, 1600);
+        await Promise.all([this.loadKpi(), this.loadDecisions(), this.loadHealth()]);
+      } catch {
+        this.pairError = 'サーバーへ接続できません（同じWi-Fiか確認してください）';
+      } finally { this.pairBusy = false; }
+    },
+    async startPairing(){
+      // PC側: 認証済みtokenで6桁コードを発行（5分・1回限り。値はログへ出さない）
+      try {
+        const res = await fetch(`${this.apiBase}/command/pair/start`, { method: 'POST', headers: this.authHeaders() });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const body = await res.json();
+        this.pairCode = body.code;
+        this.pairCodeNote = body.note || '5分有効・1回限り';
+      } catch { this.pairCode = ''; this.pairCodeNote = 'コードを発行できませんでした（この端末が認証済みか確認してください）'; }
     },
     markAuth(status){
       // 401=認証不足（接続は生きている）。接続エラーとは別に扱う
@@ -1127,7 +1175,8 @@ createApp({
             this.thinking = false;
             this.setState('IDLE');
             this.messages.push({ role: 'ai', done: true, confidence: 'HIGH', evidence: [],
-              text: '【認証が必要です】\nこの端末はまだ認証されていません。URL末尾に ?token=（PCのlcc-ui-token.txtの1行）を付けて開き直してください。\nサーバー接続は正常です。入力内容は残してあります。' });
+              text: '【認証が必要です】\nこの端末はまだ認証されていません。ホームの「端末を認証」画面から、PCに表示した6桁コードで接続してください。\nサーバー接続は正常です。入力内容は残してあります。' });
+            this.view = 'home';
             this.scrollDown();
             return;
           }

@@ -8,6 +8,7 @@
  */
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import { DevicePairingService } from './devicePairing.js';
 import type { Decision, Principal } from '../domain/types.js';
 import { nowIso } from '../../utils/date.js';
 import { CommandOrchestrator } from '../orchestrator/orchestrator.js';
@@ -150,17 +151,41 @@ export function createCommandApp(
   const promotionPipeline = new PromotionPipeline(repository);
   const incidentService = new IncidentService(repository);
 
+  // --- 端末ペアリング（iPhone接続。claimのみ認証前・LAN限定・使い捨てコード） ---
+  const pairing = new DevicePairingService();
+  app.post('/pair/claim', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { code?: string };
+    const remote = (c.env as { incoming?: { socket?: { remoteAddress?: string } } })?.incoming?.socket?.remoteAddress;
+    const result = pairing.claim(body.code ?? '', remote);
+    if (!result.ok) {
+      const map = { INVALID: [401, 'コードが違います'], EXPIRED: [410, '期限が切れました。PCで新しいコードを表示してください'], LOCKED: [429, '試行回数を超えました。PCで新しいコードを表示してください'], NOT_LAN: [403, '同じWi-Fi（社内LAN）から接続してください'] } as const;
+      const [status, message] = map[result.reason];
+      return c.json({ error: message, reason: result.reason }, status);
+    }
+    // HttpOnlyセッション（URL・画面へ秘密を出さない）。LAN HTTP運用のためSecure属性は付けない（正直な制約）
+    c.header('set-cookie', `lcc_session=${result.sid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000`);
+    return c.json({ ok: true, message: 'この端末を認証しました' });
+  });
+
   // --- Principal解決 + Rate Limit（全ルート共通） ---
   app.use('*', async (c, next) => {
     const clientKey = c.req.header('x-forwarded-for') ?? 'local';
     if (!rateLimiter.allow(clientKey)) {
       return c.json({ error: 'rate limit exceeded' }, 429);
     }
+    // 端末セッションcookie → 発行元tokenへ解決（Authorizationヘッダーが無い場合のみ）
+    let authHeader = c.req.header('authorization');
+    if (!authHeader) {
+      const cookie = c.req.header('cookie') ?? '';
+      const sid = /(?:^|;\s*)lcc_session=([^;]+)/.exec(cookie)?.[1];
+      const boundToken = pairing.resolveSession(sid);
+      if (boundToken) authHeader = `Bearer ${boundToken}`;
+    }
     // Authentication: Google Identity（設定時）→ 静的トークン の順。Authorization(RBAC)は共通。
     const principal = googleAuth
-      ? await googleAuth.authenticate(c.req.header('authorization'))
+      ? await googleAuth.authenticate(authHeader)
       : resolvePrincipal(
-          c.req.header('authorization'),
+          authHeader,
           repository.mode,
           options.apiTokens ?? process.env.LCC_COMMAND_API_TOKENS
         );
@@ -808,6 +833,19 @@ export function createCommandApp(
       connections,
       writePolicy: '外部システムへの書き込みはデフォルト無効（GET+OAuth token交換POSTのみ）'
     });
+  });
+
+  // 端末ペアリング開始（PC側・認証済みのみ）。6桁コードを返す（ログへ出さない）
+  app.post('/pair/start', (c) => {
+    const principal = c.get('principal');
+    if (!canDecideApproval(principal)) {
+      return c.json({ error: `ロール${principal.role}は端末認証コードを発行できません` }, 403);
+    }
+    const auth = c.req.header('authorization') ?? '';
+    const token = auth.replace(/^Bearer\s+/i, '');
+    if (!token) return c.json({ error: '静的トークンでの認証時のみコードを発行できます' }, 400);
+    const issued = pairing.startPairing(token);
+    return c.json({ code: issued.code, expiresInSec: issued.expiresInSec, note: 'コードは5分有効・1回限りです' });
   });
 
   // EXECUTIVE UI: ホームの「今日の意思決定」実データ（決定論actionItemsの上位。捏造なし）
