@@ -236,7 +236,26 @@ app.post('/webhooks/lineworks', async (c) => {
     const connector = createLineworksConnector();
     const input = connector.normalizeWebhookMessage(payload);
     const bundle = await analyzeAndSaveMessage(repository, input);
-    return c.json({ ok: true, bundle });
+    // DIOS §5: RawEventへ冪等登録（再送・リプレイ・重複eventを排除）+ 返信待ちタスクの自動再開。
+    // 本文は外部入力として保存のみ（本文中の指示をシステム命令として実行しない）
+    let intelligence: { deduplicated: boolean; resumedActions: number; classification: string } | null = null;
+    try {
+      const { IntelligenceStore } = await import('./command/intelligence/store.js');
+      const { classifyInbound } = await import('./command/intelligence/classify.js');
+      const store = new IntelligenceStore();
+      const p = payload as unknown as Record<string, Record<string, unknown>>;
+      const roomId = String(p.source?.roomId ?? p.source?.channelId ?? p.source?.userId ?? 'unknown');
+      const text = String((p.content as Record<string, unknown> | undefined)?.text ?? '');
+      const externalId = String(
+        (p as Record<string, unknown>).eventId ?? (p.content as Record<string, unknown> | undefined)?.messageId ?? `${roomId}:${text.slice(0, 40)}`
+      );
+      const { deduplicated } = store.ingestRawEvent({
+        companyId: 'lcc', source: 'lineworks', externalId, content: payload as unknown as Record<string, unknown>
+      });
+      const resumed = deduplicated ? [] : store.resumeWaitingByWatchKey(`lineworks:${roomId}`);
+      intelligence = { deduplicated, resumedActions: resumed.length, classification: classifyInbound(text).kind };
+    } catch { /* 取込層の失敗で受信自体は止めない */ }
+    return c.json({ ok: true, bundle, intelligence });
   } catch (error) {
     return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
   }
