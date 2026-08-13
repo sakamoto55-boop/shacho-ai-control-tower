@@ -88,8 +88,8 @@
 <body>
 <div id="app" class="mx-auto flex flex-col lg:flex-row" style="height:100dvh;max-width:1440px">
 
-  <!-- ============ LEFT: Navigation（Desktop・アイコン+日本語名称併記） ============ -->
-  <nav class="hidden lg:flex flex-col gap-1 pt-5 px-3 w-44 shrink-0" aria-label="メインナビゲーション">
+  <!-- ============ LEFT: Navigation（Desktop・アイコン+日本語名称併記。未認証時は非表示） ============ -->
+  <nav v-if="!authRequired" class="hidden lg:flex flex-col gap-1 pt-5 px-3 w-44 shrink-0" aria-label="メインナビゲーション">
     <div class="flex items-center gap-2 px-2 pb-3">
       <div class="w-9 h-9 rounded-xl glass-strong flex items-center justify-center font-black text-[color:var(--accent)]">司</div>
       <div class="leading-tight"><p class="font-bold text-sm">LCC COMMAND</p><p class="text-[8px] tracking-widest text-[color:var(--text-low)]">EXECUTIVE INTELLIGENCE OS</p></div>
@@ -114,8 +114,8 @@
             <p class="hidden lg:block text-[10px] leading-tight truncate" :class="statusClass">{{ statusLine }}<span class="mx-1">｜</span>利用者: 将軍<span v-if="lastSyncLabel" class="mx-1">｜</span>{{ lastSyncLabel }}</p>
           </div>
         </div>
-        <div class="flex items-center gap-2 shrink-0">
-          <span v-if="!connectionError && !authRequired" class="hidden lg:flex items-center gap-1 text-[10px] text-[color:var(--ok)] whitespace-nowrap"><span class="w-1.5 h-1.5 rounded-full bg-[color:var(--ok)]"></span>接続正常</span>
+        <div v-if="!authRequired" class="flex items-center gap-2 shrink-0">
+          <span v-if="!connectionError" class="hidden lg:flex items-center gap-1 text-[10px] text-[color:var(--ok)] whitespace-nowrap"><span class="w-1.5 h-1.5 rounded-full bg-[color:var(--ok)]"></span>接続正常</span>
           <button @click="enterDialogue" class="text-xs font-bold rounded-lg min-h-[44px] min-w-[44px] lg:min-h-0 lg:min-w-0 lg:px-3 lg:py-1.5 border border-[color:var(--info)]/60 text-[color:var(--info)] bg-white/5 hover:bg-white/10 whitespace-nowrap shrink-0" aria-label="対話モードへ切替"><span class="hidden lg:inline">🎙 対話モード</span><span class="lg:hidden">🎙</span></button>
           <select v-model="scope" class="bg-white/10 text-xs rounded-lg px-2 min-h-[44px] lg:min-h-0 lg:py-1.5 border border-white/20 shrink-0" aria-label="法人スコープ">
             <option value="lcc" class="text-black">LCC</option>
@@ -130,8 +130,8 @@
       </div>
     </header>
 
-    <!-- AI CORE（§2-§4。粒子集合体=LCC COMMAND固有の視覚的象徴） -->
-    <section v-show="view === 'home' || view === 'chat'" class="core-wrap relative shrink-0 select-none" :style="{height: coreHeight}" aria-label="AI CORE">
+    <!-- AI CORE（§2-§4。粒子集合体=LCC COMMAND固有の視覚的象徴。未認証時は非表示=最小画面） -->
+    <section v-show="!authRequired && (view === 'home' || view === 'chat')" class="core-wrap relative shrink-0 select-none" :style="{height: coreHeight}" aria-label="AI CORE">
       <canvas v-if="!reducedMotion" ref="coreCanvas" class="absolute inset-0 w-full h-full" @click="coreDetailOpen = !coreDetailOpen" role="button" tabindex="0"
               :aria-label="'AI CORE。現在: ' + coreSpec.label" @keydown.enter="coreDetailOpen = !coreDetailOpen"></canvas>
       <div v-else class="core-static absolute inset-0" :style="{'--core-tint': coreTint}" @click="coreDetailOpen = !coreDetailOpen"></div>
@@ -259,7 +259,7 @@
         </div>
         <div v-if="pairCode || pairCodeNote" class="mt-2 rounded-lg bg-black/30 border border-white/10 p-3 text-center">
           <p v-if="pairCode" class="text-3xl font-black tracking-[0.35em]">{{ pairCode }}</p>
-          <p class="text-[10px] text-[color:var(--text-low)] mt-1">{{ pairCodeNote }}｜iPhoneのSafariで http://192.168.128.198:8787/vui を開き、「端末を認証」にこのコードを入力してください</p>
+          <p class="text-[10px] text-[color:var(--text-low)] mt-1">{{ pairCodeNote }}｜iPhoneのSafariで <span class="font-bold">{{ pairUrls[0] || 'PCと同じWi-FiでこのLCC COMMANDのURL' }}</span> を開き、「端末を認証」にこのコードを入力してください</p>
         </div>
         <p class="text-[10px] text-[color:var(--text-low)] mt-1">状態は実取得の結果です。シート取込（SHEET_INGESTED）は本体API接続と表現しません。</p>
         <div v-if="health.loaded" class="mt-3 space-y-2">
@@ -297,6 +297,14 @@
             <option value="1.6" class="text-black">かなり早口（1.6）</option>
           </select>
         </label>
+        <div class="pt-2 border-t border-white/10 space-y-2">
+          <p class="text-[11px] font-bold">端末の認証管理</p>
+          <div class="flex gap-2">
+            <button @click="logoutDevice" class="text-[11px] px-3 py-2 rounded-lg border border-white/20 bg-white/5">この端末をログアウト</button>
+            <button @click="revokeAllDevices" class="text-[11px] px-3 py-2 rounded-lg border border-[color:var(--bad)]/50 text-[color:var(--bad)] bg-white/5">全端末を失効（社長のみ）</button>
+          </div>
+          <p v-if="pairAdminNote" class="text-[10px] text-[color:var(--text-mid)]">{{ pairAdminNote }}</p>
+        </div>
         <div class="pt-2 border-t border-white/10 text-[10px] text-[color:var(--text-low)] space-y-1">
           <p>直近応答の内部情報: {{ lastMeta.toolsUsed.join(', ') || 'なし' }}／Data: {{ lastMeta.dataStatus || '-' }}／{{ lastMeta.latencyMs }}ms</p>
           <p>配信build: {{ buildInfo.branch }}@{{ buildInfo.commit }}（{{ buildInfo.builtAt }}）</p>
@@ -377,8 +385,8 @@
       <p v-if="micNote" class="text-[10px] text-[color:var(--text-mid)] mt-1.5 text-center">{{ micNote }}</p>
     </footer>
 
-    <!-- Mobile bottom navigation（iPhone用再構成） -->
-    <nav class="bottom-nav lg:hidden" aria-label="モバイルナビゲーション">
+    <!-- Mobile bottom navigation（iPhone用再構成。未認証時は非表示） -->
+    <nav v-if="!authRequired" class="bottom-nav lg:hidden" aria-label="モバイルナビゲーション">
       <button v-for="nv in navItems.filter(n => ['home', 'chat', 'people', 'connections', 'settings'].includes(n.key))" :key="nv.key" @click="navTo(nv)" :class="{current: view === nv.view && !nv.ask}" :aria-current="view === nv.view ? 'page' : null">
         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path :d="nv.icon"/></svg>
         <span>{{ nv.short || nv.label }}</span>
@@ -664,7 +672,7 @@ createApp({
       isDesktop: window.matchMedia('(min-width: 1024px)').matches,
       /* 端末ペアリング（?token=手入力の通常導線廃止） */
       pairInput: '', pairBusy: false, pairError: '',
-      pairCode: '', pairCodeNote: '',
+      pairCode: '', pairCodeNote: '', pairUrls: [], pairAdminNote: '',
       /* EXECUTIVE COMMAND CENTER: 画面切替とホーム実データ */
       view: 'home',
       composing: false, // 日本語IME変換中の誤送信防止（compositionstart/end）
@@ -840,7 +848,21 @@ createApp({
         const body = await res.json();
         this.pairCode = body.code;
         this.pairCodeNote = body.note || '5分有効・1回限り';
+        this.pairUrls = body.pairUrls || [];
       } catch { this.pairCode = ''; this.pairCodeNote = 'コードを発行できませんでした（この端末が認証済みか確認してください）'; }
+    },
+    async logoutDevice(){
+      try { await fetch(`${this.apiBase}/command/pair/logout`, { method: 'POST', headers: this.authHeaders() }); } catch {}
+      this.pairAdminNote = 'この端末の認証を解除しました。再接続には6桁コードが必要です';
+      this.authRequired = true;
+    },
+    async revokeAllDevices(){
+      try {
+        const res = await fetch(`${this.apiBase}/command/pair/revoke-all`, { method: 'POST', headers: this.authHeaders() });
+        const body = await res.json().catch(() => ({}));
+        this.pairAdminNote = res.ok ? `全端末（${body.revoked}件）の認証を失効しました` : (body.error || '失効できませんでした');
+        if (res.ok) this.authRequired = true;
+      } catch { this.pairAdminNote = 'サーバーへ接続できません'; }
     },
     markAuth(status){
       // 401=認証不足（接続は生きている）。接続エラーとは別に扱う
@@ -1497,6 +1519,15 @@ createApp({
   },
   async mounted(){
     if (this.demoRequested) this.demoMode = true;
+    // CODEX是正3: tokenをブラウザ保存領域に永続させない。初回のみHttpOnlyセッションへ交換し、
+    // localStorage/URLから削除する（以後はcookie認証。失敗時はこの実行中のみメモリ保持）
+    if (this.apiToken) {
+      try {
+        const ex = await fetch(`${this.apiBase}/command/pair/exchange`, { method: 'POST', headers: { authorization: `Bearer ${this.apiToken}` } });
+        if (ex.ok) this.apiToken = '';
+      } catch { /* オフライン時はこの実行中のみメモリ利用 */ }
+      try { localStorage.removeItem('lcc_command_token'); } catch {}
+    }
     await this.loadKpi();
     this.loadDecisions();
     this.loadHealth();

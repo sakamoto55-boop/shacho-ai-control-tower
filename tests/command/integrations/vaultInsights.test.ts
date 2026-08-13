@@ -132,3 +132,29 @@ describe('vaultInsights（決定論・実データ形状のfixture）', () => {
     expect(act.toolsUsed).toContain('vault_action_items');
   });
 });
+
+// CODEX是正1: Drive状態は固定文言でなくintegration-statusの実状態を反映
+import { driveMaterialsStatus } from '../../../src/command/integrations/knowledge/vaultInsights.js';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join as pjoin } from 'node:path';
+
+describe('Drive状態の実反映（CODEX是正1）', () => {
+  it('LIVE_API時は未有効化と表示せず、metadata READ ONLYの能力範囲を明示する', () => {
+    const dir = mkdtempSync(pjoin(tmpdir(), 'lcc-drv-'));
+    writeFileSync(pjoin(dir, 'integration-status.json'), JSON.stringify({ sources: { gdrive: { status: 'LIVE_API', processed: 6, lastSyncedAt: '2026-08-13T12:00:00.000Z' } } }));
+    const s = driveMaterialsStatus(dir);
+    expect(s.state).toBe('LIVE_API');
+    expect(s.reason).not.toContain('未有効化');
+    expect(s.reason).toContain('metadata検索のみ');
+    expect(s.reason).toContain('本文取得不可');
+    expect(s.reason).toContain('6件');
+  });
+
+  it('ERROR時は同期時の実エラー理由、status未存在はNOT_CONNECTEDを返す', () => {
+    const dir = mkdtempSync(pjoin(tmpdir(), 'lcc-drv-'));
+    writeFileSync(pjoin(dir, 'integration-status.json'), JSON.stringify({ sources: { gdrive: { status: 'ERROR', errors: ['HTTP 403 PERMISSION_DENIED'] } } }));
+    expect(driveMaterialsStatus(dir)).toEqual({ state: 'ERROR', reason: 'HTTP 403 PERMISSION_DENIED' });
+    expect(driveMaterialsStatus(mkdtempSync(pjoin(tmpdir(), 'lcc-drv-'))).state).toBe('NOT_CONNECTED');
+  });
+});

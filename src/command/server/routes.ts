@@ -8,7 +8,20 @@
  */
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import { DevicePairingService } from './devicePairing.js';
+import { DevicePairingService, isPrivateAddress } from './devicePairing.js';
+import { networkInterfaces } from 'node:os';
+
+/** 現在のプライベートIPv4からiPhone接続URL候補を生成（IP直書き廃止・IP変更に自動追随） */
+function lanPairUrls(): string[] {
+  const urls: string[] = [];
+  const port = process.env.PORT ?? '8787';
+  for (const addrs of Object.values(networkInterfaces())) {
+    for (const a of addrs ?? []) {
+      if (a.family === 'IPv4' && !a.internal && isPrivateAddress(a.address)) urls.push(`http://${a.address}:${port}/vui`);
+    }
+  }
+  return urls;
+}
 import type { Decision, Principal } from '../domain/types.js';
 import { nowIso } from '../../utils/date.js';
 import { CommandOrchestrator } from '../orchestrator/orchestrator.js';
@@ -166,6 +179,7 @@ export function createCommandApp(
     c.header('set-cookie', `lcc_session=${result.sid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000`);
     return c.json({ ok: true, message: 'この端末を認証しました' });
   });
+  const readSid = (c: Context) => /(?:^|;\s*)lcc_session=([^;]+)/.exec(c.req.header('cookie') ?? '')?.[1];
 
   // --- Principal解決 + Rate Limit（全ルート共通） ---
   app.use('*', async (c, next) => {
@@ -173,22 +187,18 @@ export function createCommandApp(
     if (!rateLimiter.allow(clientKey)) {
       return c.json({ error: 'rate limit exceeded' }, 429);
     }
-    // 端末セッションcookie → 発行元tokenへ解決（Authorizationヘッダーが無い場合のみ）
-    let authHeader = c.req.header('authorization');
-    if (!authHeader) {
-      const cookie = c.req.header('cookie') ?? '';
-      const sid = /(?:^|;\s*)lcc_session=([^;]+)/.exec(cookie)?.[1];
-      const boundToken = pairing.resolveSession(sid);
-      if (boundToken) authHeader = `Bearer ${boundToken}`;
-    }
-    // Authentication: Google Identity（設定時）→ 静的トークン の順。Authorization(RBAC)は共通。
-    const principal = googleAuth
-      ? await googleAuth.authenticate(authHeader)
-      : resolvePrincipal(
-          authHeader,
-          repository.mode,
-          options.apiTokens ?? process.env.LCC_COMMAND_API_TOKENS
-        );
+    // 端末セッションcookie → Principalへ直接解決（tokenは保存していない）。Authorizationヘッダー優先
+    const authHeader = c.req.header('authorization');
+    const sessionPrincipal = authHeader ? null : pairing.resolveSession(readSid(c));
+    // Authentication: Google Identity（設定時）→ 静的トークン → 端末セッション の順。Authorization(RBAC)は共通。
+    const principal = sessionPrincipal
+      ?? (googleAuth
+        ? await googleAuth.authenticate(authHeader)
+        : resolvePrincipal(
+            authHeader,
+            repository.mode,
+            options.apiTokens ?? process.env.LCC_COMMAND_API_TOKENS
+          ));
     if (!principal) {
       return c.json({ error: 'unauthorized: 有効な認証情報が必要です' }, 401);
     }
@@ -835,17 +845,40 @@ export function createCommandApp(
     });
   });
 
-  // 端末ペアリング開始（PC側・認証済みのみ）。6桁コードを返す（ログへ出さない）
+  // 端末ペアリング開始（PC側・認証済みのみ）。6桁コードを返す（ログへ出さない・tokenは保存しない）
   app.post('/pair/start', (c) => {
     const principal = c.get('principal');
     if (!canDecideApproval(principal)) {
       return c.json({ error: `ロール${principal.role}は端末認証コードを発行できません` }, 403);
     }
-    const auth = c.req.header('authorization') ?? '';
-    const token = auth.replace(/^Bearer\s+/i, '');
-    if (!token) return c.json({ error: '静的トークンでの認証時のみコードを発行できます' }, 400);
-    const issued = pairing.startPairing(token);
-    return c.json({ code: issued.code, expiresInSec: issued.expiresInSec, note: 'コードは5分有効・1回限りです' });
+    const issued = pairing.startPairing(principal);
+    return c.json({ code: issued.code, expiresInSec: issued.expiresInSec, note: 'コードは5分有効・1回限りです', pairUrls: lanPairUrls() });
+  });
+
+  // ?token=→HttpOnlyセッションへの交換（PC側もtokenをlocalStorageへ永続保存しない）
+  app.post('/pair/exchange', (c) => {
+    const principal = c.get('principal');
+    const sid = pairing.issueSession(principal, c.req.header('user-agent') ?? '');
+    c.header('set-cookie', `lcc_session=${sid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000`);
+    return c.json({ ok: true });
+  });
+
+  // 現在端末のログアウト
+  app.post('/pair/logout', (c) => {
+    pairing.revoke(readSid(c));
+    c.header('set-cookie', 'lcc_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
+    return c.json({ ok: true, message: 'この端末の認証を解除しました' });
+  });
+
+  // 全端末失効（PRESIDENTのみ）
+  app.post('/pair/revoke-all', (c) => {
+    const principal = c.get('principal');
+    if (principal.role !== 'PRESIDENT') {
+      return c.json({ error: '全端末失効はPRESIDENTのみ実行できます' }, 403);
+    }
+    const n = pairing.revokeAll();
+    c.header('set-cookie', 'lcc_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
+    return c.json({ ok: true, revoked: n });
   });
 
   // EXECUTIVE UI: ホームの「今日の意思決定」実データ（決定論actionItemsの上位。捏造なし）

@@ -231,12 +231,35 @@ export function projectFinance(query: string, vaultDir = defaultVaultDir()): Pro
     candidatesShown: shown.length,
     totalMatched: hits.length,
     dataBasis: { source: 'sheets:lcc-integrated-db（projectsタブ）+ sheets:lcc-case-db（05_documents）', syncedAt: latestSyncedAt(projects) },
-    driveMaterials: { state: 'ERROR', reason: 'Drive APIがGCPプロジェクトで未有効化のため関連資料検索は未接続（有効化後にnpm run sync:driveで接続）' },
+    driveMaterials: driveMaterialsStatus(),
     notes: [
       '金額欄が「未入力」の場合、シート上が0または空であることを意味し、0円と断定しません',
       '受注額の専用列はソースに存在しないため、見積税込（estimateTotal）を代表金額として表示しています'
     ]
   };
+}
+
+/**
+ * Drive資料検索の現在状態（固定文言禁止・integration-statusの実同期結果を反映）。
+ * LIVE_API時も能力範囲を正直に表示: SA共有範囲・metadata READ ONLY・本文取得不可。
+ */
+export function driveMaterialsStatus(dataDir = process.env.LCC_INTEGRATION_DATA_DIR ?? './data'): { state: string; reason: string } {
+  try {
+    const parsed = JSON.parse(readFileSync(join(dataDir, 'integration-status.json'), 'utf8')) as {
+      sources?: Record<string, { status?: string; processed?: number; lastSyncedAt?: string; errors?: string[] }>;
+    };
+    const d = parsed.sources?.['gdrive'];
+    if (!d) return { state: 'NOT_CONNECTED', reason: 'Drive同期が未実行です（npm run sync:drive）' };
+    if (d.status === 'LIVE_API') {
+      return {
+        state: 'LIVE_API',
+        reason: `SA共有範囲のmetadata検索のみ（READ ONLY・本文取得不可）。検索可能${d.processed ?? 0}件・最終同期${(d.lastSyncedAt ?? '').slice(0, 16).replace('T', ' ')}`
+      };
+    }
+    return { state: d.status ?? 'ERROR', reason: d.errors?.[0] ?? 'Drive接続エラー（詳細はデータ接続画面）' };
+  } catch {
+    return { state: 'NOT_CONNECTED', reason: 'Drive状態を確認できません（同期未実行）' };
+  }
 }
 
 /* ============================================================
