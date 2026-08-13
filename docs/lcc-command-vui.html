@@ -349,7 +349,7 @@
 
     <!-- Mobile bottom navigation（iPhone用再構成） -->
     <nav class="bottom-nav lg:hidden" aria-label="モバイルナビゲーション">
-      <button v-for="nv in navItems.slice(0, 5)" :key="nv.key" @click="navTo(nv)" :class="{current: view === nv.view && !nv.ask}" :aria-current="view === nv.view ? 'page' : null">
+      <button v-for="nv in navItems.filter(n => ['home', 'chat', 'people', 'connections', 'settings'].includes(n.key))" :key="nv.key" @click="navTo(nv)" :class="{current: view === nv.view && !nv.ask}" :aria-current="view === nv.view ? 'page' : null">
         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path :d="nv.icon"/></svg>
         <span>{{ nv.short || nv.label }}</span>
       </button>
