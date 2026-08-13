@@ -30,7 +30,7 @@ describe('EXECUTIVE COMMAND CENTER UI（UI REBUILD検収）', () => {
     expect(UI_HTML).toContain('データ接続');
     const nav = UI_HTML.match(/<nav[^>]*メインナビゲーション[\s\S]*?<\/nav>/);
     expect(nav).toBeTruthy();
-    expect(/[💬☀️🧠⚙️]/u.test(nav![0])).toBe(false);
+    for (const emoji of ['💬', '☀️', '🧠', '⚙️']) expect(nav![0].includes(emoji)).toBe(false);
   });
 
   it('KPI未取得時は—+理由+接続状態導線を表示する（架空数値なし）', () => {

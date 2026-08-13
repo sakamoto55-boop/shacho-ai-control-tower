@@ -177,7 +177,8 @@ export interface ProjectFinanceCard {
 }
 
 function normalizeName(s: string): string {
-  return s.replace(/[\s　]/g, '').toLowerCase();
+  // U+3000=全角スペース（案件名の全角空白対策）
+  return s.replace(/[\s\u3000]/g, '').toLowerCase();
 }
 
 export function projectFinance(query: string, vaultDir = defaultVaultDir()): ProjectFinanceCard {
