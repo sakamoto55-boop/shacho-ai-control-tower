@@ -482,6 +482,41 @@ export function createCommandApp(
     return c.json({ research: store.research });
   });
 
+  // DIOS §7: queued止まりだったResearchTaskの実処理（Job Runner）。
+  // 未設定ProviderはWAITING_PROVIDER/NOT_CONFIGUREDを正直に返す。外部AI回答は仮説扱いでAgentRunへ記録
+  app.post('/research/run', async (c) => {
+    const principal = c.get('principal');
+    if (!canDecideApproval(principal)) {
+      return c.json({ error: `ロール${principal.role}は調査実行を指示できません` }, 403);
+    }
+    const { IntelligenceJobRunner, providersFromEnv } = await import('../intelligence/jobRunner.js');
+    const { IntelligenceStore } = await import('../intelligence/store.js');
+    const runner = new IntelligenceJobRunner({
+      store: new IntelligenceStore(),
+      saveResearch: (t) => repository.saveResearch(t),
+      providers: await providersFromEnv()
+    });
+    const store = await repository.getStore();
+    const results = await runner.runPending(store.research, Number(c.req.query('limit') ?? 3));
+    return c.json({
+      processed: results.length,
+      results: results.map((r) => ({
+        researchId: r.task.researchId, status: r.task.status,
+        runStatus: r.run.status, provider: r.run.provider, trust: r.run.resultTrust
+      }))
+    });
+  });
+
+  // DIOS: AgentRun履歴（監査用。仮説/提案区分・Provider・所要を含む）
+  app.get('/agent-runs', async (c) => {
+    const principal = c.get('principal');
+    if (!canDecideApproval(principal)) {
+      return c.json({ error: `ロール${principal.role}は実行履歴を参照できません` }, 403);
+    }
+    const { IntelligenceStore } = await import('../intelligence/store.js');
+    return c.json({ runs: new IntelligenceStore().agentRuns().slice(-50) });
+  });
+
   app.get('/data-quality', async (c) => {
     // データ不整合の検出結果（Phase B0は検出のみ。自動修正しない）
     try {
