@@ -154,23 +154,54 @@ app.get('/dev/reply-drafts', async (c) => {
   }
 });
 
+// CODEX是正4: レポート生成ジョブは認証必須（LCC_COMMAND_API_TOKENSのBearer一致）
+const jobAuthorized = (c: { req: { header(name: string): string | undefined } }): boolean => {
+  const tokensJson = process.env.LCC_COMMAND_API_TOKENS;
+  if (!tokensJson) return process.env.NODE_ENV !== 'production'; // productionでtoken未設定なら拒否
+  try {
+    const tokens = JSON.parse(tokensJson) as Record<string, unknown>;
+    const bearer = (c.req.header('authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
+    return Boolean(bearer && tokens[bearer]);
+  } catch {
+    return false;
+  }
+};
+
 app.post('/jobs/report/morning', async (c) => {
+  if (!jobAuthorized(c)) return c.json({ error: 'unauthorized: レポート実行には認証が必要です' }, 401);
   const report = await generateAndSendReport(repository, 'morning');
   return c.json(report);
 });
 
 app.post('/jobs/report/noon', async (c) => {
+  if (!jobAuthorized(c)) return c.json({ error: 'unauthorized: レポート実行には認証が必要です' }, 401);
   const report = await generateAndSendReport(repository, 'noon');
   return c.json(report);
 });
 
 app.post('/jobs/report/evening', async (c) => {
+  if (!jobAuthorized(c)) return c.json({ error: 'unauthorized: レポート実行には認証が必要です' }, 401);
   const report = await generateAndSendReport(repository, 'evening');
   return c.json(report);
 });
 
 app.post('/webhooks/lineworks', async (c) => {
   try {
+    // CODEX是正4: productionは署名検証必須。secret未設定なら受理しない（偽Webhookでの受信箱汚染防止）
+    if (process.env.NODE_ENV === 'production') {
+      const secret = process.env.LINEWORKS_WEBHOOK_SECRET;
+      if (!secret) {
+        return c.json({ error: 'webhook rejected: LINEWORKS_WEBHOOK_SECRET未設定のためproductionでは受理しません' }, 503);
+      }
+      const rawBody = await c.req.raw.clone().text();
+      const signature = c.req.header('x-works-signature') ?? '';
+      const { createHmac, timingSafeEqual } = await import('node:crypto');
+      const expected = createHmac('sha256', secret).update(rawBody).digest('base64');
+      const valid =
+        signature.length === expected.length &&
+        timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+      if (!valid) return c.json({ error: 'webhook rejected: 署名が一致しません' }, 401);
+    }
     const payload = (await c.req.json()) as LineworksWebhookPayload;
     const connector = createLineworksConnector();
     const input = connector.normalizeWebhookMessage(payload);
