@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   // グローバルignore（他のキーと同居させると対象ファイル限定になるため単独オブジェクトにする）
-  { ignores: ['dist/**', 'node_modules/**', 'data/**', 'prettier.config.cjs'] },
+  { ignores: ['dist/**', 'node_modules/**', 'data/**', 'prettier.config.cjs', 'docs/vendor/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

@@ -135,9 +135,7 @@ describe('vaultInsights（決定論・実データ形状のfixture）', () => {
 
 // CODEX是正1: Drive状態は固定文言でなくintegration-statusの実状態を反映
 import { driveMaterialsStatus } from '../../../src/command/integrations/knowledge/vaultInsights.js';
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join as pjoin } from 'node:path';
+const pjoin = join;
 
 describe('Drive状態の実反映（CODEX是正1）', () => {
   it('LIVE_API時は未有効化と表示せず、metadata READ ONLYの能力範囲を明示する', () => {

@@ -165,14 +165,21 @@ describe('LIVE-AI: 実ファイル生成Renderer（§16-§22）', () => {
     repository = new InMemoryCommandRepository();
   });
 
-  it('PPTX: 経営会議プレゼンを決定論データから実ファイル生成する', async () => {
+  it('PPTX: 脆弱性隔離のため未同梱時は偽の完成品を返さず正直なエラー（CODEX是正7）', async () => {
+    // pptxgenjs（→image-size High・修正版なし）は既定依存から隔離。Spec構築（決定論）は維持
     const dataset = await repository.getDataset(ASOF);
     const spec = buildManagementDeckSpec(dataset, 'lcc');
     expect(spec.slides.length).toBeGreaterThanOrEqual(3);
-    const path = await renderPresentation(spec, 'test-deck');
-    expect(statSync(path).size).toBeGreaterThan(10_000);
-    expect(readFileSync(path).subarray(0, 2).toString('latin1')).toBe('PK'); // OOXML zip
-    rmSync(path, { force: true });
+    let installed = true;
+    try { await import('pptxgenjs' as string); } catch { installed = false; }
+    if (installed) {
+      const path = await renderPresentation(spec, 'test-deck');
+      expect(statSync(path).size).toBeGreaterThan(10_000);
+      expect(readFileSync(path).subarray(0, 2).toString('latin1')).toBe('PK'); // OOXML zip
+      rmSync(path, { force: true });
+    } else {
+      await expect(renderPresentation(spec, 'test-deck')).rejects.toThrow('脆弱性隔離');
+    }
   });
 
   it('XLSX: 見積草案Workbook（数式・検証・複数シート）を生成し再読込できる', async () => {
@@ -213,17 +220,26 @@ describe('LIVE-AI: 実ファイル生成Renderer（§16-§22）', () => {
     const bus = new CommandEventBus();
     const orchestrator = new CommandOrchestrator(repository, { eventBus: bus });
     const res = await orchestrator.chat({ message: '経営会議のプレゼン作って', scope: 'lcc', asOf: ASOF });
-    expect(res.text).toContain('PPTXを生成しました');
     expect(res.text).toContain('決定論エンジン');
     const artifacts = await repository.getArtifacts();
     expect(artifacts).toHaveLength(1);
-    expect(artifacts[0].status).toBe('COMPLETED');
-    expect(artifacts[0].storageLocation).toBeTruthy();
-    expect(statSync(artifacts[0].storageLocation as string).size).toBeGreaterThan(10_000);
+    let pptxInstalled = true;
+    try { await import('pptxgenjs' as string); } catch { pptxInstalled = false; }
+    if (pptxInstalled) {
+      expect(res.text).toContain('PPTXを生成しました');
+      expect(artifacts[0].status).toBe('COMPLETED');
+      expect(artifacts[0].storageLocation).toBeTruthy();
+      expect(statSync(artifacts[0].storageLocation as string).size).toBeGreaterThan(10_000);
+      rmSync(artifacts[0].storageLocation as string, { force: true });
+    } else {
+      // CODEX是正7: 隔離時は偽の完成品を返さずPLANNED+正直な通知
+      expect(res.text).toContain('保留しました');
+      expect(res.text).toContain('脆弱性隔離');
+      expect(artifacts[0].status).toBe('PLANNED');
+    }
     // §36: 進捗イベント（生成中表示）がEvent Busへ流れる
     const events = bus.recent(100);
     expect(events.some((e) => e.displayLabel?.includes('スライド'))).toBe(true);
-    rmSync(artifacts[0].storageLocation as string, { force: true });
   });
 
   it('画像生成は未接続を正直に伝える（§46: できますと言わない）', async () => {

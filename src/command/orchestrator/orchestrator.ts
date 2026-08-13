@@ -2935,13 +2935,25 @@ export class CommandOrchestrator {
       asOf: now
     });
 
+    let isolatedNote = '';
     if (artifactType === 'PPTX') {
       emit('データを確認しています');
       const spec = buildManagementDeckSpec(ctx.dataset, ctx.scope, stamp);
       emit('グラフを作成しています');
       emit(`${spec.slides.length + 1}枚のスライドを生成しています`);
-      storageLocation = await renderPresentation(spec, fileBase, renderOptions);
-      steps = ['社内データ確認', '決定論集計', `スライド${spec.slides.length + 1}枚生成`];
+      try {
+        storageLocation = await renderPresentation(spec, fileBase, renderOptions);
+        steps = ['社内データ確認', '決定論集計', `スライド${spec.slides.length + 1}枚生成`];
+      } catch (e) {
+        // CODEX是正7（機能隔離）: PPTXライブラリ未同梱時は偽の完成品を返さずPLANNED+正直な通知
+        if (e instanceof Error && e.message.includes('脆弱性隔離')) {
+          isolatedNote = e.message;
+          storageLocation = '';
+          steps = ['社内データ確認', '決定論集計', `スライド${spec.slides.length + 1}枚の構成準備（実ファイル生成は保留）`];
+        } else {
+          throw e;
+        }
+      }
     } else if (artifactType === 'XLSX') {
       emit('既存正本を確認しています');
       // 見積「案」= 草案Workbook / 見積管理・台帳・案件管理 = 実データ台帳（§検収4）
@@ -2973,7 +2985,7 @@ export class CommandOrchestrator {
       throw new Error(`${artifactType} は現在この経路では生成できません`);
     }
 
-    this.options.eventBus?.emit({ event: 'TOOL_COMPLETED', displayLabel: '成果物が完成しました' });
+    this.options.eventBus?.emit({ event: 'TOOL_COMPLETED', displayLabel: isolatedNote ? '構成の準備が完了しました（実ファイルは保留）' : '成果物が完成しました' });
     const artifact = await this.artifactService.register(
       {
         type: artifactType,
@@ -2982,16 +2994,17 @@ export class CommandOrchestrator {
         sourceData: ['deterministic-engines'],
         sourceEvidence,
         sourceMemoryIds: [],
-        status: 'COMPLETED',
+        status: isolatedNote ? 'PLANNED' : 'COMPLETED',
         storageLocation,
         purpose: message.slice(0, 80)
       },
       now
     );
     const lines = [
-      `【${artifactType}を生成しました】`,
+      isolatedNote ? `【${artifactType}の実ファイル生成は保留しました（内容は準備済み）】` : `【${artifactType}を生成しました】`,
+      ...(isolatedNote ? [`⚠ ${isolatedNote}`, ''] : []),
       ...(constitutionHits.length > 0 ? [...constitutionHits.map((h) => `⚠ ${h.warning}`), ''] : []),
-      `保存先: ${storageLocation}`,
+      ...(isolatedNote ? [] : [`保存先: ${storageLocation}`]),
       `Snapshot: ${stamp.snapshotId} / scope: ${stamp.scopeLabel}（${stamp.scope}） / ${stamp.confidence}`,
       `成果物ID: ${artifact.artifactId}（Artifact Registryに目的・出典付きで記録済み）`,
       '',

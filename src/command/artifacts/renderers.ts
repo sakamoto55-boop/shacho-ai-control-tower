@@ -8,11 +8,22 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import pptxgen from 'pptxgenjs';
-// pptxgenjsの型定義はdefault exportがコンストラクタとして解決されないためinterop
+// CODEX是正7（機能隔離）: pptxgenjs→image-sizeのHigh脆弱性に修正版が存在しないため、
+// pptxgenjsは既定依存から除外した。PPTXが必要な場合のみ `npm install --no-save pptxgenjs` で
+// 手動導入する（lazy importで検出。未導入時は偽の完成品を返さず正直にエラー）。
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-// tsx実行時はCJS interopでdefaultが二重ラップされるため両形状に対応する
-const PptxGenJS = (((pptxgen as unknown as { default?: unknown }).default ?? pptxgen) as unknown) as new () => any;
+async function loadPptxGen(): Promise<new () => any> {
+  try {
+    const mod = (await import('pptxgenjs' as string)) as { default?: unknown };
+    // tsx実行時はCJS interopでdefaultが二重ラップされるため両形状に対応する
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ((mod.default as { default?: unknown })?.default ?? mod.default ?? mod) as new () => any;
+  } catch {
+    throw new Error(
+      'PPTX生成ライブラリは脆弱性隔離のため同梱していません（image-size High脆弱性に修正版なし）。必要な場合のみ npm install --no-save pptxgenjs で導入してください'
+    );
+  }
+}
 import ExcelJS from 'exceljs';
 import {
   AlignmentType,
@@ -58,6 +69,7 @@ export interface RenderOptions {
 }
 
 export async function renderPresentation(spec: PresentationSpec, fileBase: string, options: RenderOptions = {}): Promise<string> {
+  const PptxGenJS = await loadPptxGen();
   const pptx = new PptxGenJS();
   pptx.defineLayout({ name: 'WIDE', width: 13.33, height: 7.5 });
   pptx.layout = 'WIDE';
