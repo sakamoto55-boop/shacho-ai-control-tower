@@ -78,7 +78,11 @@
   .bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:var(--z-nav);display:flex;background:rgba(6,12,30,0.92);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
   .bottom-nav button{flex:1;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--text-mid)}
   .bottom-nav button.current{color:var(--accent)}
-  @media (max-width:1023px){ .dlg-canvas-wrap{width:94vw;height:70dvh} .dlg-subtitle{font-size:13px} }
+  @media (max-width:1023px){
+    .dlg-canvas-wrap{width:94vw;height:70dvh} .dlg-subtitle{font-size:13px}
+    /* モバイル: Role Ringは読めない薄文字になるため非表示（AI COREは粒子+状態1行に統合） */
+    .role-chip{display:none}
+  }
 </style>
 </head>
 <body>
@@ -100,25 +104,30 @@
   <!-- ============ CENTER ============ -->
   <div class="flex flex-col flex-1 min-w-0" style="height:100dvh">
 
-    <!-- TOP: ヘッダー（利用者・実データ状態・最終同期・接続正常表示） -->
+    <!-- TOP: ヘッダー（モバイル=2行構造・縦書き禁止・エラーは下の1本バーへ統合） -->
     <header class="px-4 pt-3">
-      <div class="flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2 min-w-0">
-          <div class="lg:hidden w-8 h-8 rounded-lg glass-strong flex items-center justify-center font-black text-[color:var(--accent)]">司</div>
+      <div class="flex items-center justify-between gap-2 flex-nowrap">
+        <div class="flex items-center gap-2 min-w-0 shrink">
+          <div class="lg:hidden w-8 h-8 rounded-lg glass-strong flex items-center justify-center font-black text-[color:var(--accent)] shrink-0">司</div>
           <div class="min-w-0">
-            <h1 class="font-bold leading-tight tracking-wide lg:hidden">LCC COMMAND</h1>
-            <p class="text-[10px] leading-tight truncate" :class="statusClass">{{ statusLine }}<span class="mx-1">｜</span>利用者: 将軍<span v-if="lastSyncLabel" class="mx-1">｜</span>{{ lastSyncLabel }}</p>
+            <h1 class="font-bold leading-tight tracking-wide whitespace-nowrap lg:hidden">LCC COMMAND</h1>
+            <p class="hidden lg:block text-[10px] leading-tight truncate" :class="statusClass">{{ statusLine }}<span class="mx-1">｜</span>利用者: 将軍<span v-if="lastSyncLabel" class="mx-1">｜</span>{{ lastSyncLabel }}</p>
           </div>
         </div>
-        <div class="flex items-center gap-2">
-          <span v-if="!connectionError" class="hidden sm:flex items-center gap-1 text-[10px] text-[color:var(--ok)]"><span class="w-1.5 h-1.5 rounded-full bg-[color:var(--ok)]"></span>接続正常</span>
-          <span v-else class="flex items-center gap-1 text-[10px] text-[color:var(--bad)] font-bold"><span class="w-1.5 h-1.5 rounded-full bg-[color:var(--bad)]"></span>接続に問題</span>
-          <button @click="enterDialogue" class="text-xs font-bold rounded-lg px-3 py-1.5 border border-[color:var(--info)]/60 text-[color:var(--info)] bg-white/5 hover:bg-white/10" aria-label="対話モードへ切替">🎙 対話モード</button>
-          <select v-model="scope" class="bg-white/10 text-xs rounded-lg px-2 py-1.5 border border-white/20" aria-label="法人スコープ">
+        <div class="flex items-center gap-2 shrink-0">
+          <span v-if="!connectionError && !authRequired" class="hidden lg:flex items-center gap-1 text-[10px] text-[color:var(--ok)] whitespace-nowrap"><span class="w-1.5 h-1.5 rounded-full bg-[color:var(--ok)]"></span>接続正常</span>
+          <button @click="enterDialogue" class="text-xs font-bold rounded-lg px-3 min-h-[44px] lg:min-h-0 lg:py-1.5 border border-[color:var(--info)]/60 text-[color:var(--info)] bg-white/5 hover:bg-white/10 whitespace-nowrap shrink-0" aria-label="対話モードへ切替"><span class="hidden lg:inline">🎙 対話モード</span><span class="lg:hidden">🎙 対話</span></button>
+          <select v-model="scope" class="bg-white/10 text-xs rounded-lg px-2 min-h-[44px] lg:min-h-0 lg:py-1.5 border border-white/20 shrink-0" aria-label="法人スコープ">
             <option value="lcc" class="text-black">LCC</option>
             <option value="group" class="text-black">グループ全体</option>
           </select>
         </div>
+      </div>
+      <!-- 異常時のみの単一ステータスバー（認証と接続を区別・二重表示禁止） -->
+      <div v-if="authRequired || connectionError" class="mt-2 flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[11px]"
+           :class="authRequired ? 'bg-[color:var(--warn)]/15 text-[color:var(--warn)]' : 'bg-[color:var(--bad)]/15 text-[color:var(--bad)]'">
+        <span class="whitespace-normal">{{ authRequired ? '認証が必要です。URL末尾に ?token=（PCのlcc-ui-token.txtの1行）を付けて開き直してください' : '一部データを取得できません（サーバー接続に問題）' }}</span>
+        <button @click="view = 'connections'; loadHealth()" class="font-bold underline shrink-0 min-h-[44px] lg:min-h-0">詳細</button>
       </div>
     </header>
 
@@ -167,12 +176,13 @@
             <template v-else-if="decisions.loaded">接続済みソースから抽出できる要対応はありません</template>
             <template v-else>{{ decisions.reason || 'データ取得中…' }}</template>
           </p>
-          <div class="flex gap-2 mt-3">
-            <button @click="askFromHome('今日の要対応を、重要度順に根拠付きで教えて')" class="text-xs font-bold rounded-lg px-4 py-2.5 bg-[color:var(--accent-deep)] text-white">最優先を確認</button>
-            <button @click="askFromHome('おはよう')" class="text-xs font-bold rounded-lg px-4 py-2.5 border border-white/20 bg-white/5">朝ブリーフを聞く</button>
+          <div class="flex gap-2 mt-3 items-center">
+            <button @click="askFromHome('今日の要対応を、重要度順に根拠付きで教えて')" class="text-xs font-bold rounded-lg px-4 py-2.5 min-h-[44px] bg-[color:var(--accent-deep)] text-white">最優先を確認</button>
+            <button @click="askFromHome('おはよう')" class="text-[11px] rounded-lg px-3 py-2.5 min-h-[44px] text-[color:var(--text-mid)] border border-white/15 bg-white/5">朝ブリーフを聞く</button>
           </div>
         </div>
-        <div class="surface p-4">
+        <!-- AI CORE詳細カードはPCのみ（モバイルはCORE帯+状態1行に統合し重複させない） -->
+        <div class="surface p-4 hidden lg:block">
           <p class="text-[10px] tracking-widest text-[color:var(--text-low)] font-bold">AI CORE</p>
           <p class="text-sm mt-1">{{ coreSpec.label }}</p>
           <ul class="mt-2 space-y-1 text-[11px] text-[color:var(--text-mid)]">
@@ -329,8 +339,13 @@
       </div>
     </main>
 
+    <!-- モバイルのホームはCOMMANDバー非表示（本文を覆わない）。AIに聞く導線のみ -->
+    <div v-if="view === 'home' && !isDesktop" class="px-4 pb-[calc(64px+env(safe-area-inset-bottom))]">
+      <button @click="view = 'chat'; $nextTick(() => focusInput())" class="w-full min-h-[44px] rounded-xl border border-white/15 bg-white/5 text-[12px] text-[color:var(--text-mid)]">💬 AIに聞く（質問・音声入力はこちら）</button>
+    </div>
+
     <!-- BOTTOM: COMMAND入力（暗色統一サーフェス・IME誤送信防止・エラー時入力保持） -->
-    <footer v-show="view === 'home' || view === 'chat'" class="px-4 pt-1 pb-[calc(64px+env(safe-area-inset-bottom))] lg:pb-4">
+    <footer v-show="view === 'chat' || (view === 'home' && isDesktop)" class="px-4 pt-1 pb-[calc(64px+env(safe-area-inset-bottom))] lg:pb-4">
       <div v-if="view === 'chat'" class="flex flex-wrap gap-1.5 mb-1.5">
         <button v-for="q in presetQuestions" :key="q" @click="send(q)"
                 class="text-[11px] px-2.5 py-1.5 rounded-full border border-white/15 bg-white/5 text-[color:var(--text-mid)] hover:bg-white/10">{{ q }}</button>
@@ -630,6 +645,8 @@ createApp({
       demoRequested: new URLSearchParams(location.search).get('demo') === '1',
       demoMode: false,
       connectionError: false,
+      authRequired: false, // 401時にtrue。認証エラーを接続エラーと混同表示しない
+      isDesktop: window.matchMedia('(min-width: 1024px)').matches,
       /* EXECUTIVE COMMAND CENTER: 画面切替とホーム実データ */
       view: 'home',
       composing: false, // 日本語IME変換中の誤送信防止（compositionstart/end）
@@ -685,12 +702,14 @@ createApp({
     roleRing(){ return ROLE_RING; },
     coreHeight(){
       const w = window.innerWidth;
-      const ratio = w >= 1024 ? (this.scrolled ? 0.22 : 0.3) : (this.scrolled ? 0.16 : 0.3);
-      return Math.round(window.innerHeight * ratio) + 'px';
+      // モバイルは固定170-200px帯（本文を圧迫しない・主役として中央表示）
+      if (w < 1024) return (this.scrolled ? 150 : 185) + 'px';
+      return Math.round(window.innerHeight * (this.scrolled ? 0.22 : 0.3)) + 'px';
     },
     ringSize(){ return (window.innerWidth >= 1024 ? 340 : 250) + 'px'; },
     statusLine(){
       if (this.demoMode) return 'デモモード（実データ表示なし）';
+      if (this.authRequired) return '認証が必要（接続は正常）';
       if (this.connectionError) return 'データ取得できません（接続に問題）';
       return this.health.loaded && this.health.limitedCount > 0 ? '実データ（一部制限あり）' : '実データ';
     },
@@ -775,11 +794,19 @@ createApp({
       ev.preventDefault();
       this.send(this.draft);
     },
+    markAuth(status){
+      // 401=認証不足（接続は生きている）。接続エラーとは別に扱う
+      if (status === 401) { this.authRequired = true; return true; }
+      return false;
+    },
     async loadDecisions(){
       // ホームの件数は実データのみ（取得不能なら—と理由。捏造しない）
       try {
         const res = await fetch(`${this.apiBase}/command/today/decisions`, { headers: this.authHeaders() });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
+        if (!res.ok) {
+          if (this.markAuth(res.status)) { this.decisions = { loaded: false, items: [], reason: '認証が必要（tokenを付けて開き直し）' }; return; }
+          throw new Error('HTTP ' + res.status);
+        }
         const body = await res.json();
         this.decisions = { loaded: true, items: body.items || [], reason: '' };
       } catch (e) {
@@ -789,7 +816,10 @@ createApp({
     async loadHealth(){
       try {
         const res = await fetch(`${this.apiBase}/command/health/connections`, { headers: this.authHeaders() });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
+        if (!res.ok) {
+          if (this.markAuth(res.status)) { this.health = { loaded: false, connections: [], okCount: 0, limitedCount: 0, reason: '認証が必要（tokenを付けて開き直し）' }; return; }
+          throw new Error('HTTP ' + res.status);
+        }
         const body = await res.json();
         const conns = body.connections || [];
         this.health = {
@@ -1090,6 +1120,17 @@ createApp({
             method: 'POST', headers: { 'content-type': 'application/json', ...this.authHeaders() },
             body: JSON.stringify({ message, scope: this.scope, sessionId: this.sessionId })
           });
+          if (res.status === 401) {
+            // 認証エラーは接続エラーと区別して案内（入力は保持）
+            this.authRequired = true;
+            this.draft = message;
+            this.thinking = false;
+            this.setState('IDLE');
+            this.messages.push({ role: 'ai', done: true, confidence: 'HIGH', evidence: [],
+              text: '【認証が必要です】\nこの端末はまだ認証されていません。URL末尾に ?token=（PCのlcc-ui-token.txtの1行）を付けて開き直してください。\nサーバー接続は正常です。入力内容は残してあります。' });
+            this.scrollDown();
+            return;
+          }
           if (!res.ok) throw new Error('chat failed');
           const body = await res.json();
           await this.visualizeEvents();
@@ -1234,6 +1275,7 @@ createApp({
     async loadKpi(){
       try {
         const res = await fetch(`${this.apiBase}/command/kpi?scope=${this.scope}`, { headers: this.authHeaders() });
+        if (res.status === 401) { this.markAuth(401); return; }
         if (!res.ok) throw new Error('kpi failed');
         const body = await res.json();
         const find = (key) => (body.kpis || []).find(k => k.key === key);
@@ -1417,6 +1459,8 @@ createApp({
       this.scrolled = this.$refs.chatArea.scrollTop > 40;
     });
     window.addEventListener('beforeunload', () => cancelAnimationFrame(this._raf));
+    // 画面回転・リサイズでPC/モバイル判定を追随（landscape対応）
+    window.matchMedia('(min-width: 1024px)').addEventListener('change', (e) => { this.isDesktop = e.matches; });
   }
 }).mount('#app');
 </script>

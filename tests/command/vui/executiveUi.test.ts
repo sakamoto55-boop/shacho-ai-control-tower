@@ -56,6 +56,23 @@ describe('EXECUTIVE COMMAND CENTER UI（UI REBUILD検収）', () => {
     expect(UI_HTML).not.toContain('会話から学習した内容が表示されます');
   });
 
+  it('認証エラー(401)を接続エラーと区別して表示する（MOBILE VISUAL CORRECTION）', () => {
+    expect(UI_HTML).toContain('authRequired');
+    expect(UI_HTML).toContain('認証が必要です');
+    expect(UI_HTML).toContain('接続は正常');
+    expect(UI_HTML).toContain("markAuth(res.status)");
+  });
+
+  it('モバイルは縦書き禁止・単一ステータスバー・AI CORE重複なし・ホームで入力バー非表示', () => {
+    expect(UI_HTML).not.toContain('writing-mode');
+    expect(UI_HTML).toContain('whitespace-nowrap'); // ヘッダーボタンの1文字折返し防止
+    expect(UI_HTML).toContain('単一ステータスバー');
+    expect(UI_HTML).toContain('hidden lg:block'); // AI CORE詳細カードはPCのみ
+    expect(UI_HTML).toContain("view === 'chat' || (view === 'home' && isDesktop)"); // モバイルホームは入力バー非表示
+    expect(UI_HTML).toContain('AIに聞く（質問・音声入力はこちら）');
+    expect(UI_HTML).toMatch(/max-width:1023px[\s\S]*?\.role-chip\{display:none\}/); // モバイルはRole Ring非表示
+  });
+
   it('接続エラー時に入力内容を保持する', () => {
     expect(UI_HTML).toContain('エラー時も入力内容を保持');
     expect(UI_HTML).toContain('入力内容は残してあります');
