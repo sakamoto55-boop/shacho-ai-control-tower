@@ -9,6 +9,23 @@ import { GmailClient, loadGmailConfig, resolveGmailAuthState } from '../src/comm
 
 const config = loadGmailConfig('.');
 const state = resolveGmailAuthState(config);
+
+// ロールバック用: npm run gmail:authorize -- --stop で watch を解除（token・メールへの影響なし）
+if (process.argv.includes('--stop')) {
+  if (state.state !== 'READY') {
+    console.error('[gmail] 認可済みtokenがないため解除対象のwatchはありません');
+    process.exit(2);
+  }
+  const c = new GmailClient(config);
+  try {
+    await c.stopWatch();
+    console.log('[gmail] users.stop 完了（watch解除。再開は npm run subscribers）');
+    process.exit(0);
+  } catch (e) {
+    console.error(`[gmail] watch解除に失敗: ${e instanceof Error ? e.message : String(e)}`);
+    process.exit(1);
+  }
+}
 if (state.state === 'CONFIG_REQUIRED') {
   console.error(`[gmail] ${state.reason}`);
   process.exit(2);

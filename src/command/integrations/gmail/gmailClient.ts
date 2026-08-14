@@ -153,6 +153,16 @@ export class GmailClient {
     return { historyId: body.historyId, expiration: body.expiration };
   }
 
+  /** users.stop（watch解除・ロールバック用。tokenやメールへの影響なし） */
+  async stopWatch(): Promise<void> {
+    await this.refreshIfNeeded();
+    const res = await this.fetchImpl(`${GMAIL_BASE}/users/me/stop`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${this.tokens?.accessToken ?? ''}` }
+    });
+    if (!res.ok) throw new Error(`users.stop 失敗（HTTP ${res.status}）`);
+  }
+
   /** history差分（startHistoryId以降のmessageAdded） */
   async listHistory(startHistoryId: string): Promise<{ newMessageIds: string[]; latestHistoryId: string | null }> {
     const ids: string[] = [];
