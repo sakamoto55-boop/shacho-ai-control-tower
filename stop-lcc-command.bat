@@ -30,6 +30,17 @@ if /i "%PROCNAME%"=="node" (
 )
 del lcc-command.pid
 
+rem --- Stop realtime subscribers if running (same PID-reuse guard) ---
+if exist subscribers.pid (
+  set SUB_PID=
+  set /p SUB_PID=<subscribers.pid
+  set SUBPROC=
+  for /f "usebackq" %%n in (`powershell -NoProfile -Command "(Get-Process -Id %SUB_PID% -ErrorAction SilentlyContinue).ProcessName"`) do set SUBPROC=%%n
+  if /i "%SUBPROC%"=="node" ( taskkill /PID %SUB_PID% /F /T >nul & echo Stopped subscribers - PID %SUB_PID%. )
+  if /i "%SUBPROC%"=="npx" ( taskkill /PID %SUB_PID% /F /T >nul & echo Stopped subscribers - PID %SUB_PID%. )
+  del subscribers.pid
+)
+
 rem --- Verify port 8787 is closed ---
 set PORTSTATE=unknown
 for /f "usebackq" %%s in (`powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) { 'open' } else { 'closed' }"`) do set PORTSTATE=%%s

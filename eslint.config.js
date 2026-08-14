@@ -15,5 +15,19 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }]
     }
+  },
+  // Cloud Run relay（Node実行・依存ゼロmjs）: Nodeグローバルを許可
+  {
+    files: ['cloudrun/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        Buffer: 'readonly',
+        process: 'readonly',
+        fetch: 'readonly',
+        console: 'readonly',
+        setTimeout: 'readonly',
+        URL: 'readonly'
+      }
+    }
   }
 );

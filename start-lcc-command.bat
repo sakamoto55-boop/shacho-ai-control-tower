@@ -58,6 +58,12 @@ ping -n 3 127.0.0.1 > nul
 goto :healthloop
 
 :healthy
+rem --- Optional realtime subscribers (set LCC_SUBSCRIBERS=true in .env) ---
+findstr /b /c:"LCC_SUBSCRIBERS=true" .env >nul 2>&1
+if not errorlevel 1 (
+  powershell -NoProfile -Command "(Start-Process npx -ArgumentList 'tsx','scripts/run-subscribers.ts' -PassThru -WindowStyle Hidden -RedirectStandardOutput 'logs/subscribers.log' -RedirectStandardError 'logs/subscribers.err.log').Id | Out-File -Encoding ascii 'subscribers.pid'"
+  echo Realtime subscribers started - PID file subscribers.pid
+)
 echo Server is up - HTTP %HTTPCODE%. Opening the browser.
 start "" "http://localhost:8787/vui?token=%LCC_UI_TOKEN%"
 echo (The URL token is cleared and stored automatically after the page opens)

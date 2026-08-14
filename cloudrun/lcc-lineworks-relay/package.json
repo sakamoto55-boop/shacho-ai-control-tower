@@ -1,0 +1,12 @@
+{
+  "name": "lcc-lineworks-relay",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "LINE WORKS Bot callback最小中継（署名検証+Pub/Sub publishのみ。UIなし・送信機能なし）",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": { "node": ">=20" }
+}

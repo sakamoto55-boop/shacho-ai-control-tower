@@ -27,7 +27,10 @@
     "sync:sheets": "tsx scripts/sync-integrations.ts sheets",
     "sync:lineworks": "tsx scripts/sync-integrations.ts lineworks",
     "sync:anyone": "tsx scripts/sync-integrations.ts anyone",
-    "sync:ai-history": "tsx scripts/sync-integrations.ts ai-history"
+    "sync:ai-history": "tsx scripts/sync-integrations.ts ai-history",
+    "subscribers": "tsx scripts/run-subscribers.ts",
+    "check:realtime": "tsx scripts/check-realtime-config.ts",
+    "gmail:authorize": "tsx scripts/gmail-authorize.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",

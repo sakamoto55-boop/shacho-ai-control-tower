@@ -869,7 +869,49 @@ export function createCommandApp(
               : 'Service Account未設定'
       },
       asEntry('AnyONE', 'MANUAL_IMPORT', pick('anyone(historical-export)'), '公式APIなし。data/import/anyone/inboxへのCSV/Excel投入経路は実装済み・実データ未投入（0件）'),
-      asEntry('TKC', 'MANUAL_IMPORT', pick('tkc'), '公式APIなし。data/import/tkc inbox経路は実装済み・実データ未投入（0件）')
+      asEntry('TKC', 'MANUAL_IMPORT', pick('tkc'), '公式APIなし。data/import/tkc inbox経路は実装済み・実データ未投入（0件）'),
+      // DIOS リアルタイム（実着信確認までLIVE_APIと表示しない）
+      ...(await (async () => {
+        const { resolveGmailAuthState } = await import('../integrations/gmail/gmailClient.js');
+        const { loadGmailState } = await import('../integrations/gmail/gmailSync.js');
+        const { defaultIntelligenceDir } = await import('../intelligence/store.js');
+        const { readFileSync: rf, existsSync: ex } = await import('node:fs');
+        const { join: pj } = await import('node:path');
+        const ga = resolveGmailAuthState();
+        const gs = loadGmailState();
+        const subFile = pj(defaultIntelligenceDir(), 'subscriber-state.json');
+        const sub = ex(subFile) ? (JSON.parse(rf(subFile, 'utf8')) as { gmail?: { lastPullAt?: string | null; lastOutcome?: string }; lineworks?: { lastPullAt?: string | null; lastOutcome?: string; lastEventAt?: string | null; processed?: number } }) : null;
+        const gmailRealtimeClass = ga.state !== 'READY' ? 'CONFIG_REQUIRED' : gs.lastSuccessfulFetchAt ? 'CONFIGURED_AWAITING_LIVE_TEST' : 'CONFIGURED_NOT_VERIFIED';
+        return [
+          {
+            system: 'Gmail（リアルタイム・Pub/Sub Pull）',
+            classification: gmailRealtimeClass,
+            records: gs.processedCount,
+            lastSyncedAt: gs.lastSuccessfulFetchAt,
+            errors: [],
+            note: [
+              ga.state !== 'READY' ? (ga.state === 'CONFIG_REQUIRED' ? ga.reason : '初回OAuth認証待ち（npm run gmail:authorize）') : null,
+              gs.watchExpiration ? `watch期限 ${gs.watchExpiration.slice(0, 16)}` : 'watch未登録',
+              gs.lastEventAt ? `最終通知 ${gs.lastEventAt.slice(0, 16)}` : '通知未受信',
+              gs.lastMeasuredLagMs !== null ? `実測遅延 ${Math.round(gs.lastMeasuredLagMs / 1000)}秒` : null,
+              sub?.gmail?.lastPullAt ? `subscriber最終pull ${sub.gmail.lastPullAt.slice(0, 16)}` : 'subscriber未稼働',
+              '実着信確認までLIVE_APIとしない'
+            ].filter(Boolean).join('／')
+          },
+          {
+            system: 'LINE WORKS（リアルタイム・Cloud Run relay）',
+            classification: sub?.lineworks?.lastEventAt ? 'CONFIGURED_AWAITING_LIVE_TEST' : 'CONFIG_REQUIRED',
+            records: sub?.lineworks?.processed ?? 0,
+            lastSyncedAt: sub?.lineworks?.lastEventAt ?? null,
+            errors: [],
+            note: [
+              'relay実装済み（cloudrun/lcc-lineworks-relay・deployは承認待ち）',
+              sub?.lineworks?.lastPullAt ? `subscriber最終pull ${sub.lineworks.lastPullAt.slice(0, 16)}` : 'subscriber未稼働',
+              '実着信確認までLIVE_APIとしない'
+            ].filter(Boolean).join('／')
+          }
+        ];
+      })())
     ];
     return c.json({
       generatedAt: new Date().toISOString(),
