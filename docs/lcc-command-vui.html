@@ -217,7 +217,7 @@
         </div>
       </div>
 
-      <!-- 今日の意思決定（DIOS-4: 判断1件原則・同時緊急でも最大3件。残りは件数のみ） -->
+      <!-- 今日の意思決定（判断1件原則・同時緊急でも最大3件。リアルタイム取込のDecisionCaseが最優先） -->
       <div class="surface p-4">
         <p class="text-[10px] tracking-widest text-[color:var(--text-low)] font-bold mb-2">今日の意思決定</p>
         <div v-if="decisions.loaded && topDecisions.length" class="space-y-2">
@@ -225,31 +225,45 @@
             <div class="flex items-center gap-2 flex-wrap">
               <span class="text-[10px] font-bold px-1.5 py-0.5 rounded" :class="d.priority <= 1 ? 'bg-[color:var(--bad)]/25 text-[color:var(--bad)]' : 'bg-[color:var(--warn)]/20 text-[color:var(--warn)]'">{{ d.category }}</span>
               <p class="text-[13px] font-bold">{{ d.title }}</p>
-              <span class="text-[9px] text-[color:var(--text-low)]">確定情報（実データ由来・推測なし）</span>
+              <!-- 外部申告・AI仮説を確定情報と表示しない（trustLabelは実データ由来） -->
+              <span class="text-[9px]" :class="d.trustLabel && d.trustLabel.includes('未確認') ? 'text-[color:var(--warn)]' : 'text-[color:var(--text-low)]'">{{ d.trustLabel || '出典区分なし' }}</span>
             </div>
             <p class="text-[11px] text-[color:var(--text-mid)] mt-0.5">{{ d.detail }}</p>
-            <div class="flex items-center gap-3 mt-1">
+            <p v-if="d.recommendation" class="text-[11px] mt-1"><span class="font-bold text-[color:var(--accent)]">AI推奨:</span> {{ d.recommendation }}</p>
+            <p v-if="d.nextAction" class="text-[10px] text-[color:var(--text-mid)] mt-0.5">社長の次の行動: {{ d.nextAction }}</p>
+            <div class="flex items-center gap-3 mt-1 flex-wrap">
               <span class="text-[9px] text-[color:var(--text-low)]">出典: {{ d.source }}</span>
               <button @click="askFromHome('今日の要対応を、重要度順に根拠付きで教えて')" class="text-[10px] font-bold text-[color:var(--info)]">根拠を見る</button>
+              <button v-if="d.caseId && completingCaseId !== d.caseId" @click="completingCaseId = d.caseId; outcomeDraft = ''" class="text-[10px] font-bold text-[color:var(--ok)] min-h-[44px] lg:min-h-0">判断完了（実結果を記録）</button>
+            </div>
+            <!-- §C: 社長判断の完了は実結果必須（Outcomeなしで完了しない） -->
+            <div v-if="d.caseId && completingCaseId === d.caseId" class="mt-2 rounded-lg bg-black/30 border border-white/10 p-2">
+              <input v-model="outcomeDraft" placeholder="実結果（例: 先方と合意・3日以内入金の確約）" class="w-full bg-white/10 border border-white/15 rounded px-2 py-2 text-[12px] outline-none" aria-label="実結果">
+              <div class="flex gap-3 mt-1.5">
+                <button @click="completeCase(d.caseId)" :disabled="!outcomeDraft.trim()" class="text-[11px] font-bold min-h-[44px] lg:min-h-0" :class="outcomeDraft.trim() ? 'text-[color:var(--ok)]' : 'text-[color:var(--text-low)]'">記録して完了</button>
+                <button @click="completingCaseId = ''" class="text-[11px] text-[color:var(--text-mid)] min-h-[44px] lg:min-h-0">取消</button>
+              </div>
+              <p v-if="caseError" class="text-[10px] text-[color:var(--bad)] mt-1">{{ caseError }}</p>
             </div>
           </div>
         </div>
         <p v-else-if="decisions.loaded" class="text-[12px] text-[color:var(--text-mid)]">急ぎの判断はありません。</p>
         <p v-else class="text-[11px] text-[color:var(--text-low)]">—（{{ decisions.reason || '取得中' }}）</p>
-        <!-- 残りは件数だけ（正常項目は並べない） -->
-        <div class="flex items-center gap-3 mt-3 pt-2 border-t border-white/10 text-[11px] text-[color:var(--text-mid)]">
-          <span v-if="decisions.loaded && decisions.items.length > topDecisions.length">ほか{{ decisions.items.length - topDecisions.length }}件は追跡中</span>
+        <!-- 残りは件数だけ（正常項目は並べない）。過去分・返答待ちは「今日の判断」と混同しない -->
+        <div class="flex items-center gap-3 mt-3 pt-2 border-t border-white/10 text-[11px] text-[color:var(--text-mid)] flex-wrap">
+          <span v-if="decisions.loaded && remainingDecisionCount > 0">ほか{{ remainingDecisionCount }}件は追跡中</span>
           <button @click="view = 'tracking'; loadTracking('active')" class="font-bold text-[color:var(--info)]">AIが追跡中 {{ tracking.trackingCount }}件 →</button>
+          <span v-if="tracking.awaitingReplyCount" class="text-[color:var(--text-low)]">相手の返答待ち {{ tracking.awaitingReplyCount }}件</span>
           <button @click="view = 'tracking'; loadTracking('completed')" class="text-[color:var(--text-low)]">今日完了 {{ tracking.completedTodayCount }}件</button>
         </div>
       </div>
 
       <!-- AI推奨（1件のみ。決定論ルールの最上位・推測を事実のように表示しない） -->
-      <div v-if="decisions.loaded && decisions.items.length" class="surface p-4 border-l-2" style="border-left-color:var(--accent)">
+      <div v-if="decisions.loaded && topDecisions.length" class="surface p-4 border-l-2" style="border-left-color:var(--accent)">
         <p class="text-[10px] tracking-widest text-[color:var(--text-low)] font-bold">AI推奨（決定論ルールによる最上位1件）</p>
-        <p class="text-[13px] font-bold mt-1">結論: 「{{ decisions.items[0].title }}」への対応を最優先にしてください</p>
-        <p class="text-[11px] text-[color:var(--text-mid)] mt-1">理由: 重要度ルール（事故・危険＞期限＞依頼・法定書類＞確認待ち）の最上位のため／影響: {{ decisions.items[0].detail.slice(0, 60) }}</p>
-        <p class="text-[10px] text-[color:var(--text-low)] mt-1">根拠ソース: {{ decisions.items[0].source }}（AIの推測は含まれていません）</p>
+        <p class="text-[13px] font-bold mt-1">結論: 「{{ topDecisions[0].title }}」への対応を最優先にしてください</p>
+        <p class="text-[11px] text-[color:var(--text-mid)] mt-1">{{ topDecisions[0].recommendation ? '推奨: ' + topDecisions[0].recommendation : '理由: 重要度ルール（事故・危険＞資金＞期限＞その他）の最上位のため' }}</p>
+        <p class="text-[10px] text-[color:var(--text-low)] mt-1">根拠ソース: {{ topDecisions[0].source }}／{{ topDecisions[0].trustLabel }}（AIの推測は事実と区別しています）</p>
         <button @click="askFromHome('今日の要対応を、重要度順に根拠付きで教えて')" class="text-[11px] font-bold text-[color:var(--info)] mt-1.5">詳細と根拠を確認する →</button>
       </div>
     </section>
@@ -309,6 +323,7 @@
           </div>
         </div>
         <p v-else class="mt-3 text-[11px] text-[color:var(--text-low)]">{{ trackingView === 'completed' ? '完了履歴はまだありません' : '追跡中の仕事はありません' }}</p>
+        <p v-if="trackingError" class="mt-2 text-[11px] text-[color:var(--bad)]">{{ trackingError }}</p>
       </div>
     </section>
 
@@ -709,9 +724,11 @@ createApp({
       /* EXECUTIVE COMMAND CENTER: 画面切替とホーム実データ */
       view: 'home',
       composing: false, // 日本語IME変換中の誤送信防止（compositionstart/end）
-      decisions: { loaded: false, items: [], reason: '' },
-      tracking: { trackingCount: 0, completedTodayCount: 0, waitingPresidentCount: 0 },
-      trackingView: 'active', trackingItems: [], trackingQuery: '',
+      decisions: { loaded: false, items: [], cases: [], reason: '' },
+      tracking: { trackingCount: 0, completedTodayCount: 0, waitingPresidentCount: 0, awaitingReplyCount: 0 },
+      trackingView: 'active', trackingItems: [], trackingQuery: '', trackingError: '',
+      /* §C: 社長判断完了（実結果必須） */
+      completingCaseId: '', outcomeDraft: '', caseError: '',
       health: { loaded: false, connections: [], okCount: 0, limitedCount: 0, reason: '' },
       navItems: [
         { key: 'home', label: '朝の管制', short: '管制', view: 'home', icon: 'M3 12l9-8 9 8M5 10v10h14V10' },
@@ -775,11 +792,32 @@ createApp({
       return this.health.loaded && this.health.limitedCount > 0 ? '実データ（一部制限あり）' : '実データ';
     },
     topDecisions(){
-      // DIOS-4: 最上位の判断は1件。同時緊急（priority1が複数）の場合のみ最大3件
+      // 判断1件原則。リアルタイム取込のDecisionCase（社長判断待ち）を最優先し、
+      // 同時緊急（safety/cash期限当日=rank≦10が複数）の場合のみ最大3件。
+      // DecisionCaseがない時のみ受信箱（JST当日・外部申告ラベル付き）へフォールバック
+      const cases = (this.decisions.cases || []).map((c) => ({
+        priority: c.rank <= 10 ? 1 : 2,
+        category: c.decisionKind,
+        title: c.title,
+        detail: (c.missingInformation && c.missingInformation.length ? `不足情報${c.missingInformation.length}件／` : '') + (c.riskIfWrong || ''),
+        source: 'リアルタイム取込（Gmail/LINE WORKS）',
+        trustLabel: c.trustLabel,
+        recommendation: c.aiRecommendation,
+        nextAction: c.presidentNextAction,
+        caseId: c.caseId
+      }));
+      if (cases.length) {
+        const urgent = cases.filter((d) => d.priority === 1).slice(0, 3);
+        return urgent.length > 1 ? urgent : cases.slice(0, 1);
+      }
       const items = this.decisions.items || [];
       if (!items.length) return [];
       const urgent = items.filter((d) => d.priority <= 1).slice(0, 3);
       return urgent.length > 1 ? urgent : items.slice(0, 1);
+    },
+    remainingDecisionCount(){
+      const total = (this.decisions.cases || []).length + (this.decisions.items || []).length;
+      return Math.max(0, total - this.topDecisions.length);
     },
     lastSyncLabel(){
       const s = this.health.loaded && this.health.connections.length
@@ -878,10 +916,19 @@ createApp({
       } catch { this.trackingItems = []; }
     },
     async completeAction(id){
+      this.trackingError = '';
       try {
-        await fetch(`${this.apiBase}/command/intelligence/actions/${id}/complete`, { method: 'POST', headers: this.authHeaders() });
+        const res = await fetch(`${this.apiBase}/command/intelligence/actions/${id}/complete`, { method: 'POST', headers: this.authHeaders() });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          // §C: 社長判断はここで完了できない（実結果の記録＝ホームの「判断完了」から）
+          this.trackingError = body.requiresCaseCompletion
+            ? '社長判断はホームの「判断完了（実結果を記録）」から完了してください'
+            : (body.error || '完了できませんでした');
+          return;
+        }
         await Promise.all([this.loadTracking('active'), this.loadDecisions()]); // 完了は即時に通常表示から消える
-      } catch { /* 失敗時は表示維持 */ }
+      } catch { this.trackingError = '接続できないため完了を記録できません'; }
     },
     async claimPairing(){
       // iPhone側: 6桁コード→HttpOnlyセッション。成功時はAI COREが一度だけ収束→拡散
@@ -941,11 +988,27 @@ createApp({
           throw new Error('HTTP ' + res.status);
         }
         const body = await res.json();
-        this.decisions = { loaded: true, items: body.items || [], reason: '' };
+        this.decisions = { loaded: true, items: body.items || [], cases: body.decisions || [], reason: '' };
         if (body.tracking) this.tracking = body.tracking;
       } catch (e) {
-        this.decisions = { loaded: false, items: [], reason: '接続できないため取得不能' };
+        this.decisions = { loaded: false, items: [], cases: [], reason: '接続できないため取得不能' };
       }
+    },
+    async completeCase(caseId){
+      // §C: 社長判断の完了は実結果必須（DecisionCase+関連タスク+Outcomeを同時整合）
+      if (!this.outcomeDraft.trim()) return;
+      this.caseError = '';
+      try {
+        const res = await fetch(`${this.apiBase}/command/intelligence/cases/${caseId}/complete`, {
+          method: 'POST',
+          headers: { ...this.authHeaders(), 'content-type': 'application/json' },
+          body: JSON.stringify({ actualOutcome: this.outcomeDraft.trim() })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) { this.caseError = body.error || '完了できませんでした'; return; }
+        this.completingCaseId = ''; this.outcomeDraft = '';
+        await this.loadDecisions(); // 完了は即時にホームから消える（履歴・Outcomeは保持）
+      } catch { this.caseError = '接続できないため完了を記録できません'; }
     },
     async loadHealth(){
       try {

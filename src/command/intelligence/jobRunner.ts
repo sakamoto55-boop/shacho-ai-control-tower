@@ -102,18 +102,27 @@ export class IntelligenceJobRunner {
         systemPrompt: RESEARCH_SYSTEM_PROMPT,
         userMessage: task.question
       });
+      // §G: これはLLM単体処理でありWeb検索ではない。回答中のURLは実取得・検証していないため
+      // fetchedAtを付けず（sources空）、UNVERIFIED_SOURCESとして本文に明示する。
+      // 実Web検索（URL取得・検証つき）は別の承認済み実装対象。
       const urls = [...answer.matchAll(/https?:\/\/[^\s)）」]+/g)].map((m) => m[0]).slice(0, 10);
-      const fetchedAt = new Date().toISOString();
+      const finishedAt = new Date().toISOString();
+      const unverifiedNote = urls.length > 0
+        ? `\n\n【UNVERIFIED_SOURCES】回答中のURL（${urls.length}件）は実取得・検証していません:\n${urls.join('\n')}`
+        : '';
       const done: ResearchTask = {
         ...running,
         status: 'completed',
-        completedAt: fetchedAt,
-        result: { summary: answer.slice(0, 4000), sources: urls.map((url) => ({ url, fetchedAt })) }
+        completedAt: finishedAt,
+        result: {
+          summary: `【LLM_ANALYSIS】この結果はLLM単体の分析であり、Web検索・実URL検証は行っていません。${answer.slice(0, 3800)}${unverifiedNote}`,
+          sources: [] // 実取得していないURLへfetchedAtを付けない（非捏造）
+        }
       };
       await this.deps.saveResearch(done);
       const sRun = this.deps.store.updateAgentRun(run.runId, {
-        status: 'SUCCEEDED', resultSummary: answer.slice(0, 200),
-        durationMs: Date.now() - t0, finishedAt: fetchedAt
+        status: 'SUCCEEDED', resultSummary: `[LLM_ANALYSIS] ${answer.slice(0, 180)}`,
+        durationMs: Date.now() - t0, finishedAt
       })!;
       return { task: done, run: sRun };
     } catch (e) {

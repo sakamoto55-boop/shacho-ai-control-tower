@@ -54,6 +54,53 @@ describe('Gmail Pull同期（構成訂正§1・fixture E2E）', () => {
     expect(store.actions().filter((a) => a.status === 'WAITING_PRESIDENT')).toHaveLength(1);
   });
 
+  it('E2E-2: 11ページ以上のhistoryをnextPageTokenがなくなるまで全件取得する（§E）', async () => {
+    const { GmailClient } = await import('../../../src/command/integrations/gmail/gmailClient.js');
+    const PAGES = 11;
+    let calls = 0;
+    const fetchImpl = (async (url: string) => {
+      const u = String(url);
+      if (u.includes('/history')) {
+        const page = calls; calls += 1;
+        return {
+          ok: true,
+          json: async () => ({
+            history: [{ id: String(1000 + page), messagesAdded: [{ message: { id: `pmsg-${page}` } }] }],
+            historyId: '9999',
+            ...(page < PAGES - 1 ? { nextPageToken: `pt-${page + 1}` } : {})
+          })
+        };
+      }
+      throw new Error(`unexpected ${u}`);
+    }) as unknown as typeof fetch;
+    const client = new GmailClient(
+      { clientId: 'id', clientSecret: 'sec', redirectUri: 'http://127.0.0.1:1/x', tokenFile: join(tmp(), 'no-token.json'), pubsubTopic: 'projects/p/topics/t' },
+      fetchImpl
+    );
+    // token注入（refresh不要な未来expiry）
+    (client as unknown as { tokens: unknown }).tokens = { accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 3600_000, scope: 'gmail.readonly' };
+    const r = await client.listHistory('1000');
+    expect(calls).toBe(PAGES);
+    expect(r.newMessageIds).toHaveLength(PAGES); // 10ページ制限で切り捨てない
+    expect(r.latestHistoryId).toBe('9999');
+    // 安全上限超過（未取得分が残る）はthrow＝historyIdを進めない材料
+    calls = 0;
+    await expect(client.listHistory('1000', 5)).rejects.toThrow(/安全上限/);
+  });
+
+  it('E2E-2b: 安全上限超過はFETCH_FAILEDになりhistoryIdが進まない（未処理範囲を失わない）', async () => {
+    const dir = tmp();
+    const stateFile = join(dir, 'gmail-state.json');
+    saveGmailState({ historyId: '1000', watchExpiration: null, lastEventAt: null, lastSuccessfulFetchAt: null, lastMeasuredLagMs: null, processedCount: 0 }, stateFile);
+    const overflowing = {
+      listHistory: async () => { throw new Error('history取得が安全上限100ページを超過（未取得分があるためhistoryIdを進めない）'); }
+    } as unknown as GmailClient;
+    const r = await processGmailNotification(overflowing, new IntelligenceStore(join(dir, 'i3')), loadGmailState(stateFile), { historyId: 9999 }, stateFile);
+    expect(r.outcome).toBe('FETCH_FAILED');
+    expect(r.state.historyId).toBe('1000'); // 進めない＝次回に未取得分を再取得できる
+    expect(r.state.lastSuccessfulFetchAt).toBeNull();
+  });
+
   it('取得失敗はFETCH_FAILEDで成功と偽らない・stateのlastSuccessfulFetchAtを進めない', async () => {
     const dir = tmp();
     const stateFile = join(dir, 'gmail-state.json');

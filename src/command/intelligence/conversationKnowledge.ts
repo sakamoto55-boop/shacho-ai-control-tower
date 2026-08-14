@@ -89,13 +89,53 @@ export function ingestConversationKnowledge(
   return { rawDeduplicated: false, extractedFacts: extracted };
 }
 
+export interface KnowledgeStatement {
+  statement: string;
+  kind: KnowledgeKind;
+  evidence: string;
+  asOf: string | null;
+  approvalState: KnowledgeFact['approvalState'];
+  trust: string;
+  /** 確定扱いにできるか（APPROVED または SOURCE_OF_TRUTH evidence のみtrue。§F） */
+  confirmed: boolean;
+  /** 表示用の信頼ラベル（外部申告・AI仮説を確定事実と混同させない） */
+  trustLabel: string;
+}
+
 export interface KnowledgeAnswer {
   found: boolean;
-  statements: Array<{ statement: string; kind: KnowledgeKind; evidence: string; asOf: string | null }>;
+  /** 確定情報（APPROVED / SOURCE_OF_TRUTH）のみ */
+  confirmedStatements: KnowledgeStatement[];
+  /** 未確認情報（外部申告・AI仮説・承認待ち）。回答時は必ず区分を明示する */
+  unconfirmedStatements: KnowledgeStatement[];
   supersededCount: number;
 }
 
-/** 知識検索（現行版のみ回答に使用。旧版件数を明示＝訂正履歴の存在が分かる） */
+function toStatement(f: KnowledgeFact): KnowledgeStatement {
+  const trust = f.evidence[0]?.trust ?? 'EXTERNAL_CLAIM';
+  const confirmed = f.approvalState === 'APPROVED' || trust === 'SOURCE_OF_TRUTH';
+  const trustLabel = confirmed
+    ? (f.approvalState === 'APPROVED' ? '承認済み' : '正本由来')
+    : trust === 'AI_HYPOTHESIS' ? 'AI仮説（確定事実ではありません）'
+      : trust === 'EXTERNAL_CLAIM' ? '先方からの申告（未確認）'
+        : '未確認';
+  return {
+    statement: f.statement,
+    kind: f.kind,
+    evidence: f.evidence[0] ? `${f.evidence[0].source} / ${f.evidence[0].locator}（取得 ${f.evidence[0].fetchedAt.slice(0, 10)}）` : '出典なし',
+    asOf: f.evidence[0]?.asOf ?? null,
+    approvalState: f.approvalState,
+    trust,
+    confirmed,
+    trustLabel
+  };
+}
+
+/**
+ * 知識検索（現行版のみ回答に使用。旧版件数を明示＝訂正履歴の存在が分かる）。
+ * §F: 確定情報（APPROVED/SOURCE_OF_TRUTH）と未確認情報（外部申告・AI仮説）を分離して返す。
+ * AI発言・外部メッセージを確定事実として回答しない。訂正済み（superseded）は回答に使わない。
+ */
 export function answerFromKnowledge(store: IntelligenceStore, keyword: string): KnowledgeAnswer {
   const kw = keyword.trim();
   const current = store.currentFacts().filter(
@@ -104,14 +144,11 @@ export function answerFromKnowledge(store: IntelligenceStore, keyword: string): 
   const superseded = store.allFactsIncludingSuperseded().filter(
     (f) => f.supersededBy && (f.statement.includes(kw) || f.entities.some((e) => e.name.includes(kw)))
   );
+  const statements = current.slice(0, 20).map(toStatement);
   return {
     found: current.length > 0,
-    statements: current.slice(0, 10).map((f) => ({
-      statement: f.statement,
-      kind: f.kind,
-      evidence: f.evidence[0] ? `${f.evidence[0].source} / ${f.evidence[0].locator}（取得 ${f.evidence[0].fetchedAt.slice(0, 10)}）` : '出典なし',
-      asOf: f.evidence[0]?.asOf ?? null
-    })),
+    confirmedStatements: statements.filter((s) => s.confirmed).slice(0, 10),
+    unconfirmedStatements: statements.filter((s) => !s.confirmed).slice(0, 10),
     supersededCount: superseded.length
   };
 }

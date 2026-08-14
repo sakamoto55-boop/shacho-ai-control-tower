@@ -44,7 +44,8 @@ export type GmailAuthState =
   | { state: 'AUTH_REQUIRED'; authorizeUrl: string }
   | { state: 'READY' };
 
-export function resolveGmailAuthState(config = loadGmailConfig()): GmailAuthState {
+/** oauthState: CSRF対策のstateパラメータ（認可ヘルパーが生成しcallbackで検証する） */
+export function resolveGmailAuthState(config = loadGmailConfig(), oauthState?: string): GmailAuthState {
   if (!config.clientId || !config.clientSecret) {
     return { state: 'CONFIG_REQUIRED', reason: 'GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET が未設定（GCPでOAuthクライアント作成が必要）' };
   }
@@ -58,7 +59,8 @@ export function resolveGmailAuthState(config = loadGmailConfig()): GmailAuthStat
       response_type: 'code',
       scope: GMAIL_READONLY_SCOPE,
       access_type: 'offline',
-      prompt: 'consent'
+      prompt: 'consent',
+      ...(oauthState ? { state: oauthState } : {})
     });
     return { state: 'AUTH_REQUIRED', authorizeUrl: `${AUTHORIZE_ENDPOINT}?${params.toString()}` };
   }
@@ -163,12 +165,17 @@ export class GmailClient {
     if (!res.ok) throw new Error(`users.stop 失敗（HTTP ${res.status}）`);
   }
 
-  /** history差分（startHistoryId以降のmessageAdded） */
-  async listHistory(startHistoryId: string): Promise<{ newMessageIds: string[]; latestHistoryId: string | null }> {
+  /**
+   * history差分（startHistoryId以降のmessageAdded）。
+   * nextPageTokenがなくなるまで取得する（§E: 取りこぼし防止）。
+   * 安全上限（既定100ページ）に達してもnextPageTokenが残る場合はthrow＝呼出側がFETCH_FAILEDとし
+   * historyIdを進めない（未取得分を失わない）。
+   */
+  async listHistory(startHistoryId: string, maxPages = 100): Promise<{ newMessageIds: string[]; latestHistoryId: string | null }> {
     const ids: string[] = [];
     let pageToken = '';
     let latest: string | null = null;
-    for (let page = 0; page < 10; page += 1) {
+    for (let page = 0; page < maxPages; page += 1) {
       const params = new URLSearchParams({ startHistoryId, historyTypes: 'messageAdded', labelId: 'INBOX' });
       if (pageToken) params.set('pageToken', pageToken);
       const body = await this.get<{
@@ -180,10 +187,10 @@ export class GmailClient {
       for (const h of body.history ?? []) {
         for (const m of h.messagesAdded ?? []) if (m.message?.id) ids.push(m.message.id);
       }
-      if (!body.nextPageToken) break;
+      if (!body.nextPageToken) return { newMessageIds: [...new Set(ids)], latestHistoryId: latest };
       pageToken = body.nextPageToken;
     }
-    return { newMessageIds: [...new Set(ids)], latestHistoryId: latest };
+    throw new Error(`history取得が安全上限${maxPages}ページを超過（未取得分があるためhistoryIdを進めない）`);
   }
 
   /** メッセージ取得（metadata: 送信者・宛先・件名・日時。本文はsnippetまで） */

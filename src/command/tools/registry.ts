@@ -223,7 +223,9 @@ export async function requestResearch(
     researchId: newId('res', ctx.dataset.asOf),
     companyId: params.companyId,
     question: params.question,
-    provider: params.provider ?? 'web_search',
+    // §G: 実Web検索基盤は未実装のため既定を'web_search'と呼ばない（LLM単体処理='other'）。
+    // 'web_search'は実URL取得・検証を行う承認済み実装が入った時のみ明示指定する
+    provider: params.provider ?? 'other',
     status: 'queued',
     requestedAt: ctx.dataset.asOf
   };

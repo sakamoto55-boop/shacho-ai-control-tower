@@ -20,20 +20,24 @@ Write-Host "== 対象プロジェクト（gcloud projects describe・読み取�
 gcloud projects describe $ProjectId --format="table(projectId,projectNumber,lifecycleState)"
 
 Write-Host ""
-Write-Host "== 実行計画（この内容以外は変更しません） =="
-Write-Host "  [作成] API有効化: gmail / pubsub / run / secretmanager"
+Write-Host "== 実行計画（この内容以外は変更しません。--source deployの自動作成分も含め全て明記） =="
+Write-Host "  [作成] API有効化: gmail / pubsub / run / secretmanager / cloudbuild / artifactregistry"
 Write-Host "  [作成] Pub/Sub topic: lcc-gmail-events, lcc-lineworks-events"
 Write-Host "  [作成] Pub/Sub subscription: lcc-gmail-events-pull, lcc-lineworks-events-pull (ack 60s / retention 7d)"
 Write-Host "  [作成] Service Account: $relaySa"
 Write-Host "  [作成] Secret: lineworks-bot-secret（値は非表示入力・画面/ログ非出力）"
 Write-Host "  [作成] Cloud Run: lcc-lineworks-relay（region=$Region, max-instances=2, 256Mi, 公開POST 1本のみ）"
+Write-Host "  [自動作成] Artifact Registry repo: cloud-run-source-deploy（$Region）+ relayイメージ lcc-lineworks-relay"
+Write-Host "  [自動作成] Cloud Build用ソースアップロードbucket（gcloud既定名）"
+Write-Host "  [前提] ビルドはGoogle自動作成のCloud Build用SA（<projectNumber>-compute@developer / cloudbuild）が実行"
 Write-Host ""
-Write-Host "== IAM差分（すべてリソース単位・プロジェクトレベル付与は0件） =="
+Write-Host "== IAM差分（リソース単位のみ・プロジェクトレベルの新規付与は0件） =="
 Write-Host "  [追加] gmail-api-push@system.gserviceaccount.com -> roles/pubsub.publisher @ topic lcc-gmail-events"
 Write-Host "  [追加] $LccSaEmail -> roles/pubsub.subscriber @ subscription lcc-gmail-events-pull"
 Write-Host "  [追加] $LccSaEmail -> roles/pubsub.subscriber @ subscription lcc-lineworks-events-pull"
 Write-Host "  [追加] $relaySa -> roles/secretmanager.secretAccessor @ secret lineworks-bot-secret"
 Write-Host "  [追加] $relaySa -> roles/pubsub.publisher @ topic lcc-lineworks-events"
+Write-Host "  [追加] allUsers -> roles/run.invoker @ Cloud Run lcc-lineworks-relay（--allow-unauthenticatedの実体。Webhook受口）"
 Write-Host ""
 
 if ($PlanOnly) {
@@ -47,9 +51,9 @@ if ($confirm -ne "yes") {
   exit 1
 }
 
-# --- Phase 1: API有効化 ------------------------------------------------------
+# --- Phase 1: API有効化（--source deployが要するcloudbuild/artifactregistryを含む） ---
 Write-Host "== 1. API有効化 =="
-gcloud services enable gmail.googleapis.com pubsub.googleapis.com run.googleapis.com secretmanager.googleapis.com --project $ProjectId
+gcloud services enable gmail.googleapis.com pubsub.googleapis.com run.googleapis.com secretmanager.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com --project $ProjectId
 
 # --- Phase 2: Pub/Sub topics -------------------------------------------------
 Write-Host "== 2. Pub/Sub topics =="

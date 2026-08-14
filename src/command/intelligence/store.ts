@@ -175,14 +175,26 @@ export class IntelligenceStore {
     return [...byId.values()];
   }
 
-  /** 返信待ちタスクの自動再開（gmail/lineworks新着のwatchKey一致でWAITING_*→GATHERING_INFORMATIONへ） */
-  resumeWaitingByWatchKey(watchKey: string): IntelligenceActionItem[] {
+  /**
+   * 返信待ちタスクの自動再開（WAITING_*→GATHERING_INFORMATIONへ）。
+   *
+   * 照合規則（§D: 同一room内の無関係メッセージで全タスクを再開しない）:
+   * - gmail:<threadId> はスレッド単位で特定できるため watchKey一致のみで再開する。
+   * - lineworks:<roomId> はroom単位でしか特定できないため、watchKey一致に加えて
+   *   新着メッセージのEntity（○○邸・○○様等）とタスクのEntityの重なりを必須にする。
+   *   Entityが照合できない場合は再開しない（誤再開より見逃しの方が復旧容易＝手動再開可能）。
+   */
+  resumeWaitingByWatchKey(watchKey: string, incomingEntities: Array<{ name: string }> = []): IntelligenceActionItem[] {
     const resumed: IntelligenceActionItem[] = [];
+    const threadPrecise = watchKey.startsWith('gmail:');
     for (const a of this.actions()) {
-      if (a.watchKey === watchKey && (a.status === 'WAITING_EXTERNAL' || a.status === 'WAITING_STAFF')) {
-        const u = this.updateActionStatus(a.actionId, 'GATHERING_INFORMATION');
-        if (u) resumed.push(u);
+      if (a.watchKey !== watchKey || !(a.status === 'WAITING_EXTERNAL' || a.status === 'WAITING_STAFF')) continue;
+      if (!threadPrecise) {
+        const overlap = a.entities.some((e) => incomingEntities.some((i) => i.name === e.name));
+        if (!overlap) continue; // room単位watchKeyはEntity照合が取れた場合のみ再開
       }
+      const u = this.updateActionStatus(a.actionId, 'GATHERING_INFORMATION');
+      if (u) resumed.push(u);
     }
     return resumed;
   }
@@ -209,11 +221,12 @@ export class IntelligenceStore {
   addProposal(p: Omit<ImprovementProposal, 'proposalId' | 'createdAt' | 'status'>): ImprovementProposal {
     return this.append('improvement-proposals', { ...p, proposalId: newId('prop'), createdAt: new Date().toISOString(), status: 'PROPOSED' });
   }
-  /** 承認前は適用しない。承認時のみRuleVersionを更新（approvedBy必須） */
+  /** 承認前は適用しない。承認時のみRuleVersionを更新（approvedBy必須・二重承認拒否） */
   approveProposal(proposalId: string, approvedBy: string, rule: { ruleId: string; name: string; body: string; rollbackNote: string; companyId: string }): RuleVersion {
     const hit = [...this.load<ImprovementProposal>('improvement-proposals')].reverse().find((p) => p.proposalId === proposalId);
     if (!hit) throw new Error('提案が見つかりません');
     if (!approvedBy) throw new Error('承認者なしでRuleVersionは更新できません');
+    if (hit.status !== 'PROPOSED') throw new Error(`この提案は既に${hit.status}です（同一Proposalの二重承認は拒否）`);
     this.append('improvement-proposals', { ...hit, status: 'APPROVED' });
     const prev = [...this.load<RuleVersion>('rule-versions')].reverse().find((r) => r.ruleId === rule.ruleId) ?? null;
     return this.append('rule-versions', {

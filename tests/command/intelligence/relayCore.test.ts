@@ -45,9 +45,27 @@ describe('lcc-lineworks-relay コア判定（§12-3受入試験のfixture版）'
     expect(dup.reason).toContain('duplicate');
   });
 
-  it('seenキャッシュは同一キーの2回目からtrue', () => {
+  it('seenキャッシュはhas=照会のみ・add後にtrue（照会で登録しない）', () => {
     const c = createSeenCache(10);
-    expect(c.check('k1')).toBe(false);
-    expect(c.check('k1')).toBe(true);
+    expect(c.has('k1')).toBe(false);
+    expect(c.has('k1')).toBe(false); // 照会は何度でも副作用なし
+    c.add('k1');
+    expect(c.has('k1')).toBe(true);
+  });
+
+  it('E2E-1: publish失敗→LINE WORKS再送→次回publish成功でイベント欠落0件（§A）', () => {
+    const cache = createSeenCache(10);
+    // server.mjsと同じ規律: seenRecently=hasのみ、addはpublish成功後
+    const attempt = (publishOk: boolean) => {
+      const d = decideRelay({ ...base(), seenRecently: (k: string) => cache.has(k) });
+      if (d.status === 200 && d.publish) {
+        if (publishOk) { cache.add(d.seenKey); return 'PUBLISHED'; }
+        return 'PUBLISH_FAILED'; // 処理済み登録しない
+      }
+      return d.reason.includes('duplicate') ? 'DUPLICATE' : `REJECTED_${d.status}`;
+    };
+    expect(attempt(false)).toBe('PUBLISH_FAILED'); // 初回publish失敗
+    expect(attempt(true)).toBe('PUBLISHED'); // 再送は受理されpublish成功（欠落しない）
+    expect(attempt(true)).toBe('DUPLICATE'); // publish成功後の再送のみduplicate
   });
 });

@@ -10,8 +10,12 @@
 import type { DecisionCase, DecisionKind, EntityRef, InboundClass, IntelligenceEvidence, RawEvent } from './types.js';
 
 const PRESIDENT_DECISION_WORDS = /クレーム|苦情|事故|ケガ|怪我|労災|中止|停止|承認|値引|減額|金額変更|追加費用|契約変更|解約|入金(遅|無|されて)|未入金|至急|今日中|訴訟|警察|行政/;
-const ACTION_WORDS = /見積|日程|工程|資料|請求書|発注|手配|確認して|お願いします|送って|作成|提出|打合せ|現調|訪問/;
-const AWAITING_WORDS = /ご返信|お返事|回答をお待ち|返答待ち|確認中とのこと/;
+// 「ご返信ください/お願いします」「回答をお待ちしています」は相手が**こちらの返信**を求めている＝ACTION_REQUIRED
+const ACTION_WORDS = /見積|日程|工程|資料|請求書|発注|手配|確認して|お願いします|送って|作成|提出|打合せ|現調|訪問|ご返信|お返事|回答をお待ち/;
+// AWAITING_REPLY（こちらが相手の返答を待つ）は、相手が「後で回答する」と明言した場合のみ。
+// 本来の根拠は「こちらが質問・依頼を送った記録+watchKey」（recordOutboundAwaitingReply）であり、
+// 受信文キーワードは相手の明示的な回答予告に限定する。
+const AWAITING_WORDS = /確認して(ご連絡|回答|お返事)(します|いたします)|社内で確認(して|の上|のうえ)|確認中とのこと|検討して(ご連絡|回答)(します|いたします)|改めてご連絡(します|いたします)|後日(回答|返信|ご連絡)(します|いたします)?/;
 const EXCLUDE_WORDS = /配信停止|メルマガ|キャンペーン|広告|プレスリリース|セミナーのご案内|アンケートのお願い/;
 
 export function classifyInbound(text: string): InboundClass {

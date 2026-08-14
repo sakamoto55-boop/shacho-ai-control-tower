@@ -23,6 +23,8 @@
 | API有効化 | `pubsub.googleapis.com` | イベント通知の受け渡し |
 | API有効化 | `run.googleapis.com` | LINE WORKS中継の実行基盤 |
 | API有効化 | `secretmanager.googleapis.com` | Bot Secretの安全な保管 |
+| API有効化 | `cloudbuild.googleapis.com` | `gcloud run deploy --source` がコンテナをビルドするため（必須） |
+| API有効化 | `artifactregistry.googleapis.com` | ビルドしたコンテナイメージの保存先（必須） |
 | Pub/Sub topic | `lcc-gmail-events` | Gmail新着通知（historyIdのみ・本文なし） |
 | Pub/Sub topic | `lcc-lineworks-events` | LINE WORKS検証済みイベント |
 | Pub/Sub subscription | `lcc-gmail-events-pull` | LAN内PCがPull購読（ack-deadline 60s） |
@@ -30,6 +32,12 @@
 | Service Account（新規） | `lcc-lineworks-relay@lcc-command.iam.gserviceaccount.com` | relay専用・下記2権限のみ |
 | Secret | `lineworks-bot-secret` | LINE WORKS Bot Secret（署名検証用） |
 | Cloud Run service | `lcc-lineworks-relay` | 公開エンドポイント1本のみ（`POST /lineworks/callback`）・max 2 instances・256Mi |
+| Artifact Registry repository（自動作成） | `cloud-run-source-deploy`（asia-northeast1） | `--source` deploy時にgcloudが自動作成する既定リポジトリ。relayのイメージ `lcc-lineworks-relay` がここへ保存される |
+| Cloud Storage bucket（自動作成） | `lcc-command_cloudbuild` 等（gcloud既定名） | `--source` のソースアップロード用にCloud Buildが自動作成 |
+
+**`gcloud run deploy --source` が暗黙に使うもの（隠さず明記）**:
+- **Cloud Build用Service Account**: 既定では `<projectNumber>-compute@developer.gserviceaccount.com`（または `<projectNumber>@cloudbuild.gserviceaccount.com`）がビルドを実行する。これらはGoogleがAPI有効化時に自動作成するSAで、**project-levelの既定ロール**（Compute既定SAは `roles/editor` が付与されている場合がある／Cloud Build SAは `roles/cloudbuild.builds.builder`）を持つ。本手順で**新たなproject-levelロールは付与しない**が、既定SAの存在と既定ロールは本deployの前提であることを明示する。
+- **公開設定**: `--allow-unauthenticated` は **`allUsers` へ `roles/run.invoker`** を付与する（このサービス1本のみ）。Webhook受口のため必須。アプリ層でBot ID許可+HMAC署名検証を行い、未署名リクエストは処理しない。
 
 ## 3. IAM差分（現在 → 追加後）
 
@@ -44,6 +52,7 @@
 | 3 | 同上 | `roles/pubsub.subscriber` | subscription `lcc-lineworks-events-pull` のみ | 同上（LINE WORKS側） |
 | 4 | `lcc-lineworks-relay@…`（新規SA） | `roles/secretmanager.secretAccessor` | secret `lineworks-bot-secret` のみ | relayがWebhook署名（HMAC）を検証するため。他のSecretへはアクセス不可 |
 | 5 | 同上 | `roles/pubsub.publisher` | topic `lcc-lineworks-events` のみ | 署名検証済みイベントの発行のみ。購読権・Gmail側topicへの権限なし |
+| 6 | `allUsers` | `roles/run.invoker` | Cloud Run service `lcc-lineworks-relay` のみ | LINE WORKSのWebhookが未認証HTTPSで届くため公開が必須（`--allow-unauthenticated` の実体）。アプリ層でBot ID許可+HMAC署名検証を行い、未署名リクエストは受理しない。解除コマンドは§7 |
 
 `scripts/gcloud-setup-realtime.ps1` は実行前にこの差分と作成対象を画面表示し、**`yes` の明示入力がない限り一切変更しません**（`-PlanOnly` で表示のみも可能）。
 
@@ -78,31 +87,45 @@
 | サービス | 無料枠 | 想定利用 | 概算 |
 |---|---|---|---|
 | Cloud Run | 200万リクエスト/月・360,000 GB秒 | LINE WORKSメッセージ数百〜数千件/月・min-instances 0 | **¥0**（無料枠内） |
+| Cloud Build | 120ビルド分/日 | deploy時のみ（1ビルド数分・日常利用なし） | **¥0** |
+| Artifact Registry | ストレージ0.5GBまで無料 | relayイメージ1つ（数十〜200MB程度） | **¥0**（超過時 約$0.10/GB/月） |
+| Cloud Storage | 5GB無料枠（ソースアップロード一時分） | deploy時のみ数MB | **¥0** |
 | Pub/Sub | 10GB/月 | 数MB/月 | **¥0** |
 | Secret Manager | 6 secret versions・10,000アクセス/月 | 1 secret・起動時アクセスのみ | **¥0** |
 | Gmail API | 無料（クォータ制） | 通知駆動の差分取得のみ | **¥0** |
 
-課金が発生する条件: 上記無料枠の超過時のみ。`--max-instances 2` により異常トラフィック時もCloud Runの上限が制限される。想定合計: **月¥0〜100未満**。
+課金が発生する条件: 上記無料枠の超過時のみ。`--max-instances 2` により異常トラフィック時もCloud Runの上限が制限される。再deployを繰り返すとArtifact Registryに旧イメージが蓄積するため、不要イメージは削除する（手順は§7）。想定合計: **月¥0〜100未満**。
 
 ## 7. 停止・削除・ロールバック手順（全て可逆）
 
+**停止手順（この順で・すべて実在するコマンド）**:
 ```
-# 即時停止（受信を止める）
-gcloud run services update lcc-lineworks-relay --region asia-northeast1 --max-instances 0   # relay停止
-# LINE WORKS ConsoleでCallback URLを削除（送信元を止める）
-# PC側: stop-lcc-command.bat（subscriberも停止）／ npm run gmail:authorize -- --stop でwatch解除（users.stop）
+# 1. LINE WORKS Developer ConsoleでBot Callback URLを削除（送信元を止める）
+# 2. Cloud Runの公開Invokerを解除（未認証アクセス遮断）
+gcloud run services remove-iam-policy-binding lcc-lineworks-relay --region asia-northeast1 \
+  --member="allUsers" --role="roles/run.invoker"
+# 3. Gmail watch解除（users.stop。token・メールへの影響なし）
+npm run gmail:authorize -- --stop
+# 4. PC側subscriber停止
+stop-lcc-command.bat
+```
 
-# 完全削除（作成したものを全て消す）
+**完全削除（必要に応じ・作成したものを全て消す）**:
+```
 gcloud run services delete lcc-lineworks-relay --region asia-northeast1
 gcloud pubsub subscriptions delete lcc-gmail-events-pull lcc-lineworks-events-pull
 gcloud pubsub topics delete lcc-gmail-events lcc-lineworks-events
 gcloud secrets delete lineworks-bot-secret
 gcloud iam service-accounts delete lcc-lineworks-relay@lcc-command.iam.gserviceaccount.com
-gcloud services disable gmail.googleapis.com run.googleapis.com secretmanager.googleapis.com  # 必要なら
+# --source deployが自動作成したイメージ・リポジトリ・バケットの削除
+gcloud artifacts docker images list asia-northeast1-docker.pkg.dev/lcc-command/cloud-run-source-deploy
+gcloud artifacts repositories delete cloud-run-source-deploy --location=asia-northeast1
+gsutil ls gs:// | findstr cloudbuild   # ソースアップロード用バケットを確認して削除（gsutil rb）
+gcloud services disable gmail.googleapis.com run.googleapis.com secretmanager.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com  # 必要なら
 # Gmail OAuth取消: https://myaccount.google.com/permissions → 該当クライアントを削除、PCのtokenファイル削除
 ```
 
-既存SA `lcc-command-ai@…` への追加は subscription 2件のSubscriberのみのため、subscription削除で権限も消滅する。
+既存SA `lcc-command-ai@…` への追加は subscription 2件のSubscriberのみのため、subscription削除で権限も消滅する。allUsers Invokerはサービス削除でも消滅する。
 
 ## 8. 外部送信機能が存在しないことの保証
 

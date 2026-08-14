@@ -70,8 +70,11 @@ describe('DIOS §6: 過去AI対話→会社知識（安全なテストデータ�
     const r = ingestConversationKnowledge(store, conv);
     const before = answerFromKnowledge(store, '山田邸');
     expect(before.found).toBe(true);
-    expect(before.statements[0].statement).toContain('9月開始');
-    expect(before.statements[0].evidence).toContain('ai-conversation:generic'); // 根拠付き
+    // 会話由来（EXTERNAL_CLAIM・CANDIDATE）は未確認側に入り、確定事実として回答されない（§F）
+    expect(before.confirmedStatements).toHaveLength(0);
+    expect(before.unconfirmedStatements[0].statement).toContain('9月開始');
+    expect(before.unconfirmedStatements[0].evidence).toContain('ai-conversation:generic'); // 根拠付き
+    expect(before.unconfirmedStatements[0].trustLabel).toContain('未確認');
     // 訂正
     const oldFact = r.extractedFacts[0];
     store.correctFact(oldFact.factId, {
@@ -79,8 +82,30 @@ describe('DIOS §6: 過去AI対話→会社知識（安全なテストデータ�
       entities: extractEntities('山田邸'), evidence: oldFact.evidence, approvalState: 'CANDIDATE', sourceRawEventIds: oldFact.sourceRawEventIds
     });
     const after = answerFromKnowledge(store, '山田邸');
-    expect(after.statements.some((s) => s.statement.includes('10月開始'))).toBe(true);
-    expect(after.statements.some((s) => s.statement.includes('9月開始で確定'))).toBe(false); // 旧版は使わない
+    const all = [...after.confirmedStatements, ...after.unconfirmedStatements];
+    expect(all.some((s) => s.statement.includes('10月開始'))).toBe(true);
+    expect(all.some((s) => s.statement.includes('9月開始で確定'))).toBe(false); // 旧版は使わない
     expect(after.supersededCount).toBe(1); // 旧版の存在は履歴として分かる
+  });
+
+  it('E2E-10: 外部申告・AI仮説を確定事実として回答せず、承認済み/正本由来のみ確定扱いする（§F）', () => {
+    const store = new IntelligenceStore(tmp());
+    store.addFact({
+      companyId: 'lcc', kind: 'FACT', statement: '鈴木様は追加工事に合意したと先方が連絡',
+      entities: extractEntities('鈴木様'), approvalState: 'CANDIDATE',
+      evidence: [{ source: 'lineworks:鈴木様', locator: 'ev-1', fetchedAt: NOW, asOf: null, freshness: 'FRESH', trust: 'EXTERNAL_CLAIM' }],
+      sourceRawEventIds: []
+    });
+    store.addFact({
+      companyId: 'lcc', kind: 'FACT', statement: '鈴木様案件の受注額は正本シートに登録済み',
+      entities: extractEntities('鈴木様'), approvalState: 'APPROVED',
+      evidence: [{ source: 'sheets:lcc-integrated-db', locator: 'row-10', fetchedAt: NOW, asOf: NOW, freshness: 'FRESH', trust: 'SOURCE_OF_TRUTH' }],
+      sourceRawEventIds: []
+    });
+    const a = answerFromKnowledge(store, '鈴木様');
+    expect(a.confirmedStatements).toHaveLength(1);
+    expect(a.confirmedStatements[0].statement).toContain('正本シート');
+    expect(a.unconfirmedStatements).toHaveLength(1);
+    expect(a.unconfirmedStatements[0].trustLabel).toBe('先方からの申告（未確認）');
   });
 });

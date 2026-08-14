@@ -57,7 +57,7 @@ const server = createServer((req, res) => {
       signatureHeader: req.headers['x-works-signature'],
       botSecret: BOT_SECRET,
       allowedBotIds: ALLOWED_BOT_IDS,
-      seenRecently: (k) => seen.check(k)
+      seenRecently: (k) => seen.has(k) // 照会のみ（処理済み登録はpublish成功後）
     });
     if (decision.status !== 200 || !decision.publish) {
       // 理由コードのみログ（本文・署名は出さない）
@@ -67,8 +67,10 @@ const server = createServer((req, res) => {
     }
     try {
       await publish(decision.publish.data, decision.publish.attributes);
+      if (decision.seenKey) seen.add(decision.seenKey); // publish成功後のみ処理済み登録（失敗時は再送を受理）
       res.writeHead(200).end('ok'); // 後続処理を待たず即時200
     } catch (e) {
+      // 処理済み登録しない→LINE WORKS再送が次回受理される（イベント欠落0件）
       console.log(JSON.stringify({ at: new Date().toISOString(), status: 500, reason: 'publish failed' }));
       res.writeHead(500).end();
     }

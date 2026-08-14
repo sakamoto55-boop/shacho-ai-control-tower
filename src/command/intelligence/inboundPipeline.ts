@@ -74,10 +74,12 @@ export function processInboundEvent(store: IntelligenceStore, input: InboundEven
   };
   if (deduplicated) return base; // 同一イベント再送から重複タスクを作らない（§6-4）
 
-  // 新着はまずWAITING_EXTERNALの自動再開を試す（相手の返信）
-  if (input.watchKey) base.resumedActions = store.resumeWaitingByWatchKey(input.watchKey).length;
-
   const entities = extractEntities(`${input.text} ${input.fromLabel}`);
+
+  // 新着はまずWAITING_EXTERNALの自動再開を試す（相手の返信）。
+  // gmailはthread単位で特定・lineworksはroom単位のためEntity照合必須（storeが強制）
+  if (input.watchKey) base.resumedActions = store.resumeWaitingByWatchKey(input.watchKey, entities).length;
+
   const evidence: IntelligenceEvidence[] = [{
     source: `${input.source}:${input.fromLabel}`,
     locator: input.externalId,
@@ -92,13 +94,15 @@ export function processInboundEvent(store: IntelligenceStore, input: InboundEven
     case 'EXCLUDED':
       return base; // 理由付きで除外（RawEventとしては保存済み＝監査可能）
     case 'INFORMATION':
+      // 外部メール・チャットの一般情報はFACT/AUTO確定しない（§F）。
+      // 外部申告（EXTERNAL_CLAIM evidence）としてCANDIDATE保持し、確定は承認またはSource照合後
       base.createdFact = store.addFact({
         companyId: input.companyId,
         kind: 'FACT',
         statement: input.text.slice(0, 160),
         entities,
         evidence,
-        approvalState: 'AUTO',
+        approvalState: 'CANDIDATE',
         sourceRawEventIds: [event.rawEventId]
       });
       return base;
@@ -151,6 +155,29 @@ export function processInboundEvent(store: IntelligenceStore, input: InboundEven
       return base;
     }
   }
+}
+
+/**
+ * こちらから質問・依頼を送った記録（§D: AWAITING_REPLYの本来の根拠）。
+ * 返信下書きの承認送信時などに呼び、watchKey+Entityを持つWAITING_EXTERNALタスクを作る。
+ * 相手の実返信（同watchKey+Entity照合）で自動再開される。
+ */
+export function recordOutboundAwaitingReply(
+  store: IntelligenceStore,
+  input: { companyId: string; title: string; watchKey: string; entities?: import('./types.js').EntityRef[]; relatedCaseId?: string | null; sourceRawEventIds?: string[] }
+): IntelligenceActionItem {
+  return store.addAction({
+    companyId: input.companyId,
+    title: `返答待ち: ${input.title.slice(0, 40)}`,
+    owner: 'AI', ownerName: 'LCC COMMAND',
+    status: 'WAITING_EXTERNAL',
+    dueAt: null,
+    completionCriteria: '相手からの返答受信',
+    entities: input.entities ?? [],
+    relatedCaseId: input.relatedCaseId ?? null,
+    watchKey: input.watchKey,
+    sourceRawEventIds: input.sourceRawEventIds ?? []
+  });
 }
 
 /** 取得結果の区別（§3: 取得失敗と新着なしを混同しない） */

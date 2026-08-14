@@ -61,12 +61,17 @@ describe('DIOS中核データモデル（§2）', () => {
     });
     s.addAgentRun({ companyId: 'lcc', capability: 'RESEARCH', provider: 'anthropic', inputSummary: 'x', resultSummary: '', status: 'QUEUED', costNote: null, durationMs: null, startedAt: new Date().toISOString(), finishedAt: null, relatedCaseId: c.caseId, resultTrust: 'HYPOTHESIS' });
     s.addOutcome({ companyId: 'lcc', relatedCaseId: c.caseId, predicted: '3日以内入金', actual: '5日後入金', gapAnalysis: null });
+    // E2E-11: 訂正履歴（superseded）も再起動後に保持される
+    const f1 = s.addFact({ companyId: 'lcc', kind: 'FACT', statement: '入金予定は8/10', entities: [], evidence: [], approvalState: 'CANDIDATE', sourceRawEventIds: [] });
+    s.correctFact(f1.factId, { companyId: 'lcc', statement: '入金予定は8/20（8/10は誤り）', entities: [], evidence: [], approvalState: 'CANDIDATE', sourceRawEventIds: [] });
     const s2 = new IntelligenceStore(dir);
     expect(s2.rawEvents()).toHaveLength(1);
     expect(s2.cases()).toHaveLength(1);
     expect(s2.actions()[0].actionId).toBe(a.actionId);
     expect(s2.agentRuns()).toHaveLength(1);
     expect(s2.outcomes()).toHaveLength(1);
+    expect(s2.currentFacts().some((f) => f.statement.includes('8/20'))).toBe(true);
+    expect(s2.allFactsIncludingSuperseded().find((f) => f.factId === f1.factId)?.supersededBy).toBeTruthy(); // 訂正履歴保持
   });
 
   it('返信待ちはwatchKey一致の新着で自動再開する（§8）', () => {
@@ -77,7 +82,7 @@ describe('DIOS中核データモデル（§2）', () => {
     expect(s.actions()[0].status).toBe('GATHERING_INFORMATION');
   });
 
-  it('改善提案は承認前に適用されず、承認後のみRuleVersionが版数+旧版+rollback付きで更新（§12-7）', () => {
+  it('改善提案は承認前に適用されず、承認後のみRuleVersion更新。同一Proposalの二重承認は拒否（E2E-8/9）', () => {
     const s = new IntelligenceStore(tmp());
     const p = s.addProposal({ companyId: 'lcc', title: '入金確認は3営業日で自動再確認', rationale: 'Outcome差分', metric: '回収日数', risk: '過剰連絡', relatedOutcomeIds: [] });
     expect(s.currentRule('rule-collection')).toBeNull(); // 承認前は未適用
@@ -85,7 +90,12 @@ describe('DIOS中核データモデル（§2）', () => {
     const rv = s.approveProposal(p.proposalId, '坂本社長', { ruleId: 'rule-collection', name: '回収ルール', body: '3営業日で再確認', rollbackNote: 'previousBodyへ戻す', companyId: 'lcc' });
     expect(rv.currentVersion).toBe(1);
     expect(rv.approvedBy).toBe('坂本社長');
-    const rv2 = s.approveProposal(p.proposalId, '坂本社長', { ruleId: 'rule-collection', name: '回収ルール', body: '2営業日で再確認', rollbackNote: 'previousBodyへ戻す', companyId: 'lcc' });
+    // E2E-9: 同じProposalの二重承認は拒否（Ruleも増えない）
+    expect(() => s.approveProposal(p.proposalId, '坂本社長', { ruleId: 'rule-collection', name: '回収ルール', body: '2営業日で再確認', rollbackNote: 'previousBodyへ戻す', companyId: 'lcc' })).toThrow(/二重承認/);
+    expect(s.currentRule('rule-collection')!.currentVersion).toBe(1);
+    // 別Proposalの承認で版数が上がり、旧版が保持される
+    const p2 = s.addProposal({ companyId: 'lcc', title: '再確認を2営業日へ', rationale: '差分', metric: '回収日数', risk: '過剰連絡', relatedOutcomeIds: [] });
+    const rv2 = s.approveProposal(p2.proposalId, '坂本社長', { ruleId: 'rule-collection', name: '回収ルール', body: '2営業日で再確認', rollbackNote: 'previousBodyへ戻す', companyId: 'lcc' });
     expect(rv2.currentVersion).toBe(2);
     expect(rv2.previousBody).toBe('3営業日で再確認');
   });
@@ -96,10 +106,19 @@ describe('DIOS分類とDecisionCase（§3）', () => {
     expect(classifyInbound('本日の作業完了しました').kind).toBe('INFORMATION');
     expect(classifyInbound('見積の作成をお願いします').kind).toBe('ACTION_REQUIRED');
     expect(classifyInbound('先月分が未入金です。至急確認を').kind).toBe('PRESIDENT_DECISION');
-    expect(classifyInbound('先方からのご返信をお待ちしている状況です').kind).toBe('AWAITING_REPLY');
+    // AWAITING_REPLYは相手が「後で回答する」と明言した場合のみ（こちらが待つ側）
+    expect(classifyInbound('社内で確認してご連絡します').kind).toBe('AWAITING_REPLY');
+    expect(classifyInbound('担当が確認中とのことです').kind).toBe('AWAITING_REPLY');
     const ex = classifyInbound('夏の特別キャンペーンのご案内');
     expect(ex.kind).toBe('EXCLUDED');
     if (ex.kind === 'EXCLUDED') expect(ex.reason).toContain('広告');
+  });
+
+  it('E2E-3: 「ご返信お願いします」「ご返信ください」は相手がこちらの返信を求めている＝ACTION_REQUIRED（§D）', () => {
+    expect(classifyInbound('お手数ですがご返信お願いします').kind).toBe('ACTION_REQUIRED');
+    expect(classifyInbound('内容をご確認のうえご返信ください').kind).toBe('ACTION_REQUIRED');
+    expect(classifyInbound('回答をお待ちしております').kind).toBe('ACTION_REQUIRED');
+    expect(classifyInbound('お返事いただけますと幸いです').kind).toBe('ACTION_REQUIRED');
   });
 
   it('DecisionCaseは必須項目を全て持ち、必要情報マップから不足を出す（4種）', () => {

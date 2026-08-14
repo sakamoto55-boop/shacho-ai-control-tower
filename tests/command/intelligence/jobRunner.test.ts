@@ -9,7 +9,7 @@ import type { ResearchTask } from '../../../src/command/domain/types.js';
 const tmp = () => mkdtempSync(join(tmpdir(), 'lcc-job-'));
 const task = (over: Partial<ResearchTask> = {}): ResearchTask => ({
   researchId: 'r1', companyId: 'lcc', question: '解体工事の相場動向を調べて',
-  provider: 'web_search', status: 'queued', requestedAt: new Date().toISOString(), ...over
+  provider: 'other', status: 'queued', requestedAt: new Date().toISOString(), ...over // §G: LLM単体処理をweb_searchと呼ばない
 });
 const mkSave = () => {
   const saved: ResearchTask[] = [];
@@ -17,7 +17,7 @@ const mkSave = () => {
 };
 
 describe('DIOS Job Runner（§7・queued止まりの解消）', () => {
-  it('設定済みLLMで実行しSUCCEEDED+出典+HYPOTHESIS扱いでAgentRunへ記録する', async () => {
+  it('設定済みLLMで実行しSUCCEEDED+HYPOTHESIS扱いでAgentRunへ記録。LLM_ANALYSIS/UNVERIFIED_SOURCESを明示し、未検証URLへfetchedAtを付けない（§G）', async () => {
     const store = new IntelligenceStore(tmp());
     const { saved, saveResearch } = mkSave();
     const runner = new IntelligenceJobRunner({
@@ -26,9 +26,13 @@ describe('DIOS Job Runner（§7・queued止まりの解消）', () => {
     });
     const { task: done, run } = await runner.runTask(task());
     expect(done.status).toBe('completed');
-    expect(done.result?.sources[0].url).toContain('https://example.com/market');
+    expect(done.result?.summary).toContain('LLM_ANALYSIS'); // Web検索と偽らない
+    expect(done.result?.summary).toContain('UNVERIFIED_SOURCES');
+    expect(done.result?.summary).toContain('https://example.com/market'); // URL自体は提示
+    expect(done.result?.sources).toHaveLength(0); // 実取得していないURLへfetchedAtを付けない
     expect(run.status).toBe('SUCCEEDED');
     expect(run.provider).toBe('anthropic');
+    expect(run.resultSummary).toContain('[LLM_ANALYSIS]');
     expect(run.resultTrust).toBe('HYPOTHESIS'); // 外部AI回答は事実登録しない
     expect(saved.map((s) => s.status)).toEqual(['running', 'completed']);
     expect(run.durationMs).not.toBeNull();

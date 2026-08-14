@@ -958,27 +958,42 @@ export function createCommandApp(
     return c.json({ ok: true, revoked: n });
   });
 
-  // EXECUTIVE UI: ホームの「今日の意思決定」実データ（決定論actionItemsの上位。捏造なし）
-  // DIOS-4: 追跡件数（AIが追跡中/今日完了）を同梱し、ホームは判断1件原則で表示できるようにする
+  // EXECUTIVE UI: ホームの「今日の意思決定」実データ（決定論順位付け。捏造なし）
+  // §B: リアルタイム層（WAITING_PRESIDENTのDecisionCase）を最優先候補としてホームへ接続。
+  // 従来のSheets受信箱itemsはJST当日分のみ「先方からの申告（参考）」として分離表示し、
+  // 過去受信を「今日の判断」と表示しない。追跡件数はJST当日基準。
   app.get('/today/decisions', async (c) => {
     const principal = c.get('principal');
     if (!canDecideApproval(principal)) {
       return c.json({ error: `ロール${principal.role}は意思決定一覧を参照できません` }, 403);
     }
     const { actionItems } = await import('../integrations/knowledge/vaultInsights.js');
+    const { jstDate } = await import('../utils/jst.js');
     const result = actionItems();
-    let tracking = { trackingCount: 0, completedTodayCount: 0, waitingPresidentCount: 0 };
+    const todayJst = jstDate(new Date().toISOString());
+    const legacyToday = result.items.filter((it) => it.receivedAt && jstDate(it.receivedAt) === todayJst);
+    const legacyPastCount = result.items.length - legacyToday.length;
+    let decisions: unknown[] = [];
+    let tracking = { trackingCount: 0, completedTodayCount: 0, waitingPresidentCount: 0, awaitingReplyCount: 0 };
     try {
       const { IntelligenceStore } = await import('../intelligence/store.js');
-      const actions = new IntelligenceStore().actions();
-      const today = new Date().toISOString().slice(0, 10);
-      tracking = {
-        trackingCount: actions.filter((a) => !['COMPLETED', 'ARCHIVED'].includes(a.status)).length,
-        completedTodayCount: actions.filter((a) => a.status === 'COMPLETED' && (a.completedAt ?? '').startsWith(today)).length,
-        waitingPresidentCount: actions.filter((a) => a.status === 'WAITING_PRESIDENT').length
-      };
+      const { homeDecisionCandidates, trackingCounts } = await import('../intelligence/homeDecisions.js');
+      const store = new IntelligenceStore();
+      decisions = homeDecisionCandidates(store);
+      tracking = trackingCounts(store);
     } catch { /* 追跡層の失敗で判断表示は止めない */ }
-    return c.json({ generatedAt: result.generatedAt, items: result.items, dataBasis: result.dataBasis, notes: result.notes, tracking });
+    return c.json({
+      generatedAt: result.generatedAt,
+      todayJst,
+      // 最優先: リアルタイム取込のDecisionCase（外部申告はtrustLabelで明示・完了済みは含まれない）
+      decisions,
+      // 参考: 受信箱（JST当日のみ・外部申告として表示。確定情報ではない）
+      items: legacyToday.map((it) => ({ ...it, trustLabel: '先方からの申告（未確認）' })),
+      legacyPastCount,
+      dataBasis: result.dataBasis,
+      notes: [...result.notes, '受信箱項目は外部からの申告であり、確定情報ではありません'],
+      tracking
+    });
   });
 
   // DIOS-4: 追跡・完了履歴（完了は通常画面から消すが削除せず検索可能に保持）
@@ -999,15 +1014,46 @@ export function createCommandApp(
     return c.json({ view, count: filtered.length, actions: filtered });
   });
 
+  // §C: 通常タスク完了。社長判断（PRESIDENT+関連ケースあり）はここでは完了できない＝
+  // ケース完了（実結果の記録）経由を強制し、DecisionCaseがOPENのまま残ることを防ぐ
   app.post('/intelligence/actions/:id/complete', async (c) => {
     const principal = c.get('principal');
     if (!canDecideApproval(principal)) {
       return c.json({ error: `ロール${principal.role}は完了操作ができません` }, 403);
     }
     const { IntelligenceStore } = await import('../intelligence/store.js');
-    const updated = new IntelligenceStore().updateActionStatus(c.req.param('id'), 'COMPLETED');
-    if (!updated) return c.json({ error: '対象が見つかりません' }, 404);
+    const store = new IntelligenceStore();
+    const target = store.actions().find((a) => a.actionId === c.req.param('id'));
+    if (!target) return c.json({ error: '対象が見つかりません' }, 404);
+    if (target.owner === 'PRESIDENT' && target.relatedCaseId) {
+      return c.json({
+        error: '社長判断は実結果の記録が必要です。/command/intelligence/cases/:id/complete（実結果付き）で完了してください',
+        requiresCaseCompletion: true, caseId: target.relatedCaseId
+      }, 400);
+    }
+    const updated = store.updateActionStatus(target.actionId, 'COMPLETED');
     return c.json({ ok: true, action: updated });
+  });
+
+  // §C: 社長判断の完了（実結果必須）。DecisionCase・関連ActionItem・Outcomeを同時に整合させる
+  app.post('/intelligence/cases/:id/complete', async (c) => {
+    const principal = c.get('principal');
+    if (!canDecideApproval(principal)) {
+      return c.json({ error: `ロール${principal.role}は判断完了ができません` }, 403);
+    }
+    const body = (await c.req.json().catch(() => ({}))) as { actualOutcome?: string; predicted?: string };
+    try {
+      const { IntelligenceStore } = await import('../intelligence/store.js');
+      const { completeDecisionCase } = await import('../intelligence/homeDecisions.js');
+      const result = completeDecisionCase(new IntelligenceStore(), {
+        caseId: c.req.param('id'),
+        actualOutcome: body.actualOutcome ?? '',
+        predicted: body.predicted
+      });
+      return c.json({ ok: true, caseId: result.case.caseId, completedActions: result.completedActions.length, outcomeId: result.outcome.outcomeId });
+    } catch (error) {
+      return c.json({ error: errorMessage(error) }, 400);
+    }
   });
 
   // REAL USE 75%: Drive検索（LIVE_API化後に利用可能。未接続時は正直にERRORを返す）

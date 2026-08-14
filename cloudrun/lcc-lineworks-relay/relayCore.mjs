@@ -19,9 +19,11 @@ export const REPLAY_WINDOW_MS = 5 * 60_000; // timestamp許容窓
  * @param {string|undefined} input.signatureHeader X-WORKS-Signature (base64 HMAC-SHA256)
  * @param {string} input.botSecret  Secret Manager由来（ログへ出さない）
  * @param {string[]} input.allowedBotIds
- * @param {(key: string) => boolean} input.seenRecently  重複/リプレイ検知（event key既出ならtrue）
+ * @param {(key: string) => boolean} input.seenRecently  重複/リプレイ検知（event key既出ならtrue）。
+ *   注意: この関数は「照会のみ」であること。処理済み登録はpublish成功後に呼出側が行う
+ *   （publish失敗後のLINE WORKS再送をduplicateとして破棄しないため＝イベント欠落0件）。
  * @param {number} [input.nowMs]
- * @returns {RelayDecision}
+ * @returns {RelayDecision & { seenKey?: string }}
  */
 export function decideRelay(input) {
   const nowMs = input.nowMs ?? Date.now();
@@ -48,12 +50,14 @@ export function decideRelay(input) {
   }
   const contentHash = createHmac('sha256', 'dedupe').update(input.rawBody).digest('hex').slice(0, 32);
   const eventKey = String(payload?.eventId ?? payload?.content?.messageId ?? contentHash);
-  if (input.seenRecently(`${input.botIdHeader}:${eventKey}`)) {
+  const seenKey = `${input.botIdHeader}:${eventKey}`;
+  if (input.seenRecently(seenKey)) {
     return { status: 200, reason: 'duplicate (already published)' }; // 再送には200（LINE WORKS再送を止める）
   }
   return {
     status: 200,
     reason: 'accepted',
+    seenKey, // publish成功後にのみ呼出側がadd()する（失敗時は未登録のまま→再送を受理できる）
     publish: {
       data: input.rawBody,
       attributes: { botId: input.botIdHeader, eventKey, contentHash, receivedAt: new Date(nowMs).toISOString() }
@@ -61,15 +65,19 @@ export function decideRelay(input) {
   };
 }
 
-/** 簡易LRU（インスタンス内リプレイ検知。完全な重複排除はLCC側RawEventが担保） */
+/**
+ * 簡易LRU（インスタンス内リプレイ検知。完全な重複排除はLCC側RawEventが担保）。
+ * has()は照会のみ・add()はpublish成功後にのみ呼ぶ（publish失敗イベントを処理済みにしない）。
+ */
 export function createSeenCache(max = 5000) {
   const seen = new Map();
   return {
-    check(key) {
-      if (seen.has(key)) return true;
+    has(key) {
+      return seen.has(key);
+    },
+    add(key) {
       seen.set(key, 1);
       if (seen.size > max) seen.delete(seen.keys().next().value);
-      return false;
     }
   };
 }
