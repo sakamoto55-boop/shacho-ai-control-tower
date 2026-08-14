@@ -10,11 +10,14 @@
  */
 import { createServer } from 'node:http';
 import { decideRelay, createSeenCache, MAX_BODY_BYTES } from './relayCore.mjs';
+import { captureDurably } from './durableCapture.mjs';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const TOPIC = process.env.PUBSUB_TOPIC ?? '';
 const BOT_SECRET = process.env.LINEWORKS_BOT_SECRET ?? '';
 const ALLOWED_BOT_IDS = (process.env.LINEWORKS_ALLOWED_BOT_IDS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+// 耐久outbox（GCS bucket名）。LINE WORKSは再送しないため、publish失敗イベントの最後の受け皿
+const OUTBOX_BUCKET = process.env.LINEWORKS_OUTBOX_BUCKET ?? '';
 const seen = createSeenCache();
 
 async function metadataToken() {
@@ -34,6 +37,22 @@ async function publish(data, attributes) {
     body: JSON.stringify({ messages: [{ data: Buffer.from(data).toString('base64'), attributes }] })
   });
   if (!res.ok) throw new Error(`publish ${res.status}`);
+}
+
+/** 耐久outbox: GCSへイベントJSONを保存（後続処理=LCC側drainが必ず取り込む） */
+async function outboxSave(data, attributes) {
+  if (!OUTBOX_BUCKET) throw new Error('NOT_CONFIGURED');
+  const token = await metadataToken();
+  const objectName = `lineworks-outbox/${Date.now()}-${attributes.contentHash}.json`;
+  const res = await fetch(
+    `https://storage.googleapis.com/upload/storage/v1/b/${OUTBOX_BUCKET}/o?uploadType=media&name=${encodeURIComponent(objectName)}`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ attributes, data })
+    }
+  );
+  if (!res.ok) throw new Error(`outbox ${res.status}`);
 }
 
 const server = createServer((req, res) => {
@@ -65,15 +84,22 @@ const server = createServer((req, res) => {
       res.writeHead(decision.status).end();
       return;
     }
-    try {
-      await publish(decision.publish.data, decision.publish.attributes);
-      if (decision.seenKey) seen.add(decision.seenKey); // publish成功後のみ処理済み登録（失敗時は再送を受理）
-      res.writeHead(200).end('ok'); // 後続処理を待たず即時200
-    } catch (e) {
-      // 処理済み登録しない→LINE WORKS再送が次回受理される（イベント欠落0件）
-      console.log(JSON.stringify({ at: new Date().toISOString(), status: 500, reason: 'publish failed' }));
+    // LINE WORKSはCallback失敗時に再送しない。受理した1リクエストをここで必ず耐久化する:
+    // publish内部再試行（3回）→ 失敗時は耐久outbox（GCS）→ 両方失敗のみ500（監視対象の異常）
+    const captured = await captureDurably({
+      publish: () => publish(decision.publish.data, decision.publish.attributes),
+      outbox: OUTBOX_BUCKET ? () => outboxSave(decision.publish.data, decision.publish.attributes) : undefined
+    });
+    if (captured.outcome === 'FAILED') {
+      console.log(JSON.stringify({ at: new Date().toISOString(), status: 500, reason: `capture failed after ${captured.publishAttempts} attempts` }));
       res.writeHead(500).end();
+      return;
     }
+    if (decision.seenKey) seen.add(decision.seenKey); // 耐久確保後のみ処理済み登録
+    if (captured.outcome === 'OUTBOXED') {
+      console.log(JSON.stringify({ at: new Date().toISOString(), status: 200, reason: 'outboxed (publish degraded)' }));
+    }
+    res.writeHead(200).end('ok');
   });
 });
 

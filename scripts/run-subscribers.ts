@@ -17,10 +17,13 @@ import { GmailClient, resolveGmailAuthState } from '../src/command/integrations/
 import { ensureWatch, loadGmailState, processGmailNotification, saveGmailState, defaultGmailStateFile } from '../src/command/integrations/gmail/gmailSync.js';
 import { IntelligenceStore, defaultIntelligenceDir } from '../src/command/intelligence/store.js';
 import { processInboundEvent } from '../src/command/intelligence/inboundPipeline.js';
+import { drainLineworksOutbox } from '../src/command/integrations/lineworks/outboxDrain.js';
 
 const PROJECT = process.env.GCP_PROJECT_ID ?? '';
 const GMAIL_SUB = process.env.GMAIL_PUBSUB_SUBSCRIPTION ?? (PROJECT ? `projects/${PROJECT}/subscriptions/lcc-gmail-events-pull` : '');
 const LW_SUB = process.env.LINEWORKS_PUBSUB_SUBSCRIPTION ?? (PROJECT ? `projects/${PROJECT}/subscriptions/lcc-lineworks-events-pull` : '');
+// 耐久outbox（relayがpublish失敗イベントを退避する先）。drainが後続処理として必ず取り込む
+const LW_OUTBOX_BUCKET = process.env.LINEWORKS_OUTBOX_BUCKET ?? (PROJECT ? `${PROJECT}-lineworks-outbox` : '');
 const stateFile = join(defaultIntelligenceDir(), 'subscriber-state.json');
 
 interface SubscriberState {
@@ -47,6 +50,7 @@ async function main(): Promise<void> {
     process.exit(2);
   }
   const tokenSource = new GoogleSaTokenSource(creds, 'https://www.googleapis.com/auth/pubsub');
+  const storageTokenSource = new GoogleSaTokenSource(creds, 'https://www.googleapis.com/auth/devstorage.read_write');
   const store = new IntelligenceStore();
   const state: SubscriberState = {
     startedAt: new Date().toISOString(),
@@ -85,6 +89,7 @@ async function main(): Promise<void> {
   console.log('[subscribers] 稼働開始（Ctrl+Cで停止。PC停止中の通知はPub/Subに保持されます）');
   // Pullループ（RESTロングポーリング相当）。障害時はbackoff
   let backoffMs = 0;
+  let lastDrainAt = 0;
   for (;;) {
     if (backoffMs > 0) await new Promise((r) => setTimeout(r, backoffMs));
     let hadError = false;
@@ -122,6 +127,16 @@ async function main(): Promise<void> {
       if (r.outcome === 'FETCH_FAILED') hadError = true;
     }
     saveState(state);
+    // 耐久outboxのdrain（60秒間隔目安）。LINE WORKSは再送しないため、publish失敗分の唯一の復旧経路
+    if (LW_OUTBOX_BUCKET && Date.now() - lastDrainAt > 60_000) {
+      lastDrainAt = Date.now();
+      const d = await drainLineworksOutbox(storageTokenSource, LW_OUTBOX_BUCKET, store);
+      if (d.outcome === 'DRAINED') {
+        state.lineworks.processed += d.processed;
+        console.log(`[subscribers] outbox drain: processed=${d.processed} dedup=${d.deduplicated} failed=${d.failed}`);
+        saveState(state);
+      }
+    }
     backoffMs = hadError ? Math.min((backoffMs || 2000) * 2, 60_000) : 1000;
   }
 }

@@ -20,8 +20,10 @@ export const REPLAY_WINDOW_MS = 5 * 60_000; // timestamp許容窓
  * @param {string} input.botSecret  Secret Manager由来（ログへ出さない）
  * @param {string[]} input.allowedBotIds
  * @param {(key: string) => boolean} input.seenRecently  重複/リプレイ検知（event key既出ならtrue）。
- *   注意: この関数は「照会のみ」であること。処理済み登録はpublish成功後に呼出側が行う
- *   （publish失敗後のLINE WORKS再送をduplicateとして破棄しないため＝イベント欠落0件）。
+ *   注意: この関数は「照会のみ」であること。処理済み登録は呼出側が**耐久的に確保できた後**
+ *   （publish成功またはoutbox保存成功の後）にadd()する。
+ *   前提: LINE WORKSはCallback失敗時に再送しない。失われたイベントは戻らないため、
+ *   受理したリクエストは呼出側が publish内部再試行→outbox で必ず耐久化する責務を負う。
  * @param {number} [input.nowMs]
  * @returns {RelayDecision & { seenKey?: string }}
  */
@@ -52,12 +54,13 @@ export function decideRelay(input) {
   const eventKey = String(payload?.eventId ?? payload?.content?.messageId ?? contentHash);
   const seenKey = `${input.botIdHeader}:${eventKey}`;
   if (input.seenRecently(seenKey)) {
-    return { status: 200, reason: 'duplicate (already published)' }; // 再送には200（LINE WORKS再送を止める）
+    // 同一イベントの重複配信（マルチインスタンス等）への防御。LINE WORKSの「再送」は存在しない前提
+    return { status: 200, reason: 'duplicate (already captured)' };
   }
   return {
     status: 200,
     reason: 'accepted',
-    seenKey, // publish成功後にのみ呼出側がadd()する（失敗時は未登録のまま→再送を受理できる）
+    seenKey, // 呼出側がpublish成功またはoutbox保存成功の後にのみadd()する
     publish: {
       data: input.rawBody,
       attributes: { botId: input.botIdHeader, eventKey, contentHash, receivedAt: new Date(nowMs).toISOString() }
@@ -66,8 +69,8 @@ export function decideRelay(input) {
 }
 
 /**
- * 簡易LRU（インスタンス内リプレイ検知。完全な重複排除はLCC側RawEventが担保）。
- * has()は照会のみ・add()はpublish成功後にのみ呼ぶ（publish失敗イベントを処理済みにしない）。
+ * 簡易LRU（インスタンス内の重複配信防御。完全な重複排除はLCC側RawEventが担保）。
+ * has()は照会のみ・add()は耐久確保（publish成功/outbox保存成功）後にのみ呼ぶ。
  */
 export function createSeenCache(max = 5000) {
   const seen = new Map();

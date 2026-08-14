@@ -6,7 +6,8 @@
  * - 未認証はCONFIG_REQUIREDとして正直に返す（実行したふりをしない）。
  * - tokenは環境変数指定の単一ファイル（Git外・値をログへ出さない）。保存はtemp+rename原子化。
  */
-import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync, chmodSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
@@ -72,6 +73,14 @@ function saveTokens(config: GmailConfig, tokens: GmailTokens): void {
   const tmp = `${config.tokenFile}.tmp`;
   writeFileSync(tmp, `${JSON.stringify(tokens, null, 2)}\n`, 'utf8');
   renameSync(tmp, config.tokenFile);
+  // device-sessions.jsonと同等のACL制限（POSIX 0600 / Windowsは現ユーザーのみ）
+  try {
+    if (process.platform === 'win32') {
+      execSync(`icacls "${config.tokenFile}" /inheritance:r /grant:r "%USERNAME%:(F)"`, { stdio: 'ignore' });
+    } else {
+      chmodSync(config.tokenFile, 0o600);
+    }
+  } catch { /* 権限設定失敗でも保存自体は有効（tokenはこのPC内のみ） */ }
 }
 
 export class GmailClient {

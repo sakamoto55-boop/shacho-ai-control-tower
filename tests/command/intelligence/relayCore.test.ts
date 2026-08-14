@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createHmac } from 'node:crypto';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 // @ts-expect-error mjs（Cloud Run relay純関数コア。依存ゼロを維持するためmjsのまま検査）
 import { decideRelay, createSeenCache } from '../../../cloudrun/lcc-lineworks-relay/relayCore.mjs';
+// @ts-expect-error mjs（耐久確保コア）
+import { captureDurably } from '../../../cloudrun/lcc-lineworks-relay/durableCapture.mjs';
+import { IntelligenceStore } from '../../../src/command/intelligence/store.js';
+import { processOutboxObject } from '../../../src/command/integrations/lineworks/outboxDrain.js';
 
 const SECRET = 'test-bot-secret';
 const sign = (body: string) => createHmac('sha256', SECRET).update(body).digest('base64');
@@ -53,19 +60,53 @@ describe('lcc-lineworks-relay コア判定（§12-3受入試験のfixture版）'
     expect(c.has('k1')).toBe(true);
   });
 
-  it('E2E-1: publish失敗→LINE WORKS再送→次回publish成功でイベント欠落0件（§A）', () => {
+  it('publish内部再試行: 一時障害は再試行で回復し、恒常障害はoutboxへ退避する（LINE WORKSは再送しない前提・§3）', async () => {
+    // 2回失敗→3回目成功: PUBLISHED
+    let calls = 0;
+    const flaky = await captureDurably({
+      publish: async () => { calls += 1; if (calls < 3) throw new Error('503'); },
+      sleep: async () => {}
+    });
+    expect(flaky.outcome).toBe('PUBLISHED');
+    expect(flaky.publishAttempts).toBe(3);
+    // 全滅→outbox保存: OUTBOXED（イベントは耐久確保される）
+    let outboxed = 0;
+    const down = await captureDurably({
+      publish: async () => { throw new Error('503'); },
+      outbox: async () => { outboxed += 1; },
+      sleep: async () => {}
+    });
+    expect(down.outcome).toBe('OUTBOXED');
+    expect(outboxed).toBe(1);
+    // publish・outbox両方失敗のみFAILED（500=監視対象）
+    const dead = await captureDurably({
+      publish: async () => { throw new Error('503'); },
+      outbox: async () => { throw new Error('gcs 500'); },
+      sleep: async () => {}
+    });
+    expect(dead.outcome).toBe('FAILED');
+  });
+
+  it('E2E: LINE WORKSリクエスト1回だけ→publish障害→内部復旧（outbox→drain）→最終的にRawEvent 1件（§3）', async () => {
     const cache = createSeenCache(10);
-    // server.mjsと同じ規律: seenRecently=hasのみ、addはpublish成功後
-    const attempt = (publishOk: boolean) => {
-      const d = decideRelay({ ...base(), seenRecently: (k: string) => cache.has(k) });
-      if (d.status === 200 && d.publish) {
-        if (publishOk) { cache.add(d.seenKey); return 'PUBLISHED'; }
-        return 'PUBLISH_FAILED'; // 処理済み登録しない
-      }
-      return d.reason.includes('duplicate') ? 'DUPLICATE' : `REJECTED_${d.status}`;
-    };
-    expect(attempt(false)).toBe('PUBLISH_FAILED'); // 初回publish失敗
-    expect(attempt(true)).toBe('PUBLISHED'); // 再送は受理されpublish成功（欠落しない）
-    expect(attempt(true)).toBe('DUPLICATE'); // publish成功後の再送のみduplicate
+    const outboxStore: Array<{ attributes: Record<string, string>; data: string }> = [];
+    // --- リクエストは1回だけ（LINE WORKSは再送しない） ---
+    const d = decideRelay({ ...base(), seenRecently: (k: string) => cache.has(k) });
+    expect(d.status).toBe(200);
+    const captured = await captureDurably({
+      publish: async () => { throw new Error('pubsub 503'); }, // publish恒常障害
+      outbox: async () => { outboxStore.push({ attributes: d.publish.attributes, data: d.publish.data }); },
+      sleep: async () => {}
+    });
+    expect(captured.outcome).toBe('OUTBOXED');
+    cache.add(d.seenKey); // 耐久確保後に登録（server.mjsと同じ規律）
+    // --- 後続処理（LCC側drain）が必ず取り込む ---
+    const store = new IntelligenceStore(mkdtempSync(join(tmpdir(), 'lcc-outbox-')));
+    const r = processOutboxObject(store, outboxStore[0]);
+    expect(r.outcome).toBe('PROCESSED');
+    expect(store.rawEvents()).toHaveLength(1); // 最終的にRawEvent 1件（リクエストは1回のみ）
+    // drainの冪等性: 同じoutboxオブジェクトを再処理しても重複しない
+    expect(processOutboxObject(store, outboxStore[0]).outcome).toBe('DEDUPLICATED');
+    expect(store.rawEvents()).toHaveLength(1);
   });
 });
