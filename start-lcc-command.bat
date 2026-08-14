@@ -59,10 +59,18 @@ goto :healthloop
 
 :healthy
 rem --- Optional realtime subscribers (set LCC_SUBSCRIBERS=true in .env) ---
+rem Start-Process cannot resolve npx (a .cmd shim) on Windows, so run tsx via node directly.
+rem Honest reporting: only claim "started" when the PID was actually captured.
 findstr /b /c:"LCC_SUBSCRIBERS=true" .env >nul 2>&1
 if not errorlevel 1 (
-  powershell -NoProfile -Command "(Start-Process npx -ArgumentList 'tsx','scripts/run-subscribers.ts' -PassThru -WindowStyle Hidden -RedirectStandardOutput 'logs/subscribers.log' -RedirectStandardError 'logs/subscribers.err.log').Id | Out-File -Encoding ascii 'subscribers.pid'"
-  echo Realtime subscribers started - PID file subscribers.pid
+  powershell -NoProfile -Command "(Start-Process node -ArgumentList 'node_modules/tsx/dist/cli.mjs','scripts/run-subscribers.ts' -PassThru -WindowStyle Hidden -RedirectStandardOutput 'logs/subscribers.log' -RedirectStandardError 'logs/subscribers.err.log').Id | Out-File -Encoding ascii 'subscribers.pid'"
+  set SUB_STARTED=
+  if exist subscribers.pid set /p SUB_STARTED=<subscribers.pid
+  if "!SUB_STARTED!"=="" (
+    echo WARNING: realtime subscribers did NOT start - see logs\subscribers.err.log
+  ) else (
+    echo Realtime subscribers started - PID !SUB_STARTED! saved to subscribers.pid
+  )
 )
 echo Server is up - HTTP %HTTPCODE%. Opening the browser.
 start "" "http://localhost:8787/vui?token=%LCC_UI_TOKEN%"
