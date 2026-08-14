@@ -959,6 +959,7 @@ export function createCommandApp(
   });
 
   // EXECUTIVE UI: ホームの「今日の意思決定」実データ（決定論actionItemsの上位。捏造なし）
+  // DIOS-4: 追跡件数（AIが追跡中/今日完了）を同梱し、ホームは判断1件原則で表示できるようにする
   app.get('/today/decisions', async (c) => {
     const principal = c.get('principal');
     if (!canDecideApproval(principal)) {
@@ -966,7 +967,47 @@ export function createCommandApp(
     }
     const { actionItems } = await import('../integrations/knowledge/vaultInsights.js');
     const result = actionItems();
-    return c.json({ generatedAt: result.generatedAt, items: result.items, dataBasis: result.dataBasis, notes: result.notes });
+    let tracking = { trackingCount: 0, completedTodayCount: 0, waitingPresidentCount: 0 };
+    try {
+      const { IntelligenceStore } = await import('../intelligence/store.js');
+      const actions = new IntelligenceStore().actions();
+      const today = new Date().toISOString().slice(0, 10);
+      tracking = {
+        trackingCount: actions.filter((a) => !['COMPLETED', 'ARCHIVED'].includes(a.status)).length,
+        completedTodayCount: actions.filter((a) => a.status === 'COMPLETED' && (a.completedAt ?? '').startsWith(today)).length,
+        waitingPresidentCount: actions.filter((a) => a.status === 'WAITING_PRESIDENT').length
+      };
+    } catch { /* 追跡層の失敗で判断表示は止めない */ }
+    return c.json({ generatedAt: result.generatedAt, items: result.items, dataBasis: result.dataBasis, notes: result.notes, tracking });
+  });
+
+  // DIOS-4: 追跡・完了履歴（完了は通常画面から消すが削除せず検索可能に保持）
+  app.get('/intelligence/actions', async (c) => {
+    const principal = c.get('principal');
+    if (!canDecideApproval(principal)) {
+      return c.json({ error: `ロール${principal.role}は追跡一覧を参照できません` }, 403);
+    }
+    const { IntelligenceStore } = await import('../intelligence/store.js');
+    const q = (c.req.query('q') ?? '').trim();
+    const view = c.req.query('view') === 'completed' ? 'completed' : 'active';
+    const all = new IntelligenceStore().actions();
+    const filtered = all
+      .filter((a) => (view === 'completed' ? a.status === 'COMPLETED' || a.status === 'ARCHIVED' : !['COMPLETED', 'ARCHIVED'].includes(a.status)))
+      .filter((a) => !q || a.title.includes(q) || a.entities.some((e) => e.name.includes(q)))
+      .sort((a, b) => (b.createdAt).localeCompare(a.createdAt))
+      .slice(0, 100);
+    return c.json({ view, count: filtered.length, actions: filtered });
+  });
+
+  app.post('/intelligence/actions/:id/complete', async (c) => {
+    const principal = c.get('principal');
+    if (!canDecideApproval(principal)) {
+      return c.json({ error: `ロール${principal.role}は完了操作ができません` }, 403);
+    }
+    const { IntelligenceStore } = await import('../intelligence/store.js');
+    const updated = new IntelligenceStore().updateActionStatus(c.req.param('id'), 'COMPLETED');
+    if (!updated) return c.json({ error: '対象が見つかりません' }, 404);
+    return c.json({ ok: true, action: updated });
   });
 
   // REAL USE 75%: Drive検索（LIVE_API化後に利用可能。未接続時は正直にERRORを返す）

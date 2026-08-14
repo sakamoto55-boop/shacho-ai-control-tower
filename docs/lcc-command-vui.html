@@ -217,13 +217,13 @@
         </div>
       </div>
 
-      <!-- 今日の意思決定（重要度順・確定/予測/不明・根拠導線つき） -->
+      <!-- 今日の意思決定（DIOS-4: 判断1件原則・同時緊急でも最大3件。残りは件数のみ） -->
       <div class="surface p-4">
         <p class="text-[10px] tracking-widest text-[color:var(--text-low)] font-bold mb-2">今日の意思決定</p>
-        <div v-if="decisions.loaded && decisions.items.length" class="space-y-2">
-          <div v-for="(d, i) in decisions.items.slice(0, 5)" :key="i" class="decision-item" :class="'p' + Math.min(d.priority, 3)">
+        <div v-if="decisions.loaded && topDecisions.length" class="space-y-2">
+          <div v-for="(d, i) in topDecisions" :key="i" class="decision-item" :class="'p' + Math.min(d.priority, 3)">
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded" :class="d.priority <= 1 ? 'bg-[color:var(--bad)]/25 text-[color:var(--bad)]' : d.priority === 2 ? 'bg-[color:var(--warn)]/20 text-[color:var(--warn)]' : 'bg-white/10 text-[color:var(--text-mid)]'">{{ d.category }}</span>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded" :class="d.priority <= 1 ? 'bg-[color:var(--bad)]/25 text-[color:var(--bad)]' : 'bg-[color:var(--warn)]/20 text-[color:var(--warn)]'">{{ d.category }}</span>
               <p class="text-[13px] font-bold">{{ d.title }}</p>
               <span class="text-[9px] text-[color:var(--text-low)]">確定情報（実データ由来・推測なし）</span>
             </div>
@@ -234,8 +234,14 @@
             </div>
           </div>
         </div>
-        <p v-else-if="decisions.loaded" class="text-[11px] text-[color:var(--text-low)]">接続済みソースから抽出できる要対応はありません</p>
+        <p v-else-if="decisions.loaded" class="text-[12px] text-[color:var(--text-mid)]">急ぎの判断はありません。</p>
         <p v-else class="text-[11px] text-[color:var(--text-low)]">—（{{ decisions.reason || '取得中' }}）</p>
+        <!-- 残りは件数だけ（正常項目は並べない） -->
+        <div class="flex items-center gap-3 mt-3 pt-2 border-t border-white/10 text-[11px] text-[color:var(--text-mid)]">
+          <span v-if="decisions.loaded && decisions.items.length > topDecisions.length">ほか{{ decisions.items.length - topDecisions.length }}件は追跡中</span>
+          <button @click="view = 'tracking'; loadTracking('active')" class="font-bold text-[color:var(--info)]">AIが追跡中 {{ tracking.trackingCount }}件 →</button>
+          <button @click="view = 'tracking'; loadTracking('completed')" class="text-[color:var(--text-low)]">今日完了 {{ tracking.completedTodayCount }}件</button>
+        </div>
       </div>
 
       <!-- AI推奨（1件のみ。決定論ルールの最上位・推測を事実のように表示しない） -->
@@ -277,6 +283,32 @@
           <p class="text-[10px] text-[color:var(--text-low)]">再同期: PCで <code class="bg-black/40 px-1 rounded">npm run sync:all</code> を実行（外部への書き込みは行われません）</p>
         </div>
         <p v-else class="text-[11px] text-[color:var(--text-low)] mt-2">—（{{ health.reason || '取得中' }}）</p>
+      </div>
+    </section>
+
+    <!-- ============ 追跡・完了履歴（DIOS-4: 完了は通常画面から消えるが削除せず検索可能） ============ -->
+    <section v-if="view === 'tracking'" class="flex-1 overflow-y-auto px-4 pb-28 lg:pb-4 space-y-3" aria-label="追跡">
+      <div class="surface p-4">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <p class="font-bold text-sm">{{ trackingView === 'completed' ? '完了履歴' : 'AIが追跡中の仕事' }}</p>
+          <div class="flex gap-2">
+            <button @click="loadTracking('active')" :class="trackingView === 'active' ? 'text-[color:var(--accent)] font-bold' : 'text-[color:var(--text-mid)]'" class="text-[11px] min-h-[44px] lg:min-h-0">追跡中</button>
+            <button @click="loadTracking('completed')" :class="trackingView === 'completed' ? 'text-[color:var(--accent)] font-bold' : 'text-[color:var(--text-mid)]'" class="text-[11px] min-h-[44px] lg:min-h-0">完了履歴</button>
+          </div>
+        </div>
+        <input v-model="trackingQuery" @keydown.enter="loadTracking(trackingView)" placeholder="案件名・件名で検索"
+               class="mt-2 w-full bg-white/10 border border-white/15 rounded-lg px-3 py-2 text-[12px] outline-none" aria-label="追跡検索">
+        <div v-if="trackingItems.length" class="mt-3 space-y-2">
+          <div v-for="a in trackingItems" :key="a.actionId" class="rounded-lg bg-black/25 border border-white/10 p-3">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <p class="text-[12px] font-bold">{{ a.title }}</p>
+              <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 text-[color:var(--text-mid)]">{{ actionStatusLabel(a.status) }}</span>
+            </div>
+            <p class="text-[10px] text-[color:var(--text-low)] mt-1">担当: {{ a.ownerName }}／完了条件: {{ a.completionCriteria }}{{ a.dueAt ? '／期限 ' + a.dueAt.slice(0, 10) : '' }}</p>
+            <button v-if="trackingView === 'active'" @click="completeAction(a.actionId)" class="text-[10px] font-bold text-[color:var(--ok)] mt-1 min-h-[44px] lg:min-h-0">完了にする</button>
+          </div>
+        </div>
+        <p v-else class="mt-3 text-[11px] text-[color:var(--text-low)]">{{ trackingView === 'completed' ? '完了履歴はまだありません' : '追跡中の仕事はありません' }}</p>
       </div>
     </section>
 
@@ -678,6 +710,8 @@ createApp({
       view: 'home',
       composing: false, // 日本語IME変換中の誤送信防止（compositionstart/end）
       decisions: { loaded: false, items: [], reason: '' },
+      tracking: { trackingCount: 0, completedTodayCount: 0, waitingPresidentCount: 0 },
+      trackingView: 'active', trackingItems: [], trackingQuery: '',
       health: { loaded: false, connections: [], okCount: 0, limitedCount: 0, reason: '' },
       navItems: [
         { key: 'home', label: '朝の管制', short: '管制', view: 'home', icon: 'M3 12l9-8 9 8M5 10v10h14V10' },
@@ -739,6 +773,13 @@ createApp({
       if (this.authRequired) return '認証が必要（接続は正常）';
       if (this.connectionError) return 'データ取得できません（接続に問題）';
       return this.health.loaded && this.health.limitedCount > 0 ? '実データ（一部制限あり）' : '実データ';
+    },
+    topDecisions(){
+      // DIOS-4: 最上位の判断は1件。同時緊急（priority1が複数）の場合のみ最大3件
+      const items = this.decisions.items || [];
+      if (!items.length) return [];
+      const urgent = items.filter((d) => d.priority <= 1).slice(0, 3);
+      return urgent.length > 1 ? urgent : items.slice(0, 1);
     },
     lastSyncLabel(){
       const s = this.health.loaded && this.health.connections.length
@@ -821,6 +862,27 @@ createApp({
       ev.preventDefault();
       this.send(this.draft);
     },
+    actionStatusLabel(s){
+      return {
+        GATHERING_INFORMATION: '情報収集中', AI_WORKING: 'AI作業中', WAITING_STAFF: '担当者待ち',
+        WAITING_EXTERNAL: '相手の返答待ち', WAITING_PRESIDENT: '社長の判断待ち', BLOCKED: '停止中',
+        COMPLETED: '完了', ARCHIVED: '保管'
+      }[s] || s;
+    },
+    async loadTracking(view){
+      this.trackingView = view;
+      try {
+        const res = await fetch(`${this.apiBase}/command/intelligence/actions?view=${view}&q=${encodeURIComponent(this.trackingQuery)}`, { headers: this.authHeaders() });
+        if (!res.ok) { this.trackingItems = []; return; }
+        this.trackingItems = (await res.json()).actions || [];
+      } catch { this.trackingItems = []; }
+    },
+    async completeAction(id){
+      try {
+        await fetch(`${this.apiBase}/command/intelligence/actions/${id}/complete`, { method: 'POST', headers: this.authHeaders() });
+        await Promise.all([this.loadTracking('active'), this.loadDecisions()]); // 完了は即時に通常表示から消える
+      } catch { /* 失敗時は表示維持 */ }
+    },
     async claimPairing(){
       // iPhone側: 6桁コード→HttpOnlyセッション。成功時はAI COREが一度だけ収束→拡散
       if (this.pairBusy) return;
@@ -880,6 +942,7 @@ createApp({
         }
         const body = await res.json();
         this.decisions = { loaded: true, items: body.items || [], reason: '' };
+        if (body.tracking) this.tracking = body.tracking;
       } catch (e) {
         this.decisions = { loaded: false, items: [], reason: '接続できないため取得不能' };
       }
