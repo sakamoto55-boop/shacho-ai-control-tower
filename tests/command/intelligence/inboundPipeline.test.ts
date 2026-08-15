@@ -81,6 +81,46 @@ describe('共通Inbound Event Pipeline（構成訂正§3）', () => {
     expect(s.actions().find((a) => a.title.includes('佐藤様'))!.status).toBe('WAITING_EXTERNAL');
   });
 
+  it('障害注入E2E: RawEvent保存後にActionItem作成が失敗しても、再実行でRECOVEREDとなり派生処理が完成する（Inbound完全性）', () => {
+    const s = new IntelligenceStore(tmp());
+    const input = ev({ text: '現場で事故が発生しました。至急ご判断ください', content: { crash: 1 } });
+    // 1回目: addActionが必ず失敗する（RawEvent+DecisionCase保存後・ActionItem作成前のクラッシュを注入）
+    const originalAddAction = s.addAction.bind(s);
+    s.addAction = () => { throw new Error('injected crash before action persist'); };
+    expect(() => processInboundEvent(s, input)).toThrow('injected crash');
+    expect(s.rawEvents()).toHaveLength(1); // RawEventは保存済み
+    expect(s.cases()).toHaveLength(1); // caseは保存済み
+    expect(s.actions()).toHaveLength(0); // actionが欠けた部分障害状態
+    // 2回目（再実行）: DEDUPLICATEDで終了せず、欠けたActionItemだけを再開作成する
+    s.addAction = originalAddAction;
+    const r2 = processInboundEvent(s, input);
+    expect(r2.outcome).toBe('RECOVERED');
+    expect(r2.createdCase).toBeNull(); // 既存caseは再利用（二重作成しない）
+    expect(r2.createdAction!.status).toBe('WAITING_PRESIDENT');
+    expect(r2.createdAction!.relatedCaseId).toBe(s.cases()[0].caseId); // 既存caseへ接続
+    expect(s.rawEvents()).toHaveLength(1); // 最終状態: RawEvent 1件
+    expect(s.cases()).toHaveLength(1); // DecisionCase 1件
+    expect(s.actions()).toHaveLength(1); // ActionItem 1件
+    // 3回目: 完全な状態ではDEDUPLICATED（重複作成なし）
+    expect(processInboundEvent(s, input).outcome).toBe('DEDUPLICATED');
+    expect(s.actions()).toHaveLength(1);
+  });
+
+  it('障害注入E2E: DecisionCase作成自体が失敗した場合も再実行でcase+actionが揃う', () => {
+    const s = new IntelligenceStore(tmp());
+    const input = ev({ externalId: 'crash2', text: '未入金です。至急確認をお願いします', content: { crash: 2 } });
+    const originalAddCase = s.addCase.bind(s);
+    s.addCase = () => { throw new Error('injected crash before case persist'); };
+    expect(() => processInboundEvent(s, input)).toThrow('injected crash');
+    expect(s.rawEvents()).toHaveLength(1);
+    expect(s.cases()).toHaveLength(0);
+    s.addCase = originalAddCase;
+    const r = processInboundEvent(s, input);
+    expect(r.outcome).toBe('RECOVERED');
+    expect(s.cases()).toHaveLength(1);
+    expect(s.actions()).toHaveLength(1);
+  });
+
   it('機密区分: 人事・給与・個人情報は外部Provider送信不可と判定する', () => {
     expect(sensitivityOf('社員の給与改定について').sensitive).toBe(true);
     expect(sensitivityOf('外構工事の見積').sensitive).toBe(false);

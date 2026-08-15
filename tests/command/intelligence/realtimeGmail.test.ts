@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { resolveGmailAuthState } from '../../../src/command/integrations/gmail/gmailClient.js';
+import { resolveGmailAuthState, saveTokens } from '../../../src/command/integrations/gmail/gmailClient.js';
 import { loadGmailState, processGmailNotification, saveGmailState } from '../../../src/command/integrations/gmail/gmailSync.js';
 import { PubsubPullSubscriber } from '../../../src/command/integrations/common/pubsubPull.js';
 import { GoogleSaTokenSource } from '../../../src/command/integrations/common/googleSaAuth.js';
@@ -52,6 +52,19 @@ describe('Gmail Pull同期（構成訂正§1・fixture E2E）', () => {
     const r2 = await processGmailNotification(client, store, loadGmailState(stateFile), { historyId: 1500 }, stateFile);
     expect(r2.processed.every((p) => p.outcome === 'DEDUPLICATED')).toBe(true);
     expect(store.actions().filter((a) => a.status === 'WAITING_PRESIDENT')).toHaveLength(1);
+  });
+
+  it('token ACL設定失敗は握り潰さず、tokenを削除してthrow（認証失敗として扱う・§3是正）', async () => {
+    const { existsSync } = await import('node:fs');
+    const dir = tmp();
+    const config = { clientId: 'id', clientSecret: 'sec', redirectUri: 'http://127.0.0.1:1/x', tokenFile: join(dir, 'gmail-tokens.json'), pubsubTopic: 'projects/p/topics/t' };
+    const tokens = { accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 1000, scope: 's' };
+    // ACL成功: 保存される
+    saveTokens(config, tokens, () => {});
+    expect(existsSync(config.tokenFile)).toBe(true);
+    // ACL失敗: tokenを残さずthrow（無制限ACLのtokenファイルを残さない）
+    expect(() => saveTokens(config, tokens, () => { throw new Error('icacls denied'); })).toThrow(/ACL制限に失敗/);
+    expect(existsSync(config.tokenFile)).toBe(false);
   });
 
   it('E2E-2: 11ページ以上のhistoryをnextPageTokenがなくなるまで全件取得する（§E）', async () => {

@@ -72,7 +72,7 @@ export async function drainLineworksOutbox(
       if (!res.ok) throw new Error(`get HTTP ${res.status}`);
       const obj = (await res.json()) as OutboxObject;
       const r = processOutboxObject(store, obj);
-      if (r.outcome === 'PROCESSED') processed += 1; else deduplicated += 1;
+      if (r.outcome !== 'DEDUPLICATED') processed += 1; else deduplicated += 1; // RECOVERED（派生再開）も取込成功
       // 永続化成功後のみ削除（失敗分は残して次回再処理）
       const del = await fetchImpl(`${STORAGE_BASE}/b/${bucket}/o/${encodeURIComponent(it.name)}`, { method: 'DELETE', headers: auth });
       if (!del.ok && del.status !== 404) throw new Error(`delete HTTP ${del.status}`);

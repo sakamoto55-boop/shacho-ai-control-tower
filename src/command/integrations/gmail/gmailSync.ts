@@ -97,7 +97,7 @@ export async function processGmailNotification(
     }
     next.historyId = latestHistoryId ?? String(notification.historyId ?? startId);
     next.lastSuccessfulFetchAt = new Date().toISOString();
-    next.processedCount = state.processedCount + processed.filter((p) => p.outcome === 'PROCESSED').length;
+    next.processedCount = state.processedCount + processed.filter((p) => p.outcome !== 'DEDUPLICATED').length;
     saveGmailState(next, stateFile);
     return { outcome: processed.length > 0 ? 'NEW_EVENTS' : 'NO_NEW_EVENTS', processed, state: next };
   } catch (e) {

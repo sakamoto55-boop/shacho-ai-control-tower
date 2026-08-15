@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildReceipt,
   desiredResources,
+  mergeReceipts,
   planSetup,
   planTeardown,
   resourceKey
@@ -55,6 +56,20 @@ describe('GCloud setup/teardown計画（receipt方式・ps1と同一規則のmoc
     // skipとcreateに重複がない
     const overlap = plan.create.filter((c) => half.has(resourceKey(c)));
     expect(overlap).toHaveLength(0);
+  });
+
+  it('receiptマージ: 成功ごとの追記で既存内容を失わず、重複記録せず、別projectへの追記を拒否する', () => {
+    const r1 = mergeReceipts(null, P, 'asia-northeast1', [{ kind: 'topic', id: 't1' }], '2026-08-15T00:00:00Z');
+    expect(r1.created).toHaveLength(1);
+    // 途中失敗→再実行: 既存分を保持したまま追加分のみマージ
+    const r2 = mergeReceipts(r1, P, 'asia-northeast1', [{ kind: 'topic', id: 't1' }, { kind: 'secret', id: 's1' }], '2026-08-15T00:01:00Z');
+    expect(r2.created).toHaveLength(2); // t1は重複記録しない
+    expect(r2.createdAt).toBe('2026-08-15T00:00:00Z'); // 初回作成時刻を保持
+    // 共有リソースは記録しない
+    const r3 = mergeReceipts(r2, P, 'asia-northeast1', [{ kind: 'api', id: 'x', shared: true }], '2026-08-15T00:02:00Z');
+    expect(r3.created).toHaveLength(2);
+    // 別projectのreceiptへは追記できない
+    expect(() => mergeReceipts(r2, 'other-project', 'asia-northeast1', [], 'now')).toThrow(/projectId不一致/);
   });
 
   it('正準リスト: outbox bucket・build SA・runtime SAが分離定義されている', () => {

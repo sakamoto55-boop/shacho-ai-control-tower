@@ -6,7 +6,7 @@
  * - 未認証はCONFIG_REQUIREDとして正直に返す（実行したふりをしない）。
  * - tokenは環境変数指定の単一ファイル（Git外・値をログへ出さない）。保存はtemp+rename原子化。
  */
-import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync, chmodSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync, chmodSync, rmSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 
@@ -68,19 +68,30 @@ export function resolveGmailAuthState(config = loadGmailConfig(), oauthState?: s
   return { state: 'READY' };
 }
 
-function saveTokens(config: GmailConfig, tokens: GmailTokens): void {
+function defaultAclApply(file: string): void {
+  if (process.platform === 'win32') {
+    execSync(`icacls "${file}" /inheritance:r /grant:r "%USERNAME%:(F)"`, { stdio: 'ignore' });
+  } else {
+    chmodSync(file, 0o600);
+  }
+}
+
+/**
+ * token保存（temp+rename原子化 + ACL制限）。
+ * ACL設定に失敗した場合は握り潰さず、保存したtokenを削除してthrow＝認証失敗として扱う
+ * （制限のかからないtokenファイルを残さない）。テスト用にaclApplyを注入可能。
+ */
+export function saveTokens(config: GmailConfig, tokens: GmailTokens, aclApply: (file: string) => void = defaultAclApply): void {
   mkdirSync(dirname(config.tokenFile), { recursive: true });
   const tmp = `${config.tokenFile}.tmp`;
   writeFileSync(tmp, `${JSON.stringify(tokens, null, 2)}\n`, 'utf8');
   renameSync(tmp, config.tokenFile);
-  // device-sessions.jsonと同等のACL制限（POSIX 0600 / Windowsは現ユーザーのみ）
   try {
-    if (process.platform === 'win32') {
-      execSync(`icacls "${config.tokenFile}" /inheritance:r /grant:r "%USERNAME%:(F)"`, { stdio: 'ignore' });
-    } else {
-      chmodSync(config.tokenFile, 0o600);
-    }
-  } catch { /* 権限設定失敗でも保存自体は有効（tokenはこのPC内のみ） */ }
+    aclApply(config.tokenFile);
+  } catch (e) {
+    try { rmSync(config.tokenFile, { force: true }); } catch { /* 削除失敗でもthrowは継続 */ }
+    throw new Error(`tokenファイルのACL制限に失敗したためtokenを破棄しました（再認証が必要）: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
 
 export class GmailClient {

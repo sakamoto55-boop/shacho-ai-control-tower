@@ -98,7 +98,7 @@ async function main(): Promise<void> {
         const n = JSON.parse(msg.data || '{}') as { historyId?: number | string };
         const pr = await processGmailNotification(gmailClient, store, loadGmailState(), n, defaultGmailStateFile());
         if (pr.outcome === 'FETCH_FAILED') throw new Error(pr.error ?? 'fetch failed'); // ACKしない→再配信
-        state.gmail.backlogProcessed += pr.processed.filter((p) => p.outcome === 'PROCESSED').length;
+        state.gmail.backlogProcessed += pr.processed.filter((p) => p.outcome !== 'DEDUPLICATED').length;
       });
       state.gmail.lastPullAt = new Date().toISOString();
       state.gmail.lastOutcome = r.outcome + (r.error ? `:${r.error.slice(0, 60)}` : '');
@@ -120,7 +120,7 @@ async function main(): Promise<void> {
           asOf: msg.attributes.receivedAt ?? null
         });
         state.lineworks.lastEventAt = msg.attributes.receivedAt ?? new Date().toISOString();
-        if (result.outcome === 'PROCESSED') state.lineworks.processed += 1;
+        if (result.outcome !== 'DEDUPLICATED') state.lineworks.processed += 1;
       });
       state.lineworks.lastPullAt = new Date().toISOString();
       state.lineworks.lastOutcome = r.outcome + (r.error ? `:${r.error.slice(0, 60)}` : '');

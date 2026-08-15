@@ -47,15 +47,16 @@
 
 **現在**: 既存SA `lcc-command-ai@…` にプロジェクトレベルのロール付与は**なし**（Sheets/Driveはファイル共有ベースの読取のみ。Cloud Resource Manager読取が403になることを実測確認済み）。
 
-**追加するproject-levelロール（3件・専用build SAに必要。「0件」ではない＝隠さず明記）**:
+**追加するproject-levelロール（1件・「0件」ではない＝隠さず明記）**:
 
 | # | メンバー | ロール（project-level） | 必要な理由 |
 |---|---|---|---|
-| P1 | `lcc-build@lcc-command.iam.gserviceaccount.com`（新規build SA） | `roles/logging.logWriter` | Cloud Buildのビルドログ書込に必須 |
-| P2 | 同上 | `roles/artifactregistry.createOnPushWriter` | ビルド済みイメージのpush（`cloud-run-source-deploy` repoの自動作成含む）に必須 |
-| P3 | 同上 | `roles/storage.objectViewer` | `--source`アップロード先bucketからソースを読むために必須 |
+| P1 | `lcc-build@lcc-command.iam.gserviceaccount.com`（新規build SA） | **`roles/run.builder`** | Google公式の「Cloud Runソースdeploy用build SA」ロール（ログ書込・イメージpush・ソース読取を包含）。既定Compute/Cloud Build SAの広い既定ロールへ依存しない |
 
-（既定Compute SA / Cloud Build SAの広い既定ロールへ依存しないための分離。teardownで3件とも解除する）
+（setupは既存bindingを検出した場合skipし自作扱いしない。teardownはreceiptに記録された自作binding分のみ解除する）
+
+**deployer（setup実行者）に必要な権限（preflightが実行前に検査し、不足時は変更せず停止）**:
+`roles/owner`保持なら充足。個別付与の場合は `roles/run.admin`・`roles/iam.serviceAccountAdmin`・`roles/iam.serviceAccountUser`・`roles/pubsub.admin`・`roles/secretmanager.admin`・`roles/storage.admin`・`roles/serviceusage.serviceUsageAdmin`・`roles/resourcemanager.projectIamAdmin` の全部。
 
 **追加するリソース単位の権限**:
 

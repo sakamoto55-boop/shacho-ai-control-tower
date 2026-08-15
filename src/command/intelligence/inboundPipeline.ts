@@ -40,7 +40,12 @@ export interface InboundEventInput {
 }
 
 export interface InboundResult {
-  outcome: 'PROCESSED' | 'DEDUPLICATED';
+  /**
+   * PROCESSED=新規取込 / DEDUPLICATED=重複（派生成果物も揃っている） /
+   * RECOVERED=RawEventは既存だが派生処理（ActionItem/DecisionCase/Fact）が未完了だったため再開して完成させた
+   * （RawEvent保存後・派生作成前のクラッシュから、同一入力の再実行で復旧する＝Inbound完全性）
+   */
+  outcome: 'PROCESSED' | 'DEDUPLICATED' | 'RECOVERED';
   classification: InboundClass;
   rawEventId: string;
   sensitive: boolean;
@@ -49,6 +54,20 @@ export interface InboundResult {
   createdFact: KnowledgeFact | null;
   resumedActions: number;
   excludedReason: string | null;
+}
+
+/** 派生成果物の充足判定: 分類ごとに必要な成果物が既に存在するか */
+function derivedArtifactsComplete(
+  kind: InboundClass['kind'],
+  existing: { fact: boolean; action: boolean; case: boolean }
+): boolean {
+  switch (kind) {
+    case 'EXCLUDED': return true; // 除外はRawEvent保存のみで完結
+    case 'INFORMATION': return existing.fact;
+    case 'AWAITING_REPLY':
+    case 'ACTION_REQUIRED': return existing.action;
+    case 'PRESIDENT_DECISION': return existing.case && existing.action;
+  }
 }
 
 export function processInboundEvent(store: IntelligenceStore, input: InboundEventInput): InboundResult {
@@ -61,8 +80,15 @@ export function processInboundEvent(store: IntelligenceStore, input: InboundEven
     content: input.content
   });
   const classification = classifyInbound(input.text);
+  // 既存の派生成果物（rawEventIdで接続）。dedupでも揃っていなければ再開する（DEDUPLICATEDだけで終了しない）
+  const existingFact = store.currentFacts().find((f) => f.sourceRawEventIds.includes(event.rawEventId)) ?? null;
+  const existingAction = store.actions().find((a) => a.sourceRawEventIds.includes(event.rawEventId)) ?? null;
+  const existingCase = store.cases().find((c) => c.sourceRawEventIds.includes(event.rawEventId)) ?? null;
+  const complete = derivedArtifactsComplete(classification.kind, {
+    fact: existingFact !== null, action: existingAction !== null, case: existingCase !== null
+  });
   const base: InboundResult = {
-    outcome: deduplicated ? 'DEDUPLICATED' : 'PROCESSED',
+    outcome: deduplicated ? (complete ? 'DEDUPLICATED' : 'RECOVERED') : 'PROCESSED',
     classification,
     rawEventId: event.rawEventId,
     sensitive: sensitivityOf(input.text).sensitive,
@@ -72,13 +98,14 @@ export function processInboundEvent(store: IntelligenceStore, input: InboundEven
     resumedActions: 0,
     excludedReason: classification.kind === 'EXCLUDED' ? classification.reason : null
   };
-  if (deduplicated) return base; // 同一イベント再送から重複タスクを作らない（§6-4）
+  if (deduplicated && complete) return base; // 同一イベント再送から重複タスクを作らない（§6-4）
 
   const entities = extractEntities(`${input.text} ${input.fromLabel}`);
 
   // 新着はまずWAITING_EXTERNALの自動再開を試す（相手の返信）。
-  // gmailはthread単位で特定・lineworksはroom単位のためEntity照合必須（storeが強制）
-  if (input.watchKey) base.resumedActions = store.resumeWaitingByWatchKey(input.watchKey, entities).length;
+  // gmailはthread単位で特定・lineworksはroom単位のためEntity照合必須（storeが強制）。
+  // RECOVERED（再実行）では再実行しない＝二重再開を防ぐ
+  if (input.watchKey && !deduplicated) base.resumedActions = store.resumeWaitingByWatchKey(input.watchKey, entities).length;
 
   const evidence: IntelligenceEvidence[] = [{
     source: `${input.source}:${input.fromLabel}`,
@@ -96,62 +123,71 @@ export function processInboundEvent(store: IntelligenceStore, input: InboundEven
     case 'INFORMATION':
       // 外部メール・チャットの一般情報はFACT/AUTO確定しない（§F）。
       // 外部申告（EXTERNAL_CLAIM evidence）としてCANDIDATE保持し、確定は承認またはSource照合後
-      base.createdFact = store.addFact({
-        companyId: input.companyId,
-        kind: 'FACT',
-        statement: input.text.slice(0, 160),
-        entities,
-        evidence,
-        approvalState: 'CANDIDATE',
-        sourceRawEventIds: [event.rawEventId]
-      });
+      if (!existingFact) {
+        base.createdFact = store.addFact({
+          companyId: input.companyId,
+          kind: 'FACT',
+          statement: input.text.slice(0, 160),
+          entities,
+          evidence,
+          approvalState: 'CANDIDATE',
+          sourceRawEventIds: [event.rawEventId]
+        });
+      }
       return base;
     case 'AWAITING_REPLY':
-      base.createdAction = store.addAction({
-        companyId: input.companyId,
-        title: `返答待ち: ${input.text.slice(0, 40)}`,
-        owner: 'AI', ownerName: 'LCC COMMAND',
-        status: 'WAITING_EXTERNAL',
-        dueAt: null,
-        completionCriteria: '相手からの返答受信',
-        entities,
-        relatedCaseId: null,
-        watchKey: input.watchKey,
-        sourceRawEventIds: [event.rawEventId]
-      });
+      if (!existingAction) {
+        base.createdAction = store.addAction({
+          companyId: input.companyId,
+          title: `返答待ち: ${input.text.slice(0, 40)}`,
+          owner: 'AI', ownerName: 'LCC COMMAND',
+          status: 'WAITING_EXTERNAL',
+          dueAt: null,
+          completionCriteria: '相手からの返答受信',
+          entities,
+          relatedCaseId: null,
+          watchKey: input.watchKey,
+          sourceRawEventIds: [event.rawEventId]
+        });
+      }
       return base;
     case 'ACTION_REQUIRED':
-      base.createdAction = store.addAction({
-        companyId: input.companyId,
-        title: input.text.slice(0, 50),
-        owner: 'STAFF', ownerName: '担当者（割当待ち）',
-        status: 'GATHERING_INFORMATION',
-        dueAt: null,
-        completionCriteria: '依頼内容の対応完了と記録',
-        entities,
-        relatedCaseId: null,
-        watchKey: input.watchKey,
-        sourceRawEventIds: [event.rawEventId]
-      });
+      if (!existingAction) {
+        base.createdAction = store.addAction({
+          companyId: input.companyId,
+          title: input.text.slice(0, 50),
+          owner: 'STAFF', ownerName: '担当者（割当待ち）',
+          status: 'GATHERING_INFORMATION',
+          dueAt: null,
+          completionCriteria: '依頼内容の対応完了と記録',
+          entities,
+          relatedCaseId: null,
+          watchKey: input.watchKey,
+          sourceRawEventIds: [event.rawEventId]
+        });
+      }
       return base;
     case 'PRESIDENT_DECISION': {
-      const c = store.addCase(buildDecisionCase({
+      // 部分障害からの復旧: 既存の断片（case/action）は再利用し、不足分だけを作成する
+      const c = existingCase ?? store.addCase(buildDecisionCase({
         raw: event, text: input.text, entities,
         confirmedFacts: [], aiHypotheses: [], evidence
       }));
-      base.createdCase = c;
-      base.createdAction = store.addAction({
-        companyId: input.companyId,
-        title: `判断待ち: ${c.title}`,
-        owner: 'PRESIDENT', ownerName: '坂本社長',
-        status: 'WAITING_PRESIDENT',
-        dueAt: c.impact.deadline,
-        completionCriteria: c.completionCriteria,
-        entities,
-        relatedCaseId: c.caseId,
-        watchKey: input.watchKey,
-        sourceRawEventIds: [event.rawEventId]
-      });
+      if (!existingCase) base.createdCase = c;
+      if (!existingAction) {
+        base.createdAction = store.addAction({
+          companyId: input.companyId,
+          title: `判断待ち: ${c.title}`,
+          owner: 'PRESIDENT', ownerName: '坂本社長',
+          status: 'WAITING_PRESIDENT',
+          dueAt: c.impact.deadline,
+          completionCriteria: c.completionCriteria,
+          entities,
+          relatedCaseId: c.caseId,
+          watchKey: input.watchKey,
+          sourceRawEventIds: [event.rawEventId]
+        });
+      }
       return base;
     }
   }

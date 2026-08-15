@@ -16,6 +16,25 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }]
     }
   },
+  // テスト用mock gcloud（CommonJS・Node実行）: Nodeグローバル+CJS requireを許可
+  {
+    files: ['tests/command/gcloudps1/*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: {
+        require: 'readonly',
+        process: 'readonly',
+        console: 'readonly',
+        Buffer: 'readonly',
+        __dirname: 'readonly',
+        module: 'readonly'
+      }
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-unused-expressions': 'off'
+    }
+  },
   // Cloud Run relay（Node実行・依存ゼロmjs）: Nodeグローバルを許可
   {
     files: ['cloudrun/**/*.mjs'],

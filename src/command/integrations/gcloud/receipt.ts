@@ -75,6 +75,28 @@ export function buildReceipt(projectId: string, region: string, created: GcloudR
   return { projectId, region, createdAt, created: created.filter((r) => !r.shared) };
 }
 
+/**
+ * receiptマージ（処理成功ごとの原子的追記に使う）。
+ * - 既存receiptの内容を失わない（途中失敗・再実行でも消失しない）
+ * - kind+idで重複排除（再実行で同じリソースを二重記録しない）
+ * - 既存リソース（setupがskipしたもの）は追加しない＝自作扱いしない（呼出側はcreate成功分のみ渡す）
+ */
+export function mergeReceipts(existing: SetupReceipt | null, projectId: string, region: string, additions: GcloudResource[], now: string): SetupReceipt {
+  const base: SetupReceipt = existing ?? { projectId, region, createdAt: now, created: [] };
+  if (existing && existing.projectId !== projectId) {
+    throw new Error(`receiptのprojectId不一致（${existing.projectId} != ${projectId}）。別プロジェクトのreceiptへ追記しない`);
+  }
+  const seen = new Set(base.created.map(key));
+  const merged = [...base.created];
+  for (const r of additions) {
+    if (r.shared) continue; // 共有リソースは記録しない
+    if (seen.has(key(r))) continue;
+    seen.add(key(r));
+    merged.push(r);
+  }
+  return { ...base, created: merged };
+}
+
 export interface TeardownPlan {
   delete: GcloudResource[];
   /** 共有のため削除しない（保護） */
