@@ -246,8 +246,11 @@ Grant-Binding @("storage", "buckets", "add-iam-policy-binding", "gs://$outboxBuc
   "serviceAccount:$LccSaEmail" "roles/storage.objectAdmin" `
   "$LccSaEmail|roles/storage.objectAdmin|bucket:$outboxBucket"
 
-# --- Phase 8: Cloud Run deploy（専用build SA明示） --------------------------------
+# --- Phase 8: Cloud Run deploy（専用build SA明示・既存サービスを自作扱いしない） ---
 Write-Host "== 8. Cloud Run deploy =="
+# 事前存在確認: 既存サービスへのdeployは更新であり、receiptへ自作登録しない（teardownで消さない）
+$runExisted = Test-GCExists run services describe lcc-lineworks-relay --region $Region
+if ($runExisted) { Write-Host "  既存Cloud Runサービスを更新します（自作扱いしない=teardown対象に登録しない）" }
 Invoke-GC run deploy lcc-lineworks-relay --project $ProjectId --region $Region `
   --source "$PSScriptRoot\..\cloudrun\lcc-lineworks-relay" `
   --service-account $relaySa `
@@ -256,9 +259,11 @@ Invoke-GC run deploy lcc-lineworks-relay --project $ProjectId --region $Region `
   --max-instances 2 --memory 256Mi --cpu 1 `
   --set-env-vars "PUBSUB_TOPIC=projects/$ProjectId/topics/lcc-lineworks-events,LINEWORKS_ALLOWED_BOT_IDS=$LineworksBotId,LINEWORKS_OUTBOX_BUCKET=$outboxBucket" `
   --set-secrets "LINEWORKS_BOT_SECRET=lineworks-bot-secret:latest"
-Add-Receipt "run-service" "lcc-lineworks-relay@$Region"
-Add-Receipt "artifact-image" "$Region-docker.pkg.dev/$ProjectId/cloud-run-source-deploy/lcc-lineworks-relay"
-Add-Receipt "iam-binding" "allUsers|roles/run.invoker|run-service:lcc-lineworks-relay@$Region"
+if (-not $runExisted) {
+  Add-Receipt "run-service" "lcc-lineworks-relay@$Region"
+  Add-Receipt "artifact-image" "$Region-docker.pkg.dev/$ProjectId/cloud-run-source-deploy/lcc-lineworks-relay"
+  Add-Receipt "iam-binding" "allUsers|roles/run.invoker|run-service:lcc-lineworks-relay@$Region"
+}
 
 Write-Host "== 完了。receipt: $receiptFile =="
 Write-Host "== 表示されたURL + /lineworks/callback をLINE WORKS ConsoleのBot Callback URLへ登録してください =="

@@ -78,20 +78,22 @@ function defaultAclApply(file: string): void {
 
 /**
  * token保存（temp+rename原子化 + ACL制限）。
- * ACL設定に失敗した場合は握り潰さず、保存したtokenを削除してthrow＝認証失敗として扱う
- * （制限のかからないtokenファイルを残さない）。テスト用にaclApplyを注入可能。
+ * - ACLはrename前のtempファイルへ適用＝**作成時から0600相当**（無制限ACLのtokenが一瞬も正位置に置かれない）
+ * - ACL設定に失敗した場合は握り潰さず、temp/tokenを削除してthrow＝認証失敗として扱う。
+ * - POSIXはmode 0600で作成。テスト用にaclApplyを注入可能。
  */
 export function saveTokens(config: GmailConfig, tokens: GmailTokens, aclApply: (file: string) => void = defaultAclApply): void {
   mkdirSync(dirname(config.tokenFile), { recursive: true });
   const tmp = `${config.tokenFile}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(tokens, null, 2)}\n`, 'utf8');
-  renameSync(tmp, config.tokenFile);
+  writeFileSync(tmp, `${JSON.stringify(tokens, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
   try {
-    aclApply(config.tokenFile);
+    aclApply(tmp); // rename前に制限（作成時から0600相当）
   } catch (e) {
-    try { rmSync(config.tokenFile, { force: true }); } catch { /* 削除失敗でもthrowは継続 */ }
+    try { rmSync(tmp, { force: true }); } catch { /* 削除失敗でもthrowは継続 */ }
+    try { rmSync(config.tokenFile, { force: true }); } catch { /* 旧tokenも残さない */ }
     throw new Error(`tokenファイルのACL制限に失敗したためtokenを破棄しました（再認証が必要）: ${e instanceof Error ? e.message : String(e)}`);
   }
+  renameSync(tmp, config.tokenFile);
 }
 
 export class GmailClient {

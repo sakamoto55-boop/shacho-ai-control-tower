@@ -108,15 +108,15 @@ describe.skipIf(!SHELL)('実PS1 mock gcloud E2E（途中失敗→再setup→tear
     expect(log).not.toMatch(/rm --recursive gs:\/\/mockproj_cloudbuild/);
   }, 120_000);
 
-  it('既存bindingは自作扱いせずreceiptへ記録しない', () => {
+  it('既存binding・既存Cloud Runサービスは自作扱いせずreceiptへ記録しない', () => {
     const shell = SHELL!;
     const mockDir = makeMockDir();
     const work = mkdtempSync(join(tmpdir(), 'lcc-ps1pre-'));
     const stateFile = join(work, 'mock-state.json');
     const receipt = join(work, 'receipt.json');
-    // 事前に「既存binding」を仕込む（gmail-api-push publisher）
+    // 事前に「既存binding」と「既存Cloud Runサービス」を仕込む
     writeFileSync(stateFile, JSON.stringify({
-      resources: {},
+      resources: { 'run:lcc-lineworks-relay@asia-northeast1': 1 },
       bindings: { 'topic:lcc-gmail-events|serviceAccount:gmail-api-push@system.gserviceaccount.com|roles/pubsub.publisher': 1 },
       secretData: ''
     }), 'utf8');
@@ -136,5 +136,10 @@ describe.skipIf(!SHELL)('実PS1 mock gcloud E2E（途中失敗→再setup→tear
     const ids = rec.created.map((c: { kind: string; id: string }) => `${c.kind}:${c.id}`);
     expect(ids.some((i: string) => i.includes('gmail-api-push'))).toBe(false); // 既存bindingを自作扱いしない
     expect(r.stdout).toContain('binding既存');
+    // 既存Cloud Runサービス: deployは更新扱いで、run-service/image/invoker bindingをreceiptへ登録しない
+    expect(ids.some((i: string) => i.startsWith('run-service:'))).toBe(false);
+    expect(ids.some((i: string) => i.startsWith('artifact-image:'))).toBe(false);
+    expect(ids.some((i: string) => i.includes('run.invoker'))).toBe(false);
+    expect(r.stdout).toContain('既存Cloud Runサービスを更新');
   }, 120_000);
 });
