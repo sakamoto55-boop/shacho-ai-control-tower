@@ -18,6 +18,14 @@ param(
   [switch]$AutoApprove
 )
 $ErrorActionPreference = "Stop"
+$env:CLOUDSDK_CORE_DISABLE_PROMPTS = "1"   # gcloudの対話プロンプト（API有効化確認等）を出さない
+# PS5.1では native stderr が ErrorActionPreference=Stop で終了扱いになるため、gcloud呼出だけ Continue で包む。
+# 成否判定は従来どおり $LASTEXITCODE のみで行う（Windowsは gcloud.cmd を明示解決）。
+function gcloud {
+  $ErrorActionPreference = "Continue"
+  & gcloud.cmd @args
+  $global:LASTEXITCODE = $LASTEXITCODE
+}
 if (-not $ReceiptFile) { $ReceiptFile = Join-Path $PSScriptRoot "..\data\gcloud-setup-receipt.json" }
 
 function Invoke-GC {

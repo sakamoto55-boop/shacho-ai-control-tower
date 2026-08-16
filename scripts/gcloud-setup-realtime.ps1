@@ -22,7 +22,15 @@ param(
   [string]$ReceiptFile = ""
 )
 $ErrorActionPreference = "Stop"
-$relaySa = "lcc-lineworks-relay@$ProjectId.iam.gserviceaccount.com"
+$env:CLOUDSDK_CORE_DISABLE_PROMPTS = "1"   # gcloudの対話プロンプト（API有効化確認等）を出さない
+# PS5.1では native stderr が ErrorActionPreference=Stop で終了扱いになるため、gcloud呼出だけ Continue で包む。
+# 成否判定は従来どおり $LASTEXITCODE のみで行う（Windowsは gcloud.cmd を明示解決）。
+function gcloud {
+  $ErrorActionPreference = "Continue"
+  & gcloud.cmd @args
+  $global:LASTEXITCODE = $LASTEXITCODE
+}
+$relaySa ="lcc-lineworks-relay@$ProjectId.iam.gserviceaccount.com"
 $buildSa = "lcc-build@$ProjectId.iam.gserviceaccount.com"
 $outboxBucket = "$ProjectId-lineworks-outbox"
 $runService = "lcc-lineworks-relay"
