@@ -1,14 +1,33 @@
+import {
+  BUSINESS_LINE_LABELS,
+  BUSINESS_LINE_WORK_LABELS,
+  detectBusinessLine,
+  detectInquirySpam,
+  estimateLeadValueYen,
+  FOLLOW_UP_INTERVAL_DAYS,
+  type LeadScoreResult,
+  scoreLead,
+  SNS_REPLY_HUMAN_CHECK_REASON
+} from '../../domain/leadRules.js';
 import { classifyPriority } from '../../domain/priorityRules.js';
 import { detectRisk } from '../../domain/riskRules.js';
+import { CHANNEL_BODY_LIMIT, checkAdCompliance } from '../../domain/snsContentRules.js';
 import type {
   AnalyzeMessageInput,
   AnalyzeMessageResult,
   AnalyzeReplyDraftResult,
   AnalyzeTaskResult,
+  BusinessLine,
   OwnerType,
-  ReplyTone
+  Priority,
+  ReplyTone,
+  SnsInquiryAnalysisResult,
+  SnsInquiryInput,
+  SnsPostDraftResult,
+  SnsPostGenerationInput,
+  SnsPostPurpose
 } from '../../domain/types.js';
-import { parseJapaneseDueDate } from '../../utils/date.js';
+import { parseJapaneseDueDate, shiftIsoDate } from '../../utils/date.js';
 import { normalizeText } from '../../utils/textNormalize.js';
 import type { AIProvider } from './AIProvider.js';
 
@@ -250,7 +269,193 @@ function buildReplyDraft(input: AnalyzeMessageInput, riskType: string, analysisT
   };
 }
 
+/* ------------------------------------------------------------------ *
+ * SNS集客：反響分析と投稿下書き
+ * ------------------------------------------------------------------ */
+
+/** SNS反響への一次返信下書き。金額・工期は書かず、不足情報のヒアリングに徹する。 */
+function buildInquiryReplyDraft(
+  input: SnsInquiryInput,
+  score: LeadScoreResult,
+  isSpam: boolean
+): AnalyzeReplyDraftResult {
+  if (isSpam) {
+    return {
+      needed: false,
+      text: '',
+      tone: 'confirmation_only',
+      confirmationNeeded: [],
+      ngReasons: ['売り込みDMと判定したため返信不要です。']
+    };
+  }
+
+  const text = normalizeText(input.text);
+  const displayName = input.displayName || input.accountName;
+  const nameLine = displayName ? `${displayName}様\n\n` : '';
+
+  // 感想コメントに住所や予算を聞き返さない。お礼だけを返して関係を残す。
+  if (score.buyingSignals.length === 0 && score.temperature === 'cold') {
+    return {
+      needed: true,
+      text: `${nameLine}コメントありがとうございます。現場の様子や施工の流れを引き続き投稿していきます。気になることがあれば、お気軽にご質問ください。`,
+      tone: 'external_polite',
+      confirmationNeeded: [],
+      ngReasons: [SNS_REPLY_HUMAN_CHECK_REASON]
+    };
+  }
+
+  const missingInfo = score.missingInfo;
+  const askLines = missingInfo.slice(0, 3).map((item) => `・${item}`);
+
+  const body = [
+    `${nameLine}お問い合わせありがとうございます。`,
+    '内容を確認いたしました。より正確なご案内のため、下記をお教えいただけますでしょうか。',
+    ...(askLines.length > 0 ? ['', ...askLines] : []),
+    '',
+    'お伺いした内容をもとに、担当より概算のご案内と現地調査のご相談をさせていただきます。'
+  ].join('\n');
+
+  const ngReasons = dangerousReplyWords
+    .filter((word) => text.includes(word))
+    .map((word) => `${word}に関わるため自動送信は禁止です。`);
+  ngReasons.push(SNS_REPLY_HUMAN_CHECK_REASON);
+
+  const confirmationNeeded = [...missingInfo.slice(0, 3)];
+  if (includesAny(text, ['いくら', '費用', '料金', '価格', '相場', '見積'])) {
+    confirmationNeeded.push('概算金額を出す前の原価・処分費の確認');
+  }
+
+  return {
+    needed: true,
+    text: body,
+    tone: 'external_polite',
+    confirmationNeeded,
+    ngReasons
+  };
+}
+
+const PURPOSE_CALL_TO_ACTION: Record<SnsPostPurpose, string> = {
+  lead_generation: 'ご相談・現地調査のご依頼はプロフィールのリンクまたはDMからお気軽にどうぞ。',
+  trust_building: '同じようなお悩みがあれば、コメントやDMでお聞かせください。',
+  case_study: '似た条件の現場についても、DMでご相談いただけます。',
+  recruiting: '一緒に働く仲間を募集しています。詳細はプロフィールのリンクをご覧ください。',
+  seasonal: '今の時期のご相談も受け付けています。DMからお声がけください。'
+};
+
+const BUSINESS_LINE_HASHTAGS: Record<BusinessLine, string[]> = {
+  construction: ['建設', 'リフォーム', '施工事例'],
+  demolition: ['解体工事', '空き家対策', '解体費用'],
+  exterior: ['外構工事', 'エクステリア', '駐車場工事'],
+  realestate: ['不動産', '土地活用', '空き家'],
+  welfare: ['福祉事業', '介護', '地域福祉'],
+  unknown: ['地域密着', '施工実績']
+};
+
+/** 投稿本文の骨組み。目的ごとに書き出しと構成を変える。 */
+function buildPostBody(input: SnsPostGenerationInput, workLabel: string, areaText: string): string {
+  const highlights = (input.highlights ?? []).filter((item) => item.trim().length > 0);
+  const highlightLines = highlights.slice(0, 3).map((item) => `・${item}`);
+
+  const intro =
+    input.purpose === 'case_study'
+      ? `【施工事例】${areaText}${workLabel}の現場から、${input.theme}をご紹介します。`
+      : input.purpose === 'trust_building'
+        ? `${areaText}${workLabel}について、${input.theme}をご紹介します。`
+        : input.purpose === 'lead_generation'
+          ? `${areaText}で${workLabel}をご検討中の方へ。${input.theme}をまとめました。`
+          : input.purpose === 'recruiting'
+            ? `${areaText}${workLabel}の現場で一緒に働く仲間を探しています。${input.theme}をご紹介します。`
+            : `${areaText}${workLabel}の今の時期のご相談について、${input.theme}をご案内します。`;
+
+  const middle =
+    highlightLines.length > 0
+      ? highlightLines.join('\n')
+      : [
+          '・現地の状況を確認したうえで、作業範囲と工程をご説明します',
+          '・費用は現場条件によって変わるため、内訳を分けてご提示します',
+          '・近隣への事前あいさつと養生まで含めて対応します'
+        ].join('\n');
+
+  return [intro, '', middle].join('\n');
+}
+
+function buildMediaHint(input: SnsPostGenerationInput, workLabel: string): string {
+  if (input.purpose === 'case_study') return `${workLabel}の着工前・作業中・完了後の3カット（同じ角度で撮影）`;
+  if (input.purpose === 'trust_building') return `${workLabel}のビフォーアフター比較写真、または説明用の図解1枚`;
+  if (input.purpose === 'recruiting') return '社員の作業風景と朝礼の写真（顔出し可否を本人に確認すること）';
+  return `${workLabel}の完了写真1枚と、問い合わせ導線を書いたカード画像1枚`;
+}
+
 export class MockAIProvider implements AIProvider {
+  async analyzeSnsInquiry(input: SnsInquiryInput): Promise<SnsInquiryAnalysisResult> {
+    const text = normalizeText(input.text);
+    const spam = detectInquirySpam(text);
+    const businessLine = detectBusinessLine(text);
+    // 地域・連絡先が別項目で届いている場合も「本文に書かれている」のと同じ扱いにする。
+    const scoringText = [text, input.area ?? '', input.contact ?? ''].join(' ');
+    const leadScore = scoreLead(scoringText);
+    const { score, temperature, buyingSignals, missingInfo } = leadScore;
+    // 感想コメントのように受注シグナルが無い反響は、金額を見込まない（パイプラインを膨らませない）。
+    const hasValueBasis = !spam.isSpam && (buyingSignals.length > 0 || temperature !== 'cold');
+    const estimatedValueYen = hasValueBasis ? estimateLeadValueYen(businessLine, text) : null;
+    const replyDraft = buildInquiryReplyDraft(input, leadScore, spam.isSpam);
+    const receivedDate = input.receivedAt.slice(0, 10);
+
+    const priority: Priority = spam.isSpam ? 'C' : temperature === 'hot' ? 'A' : temperature === 'warm' ? 'B' : 'C';
+    const label = BUSINESS_LINE_LABELS[businessLine];
+    const sliced = text.length > 40 ? `${text.slice(0, 40)}…` : text;
+
+    return {
+      summary: spam.isSpam
+        ? `[売り込みDM] ${sliced}`
+        : `[${input.channel}/${label}] ${sliced} [確度:${score}]`,
+      businessLine,
+      temperature,
+      leadScore: score,
+      estimatedValueYen,
+      isSpam: spam.isSpam,
+      spamReason: spam.reason,
+      buyingSignals,
+      missingInfo,
+      priority,
+      replyDraft,
+      nextAction: spam.isSpam
+        ? '対応不要。必要ならアカウントをブロックする。'
+        : temperature === 'hot'
+          ? '本日中に一次返信し、現地調査の日程を2案提示する'
+          : temperature === 'warm'
+            ? '翌営業日までに一次返信し、不足情報をヒアリングする'
+            : '定型の資料案内を返し、長期フォロー対象として記録する',
+      followUpDate: spam.isSpam ? null : shiftIsoDate(receivedDate, FOLLOW_UP_INTERVAL_DAYS[temperature]),
+      confidence: text.length > 30 ? 'medium' : 'low'
+    };
+  }
+
+  async generateSnsPost(input: SnsPostGenerationInput): Promise<SnsPostDraftResult> {
+    const label = BUSINESS_LINE_LABELS[input.businessLine];
+    const workLabel = BUSINESS_LINE_WORK_LABELS[input.businessLine];
+    const areaText = input.area ? `${input.area}の` : '';
+    const body = buildPostBody(input, workLabel, areaText);
+    const callToAction = PURPOSE_CALL_TO_ACTION[input.purpose];
+    const limit = CHANNEL_BODY_LIMIT[input.channel];
+    const full = `${body}\n\n${callToAction}`;
+    const trimmed = full.length > limit ? `${full.slice(0, limit - 1)}…` : full;
+
+    const hashtags = [
+      ...BUSINESS_LINE_HASHTAGS[input.businessLine],
+      ...(input.area ? [input.area.replace(/[都道府県市区町村]/g, '') || input.area] : [])
+    ].filter((tag) => tag.length > 0);
+
+    return {
+      title: `${input.scheduledDate} ${label}／${input.theme}`,
+      body: trimmed,
+      hashtags,
+      callToAction,
+      mediaHint: buildMediaHint(input, workLabel),
+      ngReasons: checkAdCompliance(trimmed)
+    };
+  }
+
   async analyzeMessage(input: AnalyzeMessageInput): Promise<AnalyzeMessageResult> {
     // chatHistoryがある場合、相手のメッセージのみを分析対象にする
     const analysisText = extractOtherMessagesText(input);

@@ -1,4 +1,10 @@
-import type { InboxRecord, ReplyDraftRecord, TaskRecord } from '../domain/types.js';
+import type {
+  InboxRecord,
+  LeadRecord,
+  ReplyDraftRecord,
+  SnsPostDraftRecord,
+  TaskRecord
+} from '../domain/types.js';
 import type { DateRange, Repository } from './Repository.js';
 
 export class KintoneRepository implements Repository {
@@ -45,6 +51,37 @@ export class KintoneRepository implements Repository {
   }
 
   async getReplyDraftsByDateRange(_range?: DateRange): Promise<ReplyDraftRecord[]> {
+    throw new Error('KintoneRepository is a Phase 1 connector stub. Use LocalRepository for MVP.');
+  }
+
+  async createLeadRecord(_record: LeadRecord): Promise<LeadRecord> {
+    throw new Error('KintoneRepository is a Phase 1 connector stub. Use LocalRepository for MVP.');
+  }
+
+  async updateLeadRecord(_id: string, _patch: Partial<LeadRecord>): Promise<LeadRecord | null> {
+    throw new Error('KintoneRepository is a Phase 1 connector stub. Use LocalRepository for MVP.');
+  }
+
+  async getLeadsByDateRange(_range?: DateRange): Promise<LeadRecord[]> {
+    throw new Error('KintoneRepository is a Phase 1 connector stub. Use LocalRepository for MVP.');
+  }
+
+  async getOpenLeads(): Promise<LeadRecord[]> {
+    throw new Error('KintoneRepository is a Phase 1 connector stub. Use LocalRepository for MVP.');
+  }
+
+  async createSnsPostDraftRecords(_records: SnsPostDraftRecord[]): Promise<SnsPostDraftRecord[]> {
+    throw new Error('KintoneRepository is a Phase 1 connector stub. Use LocalRepository for MVP.');
+  }
+
+  async updateSnsPostDraftRecord(
+    _id: string,
+    _patch: Partial<SnsPostDraftRecord>
+  ): Promise<SnsPostDraftRecord | null> {
+    throw new Error('KintoneRepository is a Phase 1 connector stub. Use LocalRepository for MVP.');
+  }
+
+  async getSnsPostDraftsByDateRange(_range?: DateRange): Promise<SnsPostDraftRecord[]> {
     throw new Error('KintoneRepository is a Phase 1 connector stub. Use LocalRepository for MVP.');
   }
 }

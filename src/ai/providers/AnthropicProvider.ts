@@ -1,6 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { AnalyzeMessageInput, AnalyzeMessageResult } from '../../domain/types.js';
+import type {
+  AnalyzeMessageInput,
+  AnalyzeMessageResult,
+  SnsInquiryAnalysisResult,
+  SnsInquiryInput,
+  SnsPostDraftResult,
+  SnsPostGenerationInput
+} from '../../domain/types.js';
 import type { AIProvider } from './AIProvider.js';
+import {
+  buildSnsInquiryUserPrompt,
+  buildSnsPostUserPrompt,
+  SNS_INQUIRY_SYSTEM_PROMPT,
+  SNS_POST_SYSTEM_PROMPT
+} from './snsPrompts.js';
 
 const SYSTEM_PROMPT = `あなたは建設会社の代表取締役（社長）を補佐するAIアシスタントです。
 
@@ -103,15 +116,15 @@ export class AnthropicProvider implements AIProvider {
     });
   }
 
-  async analyzeMessage(input: AnalyzeMessageInput): Promise<AnalyzeMessageResult> {
+  private async requestJson<T>(system: string, userPrompt: string, maxTokens = 2048): Promise<T> {
     const response = await this.client.messages.create({
       model: 'claude-opus-4-5',
-      max_tokens: 2048,
-      system: SYSTEM_PROMPT,
+      max_tokens: maxTokens,
+      system,
       messages: [
         {
           role: 'user',
-          content: buildUserPrompt(input)
+          content: userPrompt
         }
       ]
     });
@@ -127,6 +140,21 @@ export class AnthropicProvider implements AIProvider {
       throw new Error('No JSON found in Anthropic response');
     }
 
-    return JSON.parse(jsonMatch[0]) as AnalyzeMessageResult;
+    return JSON.parse(jsonMatch[0]) as T;
+  }
+
+  async analyzeMessage(input: AnalyzeMessageInput): Promise<AnalyzeMessageResult> {
+    return this.requestJson<AnalyzeMessageResult>(SYSTEM_PROMPT, buildUserPrompt(input));
+  }
+
+  async analyzeSnsInquiry(input: SnsInquiryInput): Promise<SnsInquiryAnalysisResult> {
+    return this.requestJson<SnsInquiryAnalysisResult>(
+      SNS_INQUIRY_SYSTEM_PROMPT,
+      buildSnsInquiryUserPrompt(input)
+    );
+  }
+
+  async generateSnsPost(input: SnsPostGenerationInput): Promise<SnsPostDraftResult> {
+    return this.requestJson<SnsPostDraftResult>(SNS_POST_SYSTEM_PROMPT, buildSnsPostUserPrompt(input), 1536);
   }
 }

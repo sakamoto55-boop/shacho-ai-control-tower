@@ -12,6 +12,19 @@ export function addDaysIsoDate(days: number, now = new Date()): string {
   return todayIsoDate(date);
 }
 
+/** YYYY-MM-DD を日数分ずらす。タイムゾーンの影響を受けないようUTCで計算する。 */
+export function shiftIsoDate(dateIso: string, days: number): string {
+  const [year, month, day] = dateIso.slice(0, 10).split('-').map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  return shifted.toISOString().slice(0, 10);
+}
+
+/** YYYY-MM-DD の曜日（0=日曜）。UTC基準で判定する。 */
+export function dayOfWeekIso(dateIso: string): number {
+  const [year, month, day] = dateIso.slice(0, 10).split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
 export function isSameDate(isoOrDateText: string | null, target = todayIsoDate()): boolean {
   if (!isoOrDateText) return false;
   return isoOrDateText.slice(0, 10) === target;

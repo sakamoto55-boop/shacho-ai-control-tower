@@ -1,6 +1,21 @@
 import OpenAI from 'openai';
-import type { AnalyzeMessageInput, AnalyzeMessageResult } from '../../domain/types.js';
+import type {
+  AnalyzeMessageInput,
+  AnalyzeMessageResult,
+  SnsInquiryAnalysisResult,
+  SnsInquiryInput,
+  SnsPostDraftResult,
+  SnsPostGenerationInput
+} from '../../domain/types.js';
 import type { AIProvider } from './AIProvider.js';
+import {
+  buildSnsInquiryUserPrompt,
+  buildSnsPostUserPrompt,
+  SNS_INQUIRY_SYSTEM_PROMPT,
+  SNS_POST_SYSTEM_PROMPT
+} from './snsPrompts.js';
+
+const JSON_ONLY_SUFFIX = '\n\n必ず有効なJSONのみを返答してください。前置きや説明文は不要です。';
 
 const SYSTEM_PROMPT = `あなたは建設会社の代表取締役（社長）を補佐するAIアシスタントです。
 
@@ -105,13 +120,13 @@ export class OpenAIProvider implements AIProvider {
     });
   }
 
-  async analyzeMessage(input: AnalyzeMessageInput): Promise<AnalyzeMessageResult> {
+  private async requestJson<T>(system: string, userPrompt: string): Promise<T> {
     const response = await this.client.chat.completions.create({
       model: 'gpt-4o',
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: buildUserPrompt(input) }
+        { role: 'system', content: system },
+        { role: 'user', content: userPrompt }
       ]
     });
 
@@ -120,6 +135,24 @@ export class OpenAIProvider implements AIProvider {
       throw new Error('No content in OpenAI response');
     }
 
-    return JSON.parse(content) as AnalyzeMessageResult;
+    return JSON.parse(content) as T;
+  }
+
+  async analyzeMessage(input: AnalyzeMessageInput): Promise<AnalyzeMessageResult> {
+    return this.requestJson<AnalyzeMessageResult>(SYSTEM_PROMPT, buildUserPrompt(input));
+  }
+
+  async analyzeSnsInquiry(input: SnsInquiryInput): Promise<SnsInquiryAnalysisResult> {
+    return this.requestJson<SnsInquiryAnalysisResult>(
+      `${SNS_INQUIRY_SYSTEM_PROMPT}${JSON_ONLY_SUFFIX}`,
+      buildSnsInquiryUserPrompt(input)
+    );
+  }
+
+  async generateSnsPost(input: SnsPostGenerationInput): Promise<SnsPostDraftResult> {
+    return this.requestJson<SnsPostDraftResult>(
+      `${SNS_POST_SYSTEM_PROMPT}${JSON_ONLY_SUFFIX}`,
+      buildSnsPostUserPrompt(input)
+    );
   }
 }

@@ -1,13 +1,21 @@
 import 'dotenv/config';
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
-import { analyzeMessage } from './ai/analyzeMessage.js';
-import type { AnalyzeMessageInput, MessageSource, OriginalChannel } from './domain/types.js';
+import { analyzeMessage, createAIProvider } from './ai/analyzeMessage.js';
+import type {
+  AnalyzeMessageInput,
+  MessageSource,
+  OriginalChannel,
+  SnsChannel
+} from './domain/types.js';
 import { analyzeAndSaveMessage } from './jobs/analyzeIncomingMessages.js';
-import { generateAndSendReport } from './jobs/generateReports.js';
+import { generateAndSendReport, generateAndSendRevenueReport } from './jobs/generateReports.js';
+import { followUpLeads, ingestSnsInquiry } from './jobs/snsLeadPipeline.js';
+import { approveSnsPostDraft, planSnsPosts, publishApprovedSnsPosts } from './jobs/snsPostJobs.js';
 import { createRepository } from './repositories/createRepository.js';
 import { createLineworksConnector, type LineworksWebhookPayload } from './connectors/lineworks.js';
-import { nowIso } from './utils/date.js';
+import { createSnsConnector, type SnsInquiryWebhookPayload } from './connectors/sns.js';
+import { nowIso, todayIsoDate } from './utils/date.js';
 
 export const app = new Hono();
 
@@ -127,6 +135,108 @@ app.post('/jobs/report/noon', async (c) => {
 
 app.post('/jobs/report/evening', async (c) => {
   const report = await generateAndSendReport(repository, 'evening');
+  return c.json(report);
+});
+
+/* ------------------------------------------------------------------ *
+ * SNS集客・収益化
+ * ------------------------------------------------------------------ */
+
+interface PlanSnsPostsBody {
+  fromDate?: string;
+  days?: number;
+  channels?: SnsChannel[];
+  area?: string;
+  highlights?: string[];
+}
+
+app.post('/webhooks/sns/inquiry', async (c) => {
+  try {
+    const payload = (await c.req.json()) as SnsInquiryWebhookPayload;
+    const input = createSnsConnector().normalizeWebhookInquiry(payload);
+    if (input.text.length === 0) {
+      throw new Error('text is required');
+    }
+    const bundle = await ingestSnsInquiry(repository, input);
+    return c.json({ ok: true, bundle });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+  }
+});
+
+app.post('/dev/sns/analyze-inquiry', async (c) => {
+  try {
+    requireDevEndpoint();
+    const payload = (await c.req.json()) as SnsInquiryWebhookPayload;
+    const input = createSnsConnector().normalizeWebhookInquiry(payload);
+    if (input.text.length === 0) {
+      throw new Error('text is required');
+    }
+    const result = await createAIProvider().analyzeSnsInquiry(input);
+    return c.json({ input, result });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+  }
+});
+
+app.get('/dev/sns/leads', async (c) => {
+  try {
+    requireDevEndpoint();
+    const records = await repository.getLeadsByDateRange();
+    return c.json({ records });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+  }
+});
+
+app.get('/dev/sns/post-drafts', async (c) => {
+  try {
+    requireDevEndpoint();
+    const records = await repository.getSnsPostDraftsByDateRange();
+    return c.json({ records });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+  }
+});
+
+app.post('/dev/sns/post-drafts/:id/approve', async (c) => {
+  try {
+    requireDevEndpoint();
+    const result = await approveSnsPostDraft(repository, c.req.param('id'));
+    return c.json(result, result.ok ? 200 : 400);
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+  }
+});
+
+app.post('/jobs/sns/plan-posts', async (c) => {
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as PlanSnsPostsBody;
+    const result = await planSnsPosts(repository, {
+      fromDate: body.fromDate ?? todayIsoDate(),
+      days: body.days ?? 7,
+      channels: body.channels,
+      area: body.area ?? process.env.SNS_DEFAULT_AREA,
+      highlights: body.highlights
+    });
+    return c.json(result);
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+  }
+});
+
+app.post('/jobs/sns/follow-up', async (c) => {
+  const result = await followUpLeads(repository);
+  return c.json(result);
+});
+
+app.post('/jobs/sns/publish-approved', async (c) => {
+  const result = await publishApprovedSnsPosts(repository);
+  return c.json(result);
+});
+
+app.post('/jobs/report/revenue', async (c) => {
+  const report = await generateAndSendRevenueReport(repository);
   return c.json(report);
 });
 

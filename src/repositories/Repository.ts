@@ -1,4 +1,10 @@
-import type { InboxRecord, ReplyDraftRecord, TaskRecord } from '../domain/types.js';
+import type {
+  InboxRecord,
+  LeadRecord,
+  ReplyDraftRecord,
+  SnsPostDraftRecord,
+  TaskRecord
+} from '../domain/types.js';
 
 export interface DateRange {
   from?: string;
@@ -16,4 +22,16 @@ export interface Repository {
   getInboxRecordsByDateRange(range?: DateRange): Promise<InboxRecord[]>;
   getTasksByDateRange(range?: DateRange): Promise<TaskRecord[]>;
   getReplyDraftsByDateRange(range?: DateRange): Promise<ReplyDraftRecord[]>;
+
+  /* SNS集客・収益化 */
+  createLeadRecord(record: LeadRecord): Promise<LeadRecord>;
+  updateLeadRecord(id: string, patch: Partial<LeadRecord>): Promise<LeadRecord | null>;
+  getLeadsByDateRange(range?: DateRange): Promise<LeadRecord[]>;
+  getOpenLeads(): Promise<LeadRecord[]>;
+  createSnsPostDraftRecords(records: SnsPostDraftRecord[]): Promise<SnsPostDraftRecord[]>;
+  updateSnsPostDraftRecord(
+    id: string,
+    patch: Partial<SnsPostDraftRecord>
+  ): Promise<SnsPostDraftRecord | null>;
+  getSnsPostDraftsByDateRange(range?: DateRange): Promise<SnsPostDraftRecord[]>;
 }

@@ -1,6 +1,13 @@
 export type MessageSource = 'gmail' | 'lineworks' | 'manual_import' | 'external_forward';
 
-export type OriginalChannel = 'private_line' | 'sms' | 'phone_call' | 'paper_memo' | 'other' | '';
+export type OriginalChannel =
+  | 'private_line'
+  | 'sms'
+  | 'phone_call'
+  | 'paper_memo'
+  | 'sns'
+  | 'other'
+  | '';
 
 export type Priority = 'A' | 'B' | 'C';
 
@@ -191,4 +198,198 @@ export interface DailyReport {
   generatedAt: string;
   text: string;
   counts: ReportCounts;
+}
+
+/* ------------------------------------------------------------------ *
+ * SNS集客・収益化（リードから受注までのパイプライン）
+ * ------------------------------------------------------------------ */
+
+/** 反響が発生したSNS・Web上の窓口 */
+export type SnsChannel =
+  | 'instagram'
+  | 'x'
+  | 'youtube'
+  | 'tiktok'
+  | 'facebook'
+  | 'google_business'
+  | 'web_form';
+
+/** 5事業のどれに紐づく反響・投稿か */
+export type BusinessLine =
+  | 'construction'
+  | 'demolition'
+  | 'exterior'
+  | 'realestate'
+  | 'welfare'
+  | 'unknown';
+
+/** 見込み客の進行段階。won/lostが終了状態。 */
+export type LeadStage =
+  | 'new'
+  | 'contacted'
+  | 'estimating'
+  | 'proposed'
+  | 'won'
+  | 'lost'
+  | 'nurturing';
+
+/** 受注確度の温度感。hotは当日中に一次返信すべき反響。 */
+export type LeadTemperature = 'hot' | 'warm' | 'cold';
+
+/** 投稿の目的。集客導線か、信頼構築か、採用かで文面と締めが変わる。 */
+export type SnsPostPurpose =
+  | 'lead_generation'
+  | 'trust_building'
+  | 'case_study'
+  | 'recruiting'
+  | 'seasonal';
+
+/** SNSのDM・コメント・問い合わせフォームから届いた1件の反響 */
+export interface SnsInquiryInput {
+  channel: SnsChannel;
+  externalInquiryId?: string;
+  receivedAt: string;
+  /** 相手のアカウントID（@handleなど） */
+  accountName: string;
+  /** 相手の表示名。空でもよい。 */
+  displayName: string;
+  text: string;
+  /** どの投稿への反応か（投稿URLやID） */
+  postRef?: string;
+  /** 相手が書いていれば地域 */
+  area?: string;
+  /** 相手が書いていれば連絡先（電話・メール） */
+  contact?: string;
+}
+
+export interface SnsInquiryAnalysisResult {
+  summary: string;
+  businessLine: BusinessLine;
+  temperature: LeadTemperature;
+  /** 0〜100。受注確度の目安。 */
+  leadScore: number;
+  /** 見込み金額（円）。判断材料が無ければnull。 */
+  estimatedValueYen: number | null;
+  isSpam: boolean;
+  spamReason: string;
+  /** 受注につながる発言（「見積が欲しい」「今月中に」など） */
+  buyingSignals: string[];
+  /** 返信前に聞くべき不足情報 */
+  missingInfo: string[];
+  priority: Priority;
+  replyDraft: AnalyzeReplyDraftResult;
+  nextAction: string;
+  /** 次回追客日（YYYY-MM-DD）。不要ならnull。 */
+  followUpDate: string | null;
+  confidence: Confidence;
+}
+
+export interface LeadRecord {
+  id: string;
+  /** 紐づくAI受信箱レコード。既存の朝昼晩レポートからも見えるようにする。 */
+  sourceInboxId: string;
+  channel: SnsChannel;
+  externalInquiryId: string;
+  receivedAt: string;
+  accountName: string;
+  displayName: string;
+  contact: string;
+  area: string;
+  postRef: string;
+  inquiryText: string;
+  summary: string;
+  businessLine: BusinessLine;
+  temperature: LeadTemperature;
+  leadScore: number;
+  estimatedValueYen: number | null;
+  stage: LeadStage;
+  isSpam: boolean;
+  buyingSignals: string[];
+  missingInfo: string[];
+  nextAction: string;
+  followUpDate: string | null;
+  /** 追客タスクを自動生成した回数。上限に達したらnurturingへ落とす。 */
+  followUpCount: number;
+  lastContactedAt: string | null;
+  ownerType: OwnerType;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 投稿1件を生成するための指示。投稿カレンダーの1コマに相当する。 */
+export interface SnsPostGenerationInput {
+  channel: SnsChannel;
+  /** YYYY-MM-DD */
+  scheduledDate: string;
+  /** HH:mm */
+  scheduledTime: string;
+  businessLine: BusinessLine;
+  purpose: SnsPostPurpose;
+  theme: string;
+  area?: string;
+  /** 実績値や現場情報など、本文に織り込む素材 */
+  highlights?: string[];
+}
+
+export interface SnsPostDraftResult {
+  title: string;
+  body: string;
+  hashtags: string[];
+  callToAction: string;
+  /** 撮影・用意してほしい写真や素材の指示 */
+  mediaHint: string;
+  /** 景表法・誇大広告など、そのまま出せない理由 */
+  ngReasons: string[];
+}
+
+export interface SnsPostDraftRecord {
+  id: string;
+  channel: SnsChannel;
+  scheduledDate: string;
+  scheduledTime: string;
+  businessLine: BusinessLine;
+  purpose: SnsPostPurpose;
+  theme: string;
+  title: string;
+  body: string;
+  hashtags: string[];
+  callToAction: string;
+  mediaHint: string;
+  ngReasons: string[];
+  approvalStatus: ApprovalStatus;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StoredLeadBundle {
+  inbox: InboxRecord;
+  lead: LeadRecord;
+  tasks: TaskRecord[];
+  replyDraft?: ReplyDraftRecord;
+}
+
+export interface RevenueCounts {
+  postDraftsWaiting: number;
+  postsScheduled: number;
+  newLeads: number;
+  hotLeads: number;
+  unrepliedLeads: number;
+  followUpDue: number;
+  estimatingLeads: number;
+  wonLeads: number;
+  lostLeads: number;
+  /** 進行中リードの見込み金額合計（円） */
+  pipelineValueYen: number;
+  /** 段階別の確度で重み付けした見込み金額（円） */
+  weightedPipelineValueYen: number;
+  /** 受注済みリードの金額合計（円） */
+  wonValueYen: number;
+}
+
+export interface RevenueReport {
+  kind: 'revenue';
+  generatedAt: string;
+  text: string;
+  counts: RevenueCounts;
 }
