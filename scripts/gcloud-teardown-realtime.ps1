@@ -18,6 +18,9 @@ param(
   [switch]$AutoApprove
 )
 $ErrorActionPreference = "Stop"
+# stdoutを常にUTF-8で出す（コンソールcodepageに依存せず日本語ログが化けない・E2Eのutf8デコードと一致）
+try { [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false) } catch {}
+$OutputEncoding = [Text.UTF8Encoding]::new($false)
 $env:CLOUDSDK_CORE_DISABLE_PROMPTS = "1"   # gcloudの対話プロンプト（API有効化確認等）を出さない
 # PS5.1では native stderr が ErrorActionPreference=Stop で終了扱いになるため、gcloud呼出だけ Continue で包む。
 # 成否判定は従来どおり $LASTEXITCODE のみで行う（Windowsは gcloud.cmd を明示解決）。

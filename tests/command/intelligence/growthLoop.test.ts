@@ -39,7 +39,7 @@ describe('成長閉ループ（DIOS §10・§12-7）', () => {
 describe('DIOS-4 UI（判断1件原則・追跡/完了履歴分離）', () => {
   it('ホームは判断1件原則+件数表示、完了は履歴画面へ分離される', () => {
     expect(UI_HTML).toContain('topDecisions'); // 1件原則（緊急時最大3件）
-    expect(UI_HTML).toContain('急ぎの判断はありません。');
+    expect(UI_HTML).toContain('急ぎの判断はありません'); // HOME V2: 判断0件カードの見出し
     expect(UI_HTML).toContain('AIが追跡中');
     expect(UI_HTML).toContain('今日完了');
     expect(UI_HTML).toContain('完了履歴');

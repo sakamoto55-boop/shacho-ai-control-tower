@@ -75,6 +75,28 @@
   .decision-item.p1{border-left-color:var(--bad)}
   .decision-item.p2{border-left-color:var(--warn)}
   .decision-item.p3{border-left-color:var(--info)}
+  /* ============ HOME V2（判断1件・一目で分かる） 色は3色のみ: 赤=今日判断 黄=追跡中 灰=完了 ============ */
+  /* vendor/tw.css（purge済み）に無いユーティリティはここで補う（CDN非依存を維持） */
+  .grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))} .max-w-3xl{max-width:48rem} .list-disc{list-style-type:disc}
+  .pl-5{padding-left:1.25rem} .pl-2{padding-left:.5rem} .pb-1{padding-bottom:.25rem} .text-left{text-align:left}
+  .text-\[14px\]{font-size:14px} .text-\[15px\]{font-size:15px} .text-\[17px\]{font-size:17px}
+  .h2-stat{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:10px 6px;border-radius:var(--radius-m);border:1px solid var(--line);background:var(--glass);min-height:64px}
+  .h2-stat .n{font-size:26px;font-weight:900;line-height:1}
+  .h2-stat .l{font-size:11px;color:var(--text-mid)}
+  .h2-stat.red .n{color:var(--bad)} .h2-stat.yellow .n{color:var(--warn)} .h2-stat.grey .n{color:var(--text-low)}
+  .h2-card{background:var(--glass-strong);border:1px solid var(--line-strong);border-left:6px solid var(--bad);border-radius:var(--radius-l);padding:18px 18px 16px}
+  .h2-title{font-size:20px;line-height:1.35;font-weight:900;color:var(--text-hi);word-break:break-word}
+  @media (min-width:1024px){.h2-title{font-size:24px}}
+  .h2-kv{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .h2-kv > div{background:rgba(0,0,0,.28);border-radius:var(--radius-s);padding:8px 10px}
+  .h2-kv .k{font-size:10px;color:var(--text-low)} .h2-kv .v{font-size:15px;font-weight:800;margin-top:2px}
+  .h2-btn{min-height:50px;border-radius:14px;font-size:15px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:6px;transition:var(--transition-fast)}
+  .h2-btn.ok{background:var(--ok);color:#06210f} .h2-btn.ng{background:var(--bad);color:#2b0606} .h2-btn.later{background:rgba(255,255,255,.08);color:var(--text-mid);border:1px solid var(--line-strong)}
+  .h2-btn:disabled{opacity:.45}
+  .h2-details summary{cursor:pointer;list-style:none;font-size:12px;font-weight:700;color:var(--info);padding:8px 0;min-height:44px;display:flex;align-items:center;gap:6px}
+  .h2-details summary::-webkit-details-marker{display:none}
+  .h2-details[open] summary .chev{transform:rotate(90deg)}
+  .chev{display:inline-block;transition:transform .2s ease}
   /* Mobile bottom-nav（PC縮小ではなくiPhone用の再構成・タッチ44px以上・safe-area内） */
   .bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:var(--z-nav);display:flex;background:rgba(6,12,30,0.92);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
   .bottom-nav button{flex:1;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--text-mid)}
@@ -137,8 +159,8 @@
               :aria-label="'AI CORE。現在: ' + coreSpec.label" @keydown.enter="coreDetailOpen = !coreDetailOpen"></canvas>
       <div v-else class="core-static absolute inset-0" :style="{'--core-tint': coreTint}" @click="coreDetailOpen = !coreDetailOpen"></div>
 
-      <!-- Role Ring（§4。活動中Roleのみ反応） -->
-      <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+      <!-- Role Ring（§4。活動中Roleのみ反応）。HOME V2: ホームでは出さない（判断1件に集中・会話画面のみ） -->
+      <div v-if="view !== 'home'" class="absolute inset-0 pointer-events-none flex items-center justify-center">
         <div class="relative" :style="{width: ringSize, height: ringSize}">
           <span v-for="(r, i) in roleRing" :key="r.role"
                 class="role-chip absolute text-[9px] px-1.5 py-0.5 rounded-full border border-white/15 bg-black/30 text-[color:var(--text-mid)]"
@@ -176,96 +198,121 @@
       </div>
     </section>
 
-    <!-- ============ HOME: 朝の管制（MORNING COMMAND BRIEF） ============ -->
-    <section v-if="view === 'home' && !authRequired" class="flex-1 overflow-y-auto px-4 pb-28 lg:pb-4 space-y-3" aria-label="朝の管制">
-      <div class="grid lg:grid-cols-3 gap-3">
-        <div class="surface lg:col-span-2 p-4">
-          <p class="text-[10px] tracking-widest text-[color:var(--text-low)] font-bold">MORNING COMMAND BRIEF</p>
-          <p class="text-lg font-bold mt-1 leading-snug">
-            <template v-if="decisions.loaded">今日、将軍の判断が必要なのは<span class="text-[color:var(--accent)]">{{ decisions.items.length }}件</span>です</template>
-            <template v-else>今日の判断事項: <span class="text-[color:var(--text-low)]">—</span></template>
-          </p>
-          <p class="text-[12px] text-[color:var(--text-mid)] mt-1">
-            <template v-if="decisions.loaded && decisions.items.length">最優先: {{ decisions.items[0].title }}</template>
-            <template v-else-if="decisions.loaded">接続済みソースから抽出できる要対応はありません</template>
-            <template v-else>{{ decisions.reason || 'データ取得中…' }}</template>
-          </p>
-          <div class="flex gap-2 mt-3 items-center">
-            <button @click="askFromHome('今日の要対応を、重要度順に根拠付きで教えて')" class="text-xs font-bold rounded-lg px-4 py-2.5 min-h-[44px] bg-[color:var(--accent-deep)] text-white">最優先を確認</button>
-            <button @click="askFromHome('おはよう')" class="text-[11px] rounded-lg px-3 py-2.5 min-h-[44px] text-[color:var(--text-mid)] border border-white/15 bg-white/5">朝ブリーフを聞く</button>
+    <!-- ============ HOME: 朝の管制（MORNING COMMAND BRIEF）V2 =============
+         設計: 画面の主役は「判断1件」。上部は3数字だけ（赤=今日判断／黄=追跡中／灰=今日完了）。
+         根拠・不足情報・AI推測・経営数字は折りたたみ（押さなければ出ない）。架空数値は出さない（未接続は—）。 -->
+    <section v-if="view === 'home' && !authRequired" class="flex-1 overflow-y-auto px-4 pb-28 lg:pb-4" aria-label="朝の管制">
+     <div class="max-w-3xl w-full mx-auto space-y-3">
+      <p class="text-[10px] tracking-widest text-[color:var(--text-low)] font-bold">MORNING COMMAND BRIEF ｜ 今日、将軍の判断が必要なのは<span v-if="decisions.loaded">{{ pendingDecisionTotal }}件</span><span v-else>—件（{{ decisions.reason || '取得不能' }}）</span></p>
+
+      <!-- 3数字（押すと該当画面へ） -->
+      <div class="grid grid-cols-3 gap-2" role="list" aria-label="今日の状況">
+        <button role="listitem" class="h2-stat red" @click="deferredCaseIds = []" aria-label="今日判断する件数">
+          <span class="n">{{ decisions.loaded ? pendingDecisionTotal : '—' }}</span><span class="l">今日 判断する</span>
+        </button>
+        <button role="listitem" class="h2-stat yellow" @click="view = 'tracking'; loadTracking('active')" aria-label="AIが追跡中の件数">
+          <span class="n">{{ tracking.trackingCount }}</span><span class="l">AIが追跡中</span>
+        </button>
+        <button role="listitem" class="h2-stat grey" @click="view = 'tracking'; loadTracking('completed')" aria-label="今日完了した件数">
+          <span class="n">{{ tracking.completedTodayCount }}</span><span class="l">今日 完了</span>
+        </button>
+      </div>
+
+      <!-- 判断1件（大カード） -->
+      <div v-if="decisions.loaded && currentDecision" class="h2-card" :style="{'border-left-color': currentDecision.priority <= 1 ? 'var(--bad)' : 'var(--warn)'}">
+        <div class="flex items-center gap-2 flex-wrap text-[11px]">
+          <span class="font-bold px-2 py-0.5 rounded" :class="currentDecision.priority <= 1 ? 'bg-[color:var(--bad)]/25 text-[color:var(--bad)]' : 'bg-[color:var(--warn)]/20 text-[color:var(--warn)]'">{{ currentDecision.category }}</span>
+          <span class="text-[color:var(--text-mid)]">{{ currentDecision.receivedLabel }}</span>
+          <!-- 外部申告・AI仮説を確定情報と表示しない -->
+          <span :class="currentDecision.trustLabel && currentDecision.trustLabel.includes('未確認') ? 'text-[color:var(--warn)]' : 'text-[color:var(--text-low)]'">{{ currentDecision.trustLabel || '出典区分なし' }}</span>
+        </div>
+        <h2 class="h2-title mt-2">{{ currentDecision.headline }}</h2>
+        <p v-if="currentDecision.subline" class="text-[13px] text-[color:var(--text-mid)] mt-1 leading-snug">{{ currentDecision.subline }}</p>
+
+        <div class="h2-kv mt-3">
+          <div><p class="k">期限</p><p class="v" :class="currentDecision.deadlineLabel === '不明' ? 'text-[color:var(--text-low)]' : ''">{{ currentDecision.deadlineLabel }}</p></div>
+          <div><p class="k">金額</p><p class="v" :class="currentDecision.amountLabel === '不明' ? 'text-[color:var(--text-low)]' : ''">{{ currentDecision.amountLabel }}</p></div>
+        </div>
+
+        <div class="mt-3 rounded-xl bg-black/25 px-3 py-2.5">
+          <p class="text-[10px] text-[color:var(--text-low)]">決めること</p>
+          <p class="text-[14px] font-bold mt-0.5">{{ currentDecision.nextAction || '対応方針を決める' }}</p>
+          <p v-if="currentDecision.recommendation" class="text-[12px] text-[color:var(--text-mid)] mt-1.5"><span class="font-bold text-[color:var(--accent)]">AI推奨:</span> {{ currentDecision.recommendation }}</p>
+        </div>
+
+        <!-- ボタン3つだけ。§C: 完了は実結果必須（承認/差戻は実結果の入力欄を開く） -->
+        <div v-if="currentDecision.caseId && completingCaseId !== currentDecision.caseId" class="grid grid-cols-3 gap-2 mt-4">
+          <button class="h2-btn ok" @click="startComplete(currentDecision.caseId, '承認: ')">承認</button>
+          <button class="h2-btn ng" @click="startComplete(currentDecision.caseId, '差戻: ')">差戻</button>
+          <button class="h2-btn later" @click="deferCase(currentDecision.caseId)">後で</button>
+        </div>
+        <div v-else-if="!currentDecision.caseId" class="grid grid-cols-2 gap-2 mt-4">
+          <button class="h2-btn ok" @click="askFromHome('今日の要対応を、重要度順に根拠付きで教えて')">AIに聞く</button>
+          <button class="h2-btn later" @click="deferItem(currentDecision.title)">後で</button>
+        </div>
+        <div v-if="currentDecision.caseId && completingCaseId === currentDecision.caseId" class="mt-4 rounded-xl bg-black/30 border border-white/10 p-3">
+          <p class="text-[11px] text-[color:var(--text-mid)]">実結果を1行で（これが完了の記録になります）</p>
+          <input v-model="outcomeDraft" placeholder="例: 承認: 150万円で了承・明日先方へ回答" class="mt-1.5 w-full bg-white/10 border border-white/15 rounded-lg px-3 py-3 text-[14px] outline-none" aria-label="実結果" @keydown.enter="completeCase(currentDecision.caseId)">
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            <button class="h2-btn ok" @click="completeCase(currentDecision.caseId)" :disabled="!outcomeDraft.replace(/^(承認|差戻):\s*/, '').trim()">記録して完了</button>
+            <button class="h2-btn later" @click="completingCaseId = ''; outcomeDraft = ''">取消</button>
+          </div>
+          <p v-if="caseError" class="text-[11px] text-[color:var(--bad)] mt-1.5">{{ caseError }}</p>
+        </div>
+
+        <!-- 根拠・不足情報・リスク（折りたたみ1つ。AI推測は事実と区別） -->
+        <details class="h2-details mt-2">
+          <summary><span class="chev">▶</span>根拠を見る<span class="text-[color:var(--text-low)] font-normal">（出典・不足情報{{ (currentDecision.missing || []).length }}件・リスク）</span></summary>
+          <div class="text-[12px] text-[color:var(--text-mid)] space-y-1.5 pb-1">
+            <p>出典: {{ currentDecision.source }}／{{ currentDecision.trustLabel || '出典区分なし' }}（AIの推測は事実と区別しています）</p>
+            <p v-if="currentDecision.reason">推奨の理由: {{ currentDecision.reason }}</p>
+            <p v-if="currentDecision.risk">判断を誤った場合: {{ currentDecision.risk }}</p>
+            <div v-if="(currentDecision.missing || []).length">
+              <p class="font-bold text-[color:var(--warn)]">不足情報（推測で埋めていません）</p>
+              <ul class="list-disc pl-5"><li v-for="m in currentDecision.missing" :key="m">{{ m }}</li></ul>
+            </div>
+            <p v-if="currentDecision.detail && !currentDecision.caseId">{{ currentDecision.detail }}</p>
+            <button @click="askFromHome('今日の要対応を、重要度順に根拠付きで教えて')" class="font-bold text-[color:var(--info)] min-h-[44px] lg:min-h-0">AIに詳しく聞く →</button>
+          </div>
+        </details>
+      </div>
+
+      <!-- 判断なし／全件保留／取得不能 -->
+      <div v-else-if="decisions.loaded && deferredCount > 0 && pendingDecisionTotal === 0" class="h2-card" style="border-left-color:var(--warn)">
+        <p class="text-[15px] font-bold">{{ deferredCount }}件を「後で」にしています</p>
+        <p class="text-[12px] text-[color:var(--text-mid)] mt-1">追跡は続いています。今すぐ見直すなら下のボタン。</p>
+        <button class="h2-btn later mt-3 w-full" @click="deferredCaseIds = []; deferredTitles = []">保留を解除して表示</button>
+      </div>
+      <div v-else-if="decisions.loaded" class="h2-card" style="border-left-color:var(--text-low)">
+        <p class="text-[17px] font-black">急ぎの判断はありません</p>
+        <p class="text-[12px] text-[color:var(--text-mid)] mt-1">接続済みソース（Gmail／LINE WORKS／シート）から抽出できる要対応は0件です。着信があれば自動でここに出ます。</p>
+        <button class="h2-btn later mt-3 w-full" @click="askFromHome('おはよう')">朝ブリーフを聞く</button>
+      </div>
+      <div v-else class="h2-card" style="border-left-color:var(--text-low)">
+        <p class="text-[15px] font-bold">—</p>
+        <p class="text-[12px] text-[color:var(--text-mid)] mt-1">{{ decisions.reason || '取得不能' }}</p>
+        <button class="h2-btn later mt-3 w-full" @click="view = 'connections'; loadHealth()">接続状態を見る</button>
+      </div>
+
+      <!-- 同時緊急（2件目以降）: 件名だけ。押すと入れ替え -->
+      <div v-if="decisions.loaded && otherUrgent.length" class="surface p-3">
+        <p class="text-[10px] tracking-widest text-[color:var(--text-low)] font-bold">同時に緊急 {{ otherUrgent.length }}件（押すと表示）</p>
+        <button v-for="d in otherUrgent" :key="d.key" @click="focusDecision(d)" class="block w-full text-left mt-1.5 text-[13px] font-bold min-h-[44px] lg:min-h-0 border-l-2 pl-2" :style="{'border-left-color': d.priority <= 1 ? 'var(--bad)' : 'var(--warn)'}">{{ d.headline }}</button>
+      </div>
+
+      <!-- 経営数字（折りたたみ。未取得は—+理由+導線。架空数値なし） -->
+      <details class="h2-details surface px-4">
+        <summary><span class="chev">▶</span>経営数字を見る<span class="text-[color:var(--text-low)] font-normal">（現預金・30日後資金・当月売上・粗利／未接続は—）</span></summary>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 pb-3" role="list" aria-label="重要KPI">
+          <div v-for="k in kpiCards" :key="k.label" role="listitem" class="surface kpi-card">
+            <p class="text-[10px] text-[color:var(--text-low)]">{{ k.label }}</p>
+            <p class="text-base font-bold mt-0.5" :class="k.cls">{{ k.value }}</p>
+            <p class="text-[9px] text-[color:var(--text-low)] mt-0.5">{{ k.sub }}</p>
+            <button v-if="k.value === '—'" @click="view = 'connections'; loadHealth()" class="text-[10px] text-[color:var(--info)] font-bold mt-0.5">接続状態を見る</button>
           </div>
         </div>
-        <!-- AI CORE詳細カードはPCのみ（モバイルはCORE帯+状態1行に統合し重複させない） -->
-        <div class="surface p-4 hidden lg:block">
-          <p class="text-[10px] tracking-widest text-[color:var(--text-low)] font-bold">AI CORE</p>
-          <p class="text-sm mt-1">{{ coreSpec.label }}</p>
-          <ul class="mt-2 space-y-1 text-[11px] text-[color:var(--text-mid)]">
-            <li>分析対象ソース: {{ health.loaded ? health.okCount + '系統' : '—（' + (health.reason || '取得中') + '）' }}</li>
-            <li>直近回答の根拠: {{ lastMeta.evidenceCount !== null ? lastMeta.evidenceCount + '件' : '—（未回答）' }}</li>
-            <li>最終処理: {{ lastMeta.finishedAtLabel || '—' }}</li>
-          </ul>
-        </div>
-      </div>
-
-      <!-- KPI（最大4枚。未取得は—+理由+導線。カード全体を警告色にしない） -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3" role="list" aria-label="重要KPI">
-        <div v-for="k in kpiCards" :key="k.label" role="listitem" class="surface kpi-card">
-          <p class="text-[10px] text-[color:var(--text-low)]">{{ k.label }}</p>
-          <p class="text-base font-bold mt-0.5" :class="k.cls">{{ k.value }}</p>
-          <p class="text-[9px] text-[color:var(--text-low)] mt-0.5">{{ k.sub }}</p>
-          <button v-if="k.value === '—'" @click="view = 'connections'; loadHealth()" class="text-[10px] text-[color:var(--info)] font-bold mt-0.5">接続状態を見る</button>
-        </div>
-      </div>
-
-      <!-- 今日の意思決定（判断1件原則・同時緊急でも最大3件。リアルタイム取込のDecisionCaseが最優先） -->
-      <div class="surface p-4">
-        <p class="text-[10px] tracking-widest text-[color:var(--text-low)] font-bold mb-2">今日の意思決定</p>
-        <div v-if="decisions.loaded && topDecisions.length" class="space-y-2">
-          <div v-for="(d, i) in topDecisions" :key="i" class="decision-item" :class="'p' + Math.min(d.priority, 3)">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded" :class="d.priority <= 1 ? 'bg-[color:var(--bad)]/25 text-[color:var(--bad)]' : 'bg-[color:var(--warn)]/20 text-[color:var(--warn)]'">{{ d.category }}</span>
-              <p class="text-[13px] font-bold">{{ d.title }}</p>
-              <!-- 外部申告・AI仮説を確定情報と表示しない（trustLabelは実データ由来） -->
-              <span class="text-[9px]" :class="d.trustLabel && d.trustLabel.includes('未確認') ? 'text-[color:var(--warn)]' : 'text-[color:var(--text-low)]'">{{ d.trustLabel || '出典区分なし' }}</span>
-            </div>
-            <p class="text-[11px] text-[color:var(--text-mid)] mt-0.5">{{ d.detail }}</p>
-            <p v-if="d.recommendation" class="text-[11px] mt-1"><span class="font-bold text-[color:var(--accent)]">AI推奨:</span> {{ d.recommendation }}</p>
-            <p v-if="d.nextAction" class="text-[10px] text-[color:var(--text-mid)] mt-0.5">社長の次の行動: {{ d.nextAction }}</p>
-            <div class="flex items-center gap-3 mt-1 flex-wrap">
-              <span class="text-[9px] text-[color:var(--text-low)]">出典: {{ d.source }}</span>
-              <button @click="askFromHome('今日の要対応を、重要度順に根拠付きで教えて')" class="text-[10px] font-bold text-[color:var(--info)]">根拠を見る</button>
-              <button v-if="d.caseId && completingCaseId !== d.caseId" @click="completingCaseId = d.caseId; outcomeDraft = ''" class="text-[10px] font-bold text-[color:var(--ok)] min-h-[44px] lg:min-h-0">判断完了（実結果を記録）</button>
-            </div>
-            <!-- §C: 社長判断の完了は実結果必須（Outcomeなしで完了しない） -->
-            <div v-if="d.caseId && completingCaseId === d.caseId" class="mt-2 rounded-lg bg-black/30 border border-white/10 p-2">
-              <input v-model="outcomeDraft" placeholder="実結果（例: 先方と合意・3日以内入金の確約）" class="w-full bg-white/10 border border-white/15 rounded px-2 py-2 text-[12px] outline-none" aria-label="実結果">
-              <div class="flex gap-3 mt-1.5">
-                <button @click="completeCase(d.caseId)" :disabled="!outcomeDraft.trim()" class="text-[11px] font-bold min-h-[44px] lg:min-h-0" :class="outcomeDraft.trim() ? 'text-[color:var(--ok)]' : 'text-[color:var(--text-low)]'">記録して完了</button>
-                <button @click="completingCaseId = ''" class="text-[11px] text-[color:var(--text-mid)] min-h-[44px] lg:min-h-0">取消</button>
-              </div>
-              <p v-if="caseError" class="text-[10px] text-[color:var(--bad)] mt-1">{{ caseError }}</p>
-            </div>
-          </div>
-        </div>
-        <p v-else-if="decisions.loaded" class="text-[12px] text-[color:var(--text-mid)]">急ぎの判断はありません。</p>
-        <p v-else class="text-[11px] text-[color:var(--text-low)]">—（{{ decisions.reason || '取得中' }}）</p>
-        <!-- 残りは件数だけ（正常項目は並べない）。過去分・返答待ちは「今日の判断」と混同しない -->
-        <div class="flex items-center gap-3 mt-3 pt-2 border-t border-white/10 text-[11px] text-[color:var(--text-mid)] flex-wrap">
-          <span v-if="decisions.loaded && remainingDecisionCount > 0">ほか{{ remainingDecisionCount }}件は追跡中</span>
-          <button @click="view = 'tracking'; loadTracking('active')" class="font-bold text-[color:var(--info)]">AIが追跡中 {{ tracking.trackingCount }}件 →</button>
-          <span v-if="tracking.awaitingReplyCount" class="text-[color:var(--text-low)]">相手の返答待ち {{ tracking.awaitingReplyCount }}件</span>
-          <button @click="view = 'tracking'; loadTracking('completed')" class="text-[color:var(--text-low)]">今日完了 {{ tracking.completedTodayCount }}件</button>
-        </div>
-      </div>
-
-      <!-- AI推奨（1件のみ。決定論ルールの最上位・推測を事実のように表示しない） -->
-      <div v-if="decisions.loaded && topDecisions.length" class="surface p-4 border-l-2" style="border-left-color:var(--accent)">
-        <p class="text-[10px] tracking-widest text-[color:var(--text-low)] font-bold">AI推奨（決定論ルールによる最上位1件）</p>
-        <p class="text-[13px] font-bold mt-1">結論: 「{{ topDecisions[0].title }}」への対応を最優先にしてください</p>
-        <p class="text-[11px] text-[color:var(--text-mid)] mt-1">{{ topDecisions[0].recommendation ? '推奨: ' + topDecisions[0].recommendation : '理由: 重要度ルール（事故・危険＞資金＞期限＞その他）の最上位のため' }}</p>
-        <p class="text-[10px] text-[color:var(--text-low)] mt-1">根拠ソース: {{ topDecisions[0].source }}／{{ topDecisions[0].trustLabel }}（AIの推測は事実と区別しています）</p>
-        <button @click="askFromHome('今日の要対応を、重要度順に根拠付きで教えて')" class="text-[11px] font-bold text-[color:var(--info)] mt-1.5">詳細と根拠を確認する →</button>
-      </div>
+      </details>
+     </div>
     </section>
 
     <!-- ============ データ接続画面（技術情報はここに集約） ============ -->
@@ -443,7 +490,8 @@
   </div>
 
   <!-- ============ RIGHT: Contextual Intelligence（Desktop・§6） ============ -->
-  <aside class="hidden lg:flex flex-col gap-3 w-72 shrink-0 pt-5 pr-4 pb-4 overflow-y-auto no-scrollbar" aria-label="コンテキスト情報">
+  <!-- HOME V2: ホームでは右カラムを出さない（判断1件に集中）。会話・他画面では従来どおり -->
+  <aside v-if="view !== 'home'" class="hidden lg:flex flex-col gap-3 w-72 shrink-0 pt-5 pr-4 pb-4 overflow-y-auto no-scrollbar" aria-label="コンテキスト情報">
     <div class="glass px-3 py-2.5">
       <p class="text-[10px] font-bold text-[color:var(--text-low)] tracking-wider">現在の活動</p>
       <p class="text-sm mt-1">{{ coreSpec.label }}</p>
@@ -729,6 +777,8 @@ createApp({
       trackingView: 'active', trackingItems: [], trackingQuery: '', trackingError: '',
       /* §C: 社長判断完了（実結果必須） */
       completingCaseId: '', outcomeDraft: '', caseError: '',
+      /* HOME V2: 「後で」（この画面内の保留。追跡は継続・サーバー状態は変えない）と表示中の切替 */
+      deferredCaseIds: [], deferredTitles: [], focusedKey: '',
       health: { loaded: false, connections: [], okCount: 0, limitedCount: 0, reason: '' },
       navItems: [
         { key: 'home', label: '朝の管制', short: '管制', view: 'home', icon: 'M3 12l9-8 9 8M5 10v10h14V10' },
@@ -780,44 +830,93 @@ createApp({
     roleRing(){ return ROLE_RING; },
     coreHeight(){
       const w = window.innerWidth;
-      // モバイルは固定170-200px帯（本文を圧迫しない・主役として中央表示）
+      // HOME V2: ホームは「判断1件」が主役。COREは象徴として小さめ帯（モバイル110px／PC 14%）
+      if (this.view === 'home') return (w < 1024 ? 110 : Math.round(window.innerHeight * 0.14)) + 'px';
+      // 会話画面: モバイルは固定170-200px帯（本文を圧迫しない・主役として中央表示）
       if (w < 1024) return (this.scrolled ? 150 : 185) + 'px';
       return Math.round(window.innerHeight * (this.scrolled ? 0.22 : 0.3)) + 'px';
     },
-    ringSize(){ return (window.innerWidth >= 1024 ? 340 : 250) + 'px'; },
+    ringSize(){ if (this.view === 'home') return (window.innerWidth >= 1024 ? 150 : 110) + 'px'; return (window.innerWidth >= 1024 ? 340 : 250) + 'px'; }, // HOME V2: 小さめ帯に収める
     statusLine(){
       if (this.demoMode) return 'デモモード（実データ表示なし）';
       if (this.authRequired) return '認証が必要（接続は正常）';
       if (this.connectionError) return 'データ取得できません（接続に問題）';
       return this.health.loaded && this.health.limitedCount > 0 ? '実データ（一部制限あり）' : '実データ';
     },
-    topDecisions(){
-      // 判断1件原則。リアルタイム取込のDecisionCase（社長判断待ち）を最優先し、
-      // 同時緊急（safety/cash期限当日=rank≦10が複数）の場合のみ最大3件。
-      // DecisionCaseがない時のみ受信箱（JST当日・外部申告ラベル付き）へフォールバック
+    decisionList(){
+      // HOME V2の表示モデル。リアルタイム取込のDecisionCase（社長判断待ち）が最優先。
+      // DecisionCaseがない時のみ受信箱（JST当日・外部申告ラベル付き）へフォールバック。
+      // 値はAPIの実データのみ（期限・金額が無ければ「不明」。推測で埋めない）
+      const jstTime = (iso) => {
+        if (!iso) return '';
+        try { return new Date(iso).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }); } catch { return ''; }
+      };
+      const split = (t) => {
+        const lines = String(t || '').split('\n').map((s) => s.trim()).filter(Boolean);
+        return { headline: (lines[0] || '').replace(/^件名:\s*/, '') || '（件名なし）', subline: lines.slice(1).join(' ') };
+      };
       const cases = (this.decisions.cases || []).map((c) => ({
+        key: 'case:' + c.caseId,
+        caseId: c.caseId,
         priority: c.rank <= 10 ? 1 : 2,
         category: c.decisionKind,
         title: c.title,
-        detail: (c.missingInformation && c.missingInformation.length ? `不足情報${c.missingInformation.length}件／` : '') + (c.riskIfWrong || ''),
+        ...split(c.title),
+        receivedLabel: c.createdAt ? '受信 ' + jstTime(c.createdAt) : '',
+        deadlineLabel: c.deadline ? String(c.deadline) : '不明',
+        amountLabel: (c.amountYen !== null && c.amountYen !== undefined) ? Number(c.amountYen).toLocaleString('ja-JP') + '円' : '不明',
         source: 'リアルタイム取込（Gmail/LINE WORKS）',
         trustLabel: c.trustLabel,
         recommendation: c.aiRecommendation,
+        reason: c.recommendationReason,
+        risk: c.riskIfWrong,
+        missing: c.missingInformation || [],
         nextAction: c.presidentNextAction,
-        caseId: c.caseId
+        detail: ''
       }));
-      if (cases.length) {
-        const urgent = cases.filter((d) => d.priority === 1).slice(0, 3);
-        return urgent.length > 1 ? urgent : cases.slice(0, 1);
-      }
-      const items = this.decisions.items || [];
-      if (!items.length) return [];
-      const urgent = items.filter((d) => d.priority <= 1).slice(0, 3);
-      return urgent.length > 1 ? urgent : items.slice(0, 1);
+      if (cases.length) return cases;
+      return (this.decisions.items || []).map((d, i) => ({
+        key: 'item:' + i + ':' + d.title,
+        caseId: '',
+        priority: d.priority,
+        category: d.category,
+        title: d.title,
+        ...split(d.title),
+        receivedLabel: '',
+        deadlineLabel: '不明',
+        amountLabel: '不明',
+        source: d.source,
+        trustLabel: d.trustLabel,
+        recommendation: d.recommendation,
+        reason: '',
+        risk: '',
+        missing: [],
+        nextAction: d.nextAction,
+        detail: d.detail
+      }));
     },
+    visibleDecisions(){
+      return this.decisionList.filter((d) => d.caseId ? !this.deferredCaseIds.includes(d.caseId) : !this.deferredTitles.includes(d.title));
+    },
+    topDecisions(){
+      // 判断1件原則。同時緊急（safety/cash期限当日=rank≦10が複数）の場合のみ最大3件
+      const list = this.visibleDecisions;
+      if (!list.length) return [];
+      const urgent = list.filter((d) => d.priority <= 1).slice(0, 3);
+      return urgent.length > 1 ? urgent : list.slice(0, 1);
+    },
+    currentDecision(){
+      const focused = this.focusedKey ? this.visibleDecisions.find((d) => d.key === this.focusedKey) : null;
+      return focused || this.topDecisions[0] || null;
+    },
+    otherUrgent(){
+      const cur = this.currentDecision;
+      return this.topDecisions.filter((d) => !cur || d.key !== cur.key);
+    },
+    pendingDecisionTotal(){ return this.visibleDecisions.length; },
+    deferredCount(){ return this.decisionList.length - this.visibleDecisions.length; },
     remainingDecisionCount(){
-      const total = (this.decisions.cases || []).length + (this.decisions.items || []).length;
-      return Math.max(0, total - this.topDecisions.length);
+      return Math.max(0, this.visibleDecisions.length - this.topDecisions.length);
     },
     lastSyncLabel(){
       const s = this.health.loaded && this.health.connections.length
@@ -994,9 +1093,24 @@ createApp({
         this.decisions = { loaded: false, items: [], cases: [], reason: '接続できないため取得不能' };
       }
     },
+    startComplete(caseId, prefix){
+      // 承認/差戻ボタン: 実結果の入力欄を開く（接頭辞のみ。実結果は社長が1行で記す=§C）
+      this.completingCaseId = caseId; this.outcomeDraft = prefix || ''; this.caseError = '';
+    },
+    deferCase(caseId){
+      // 「後で」: この画面内で次の判断へ送る（追跡・サーバー状態は変えない）
+      if (!this.deferredCaseIds.includes(caseId)) this.deferredCaseIds.push(caseId);
+      this.completingCaseId = ''; this.outcomeDraft = ''; this.focusedKey = '';
+    },
+    deferItem(title){
+      if (!this.deferredTitles.includes(title)) this.deferredTitles.push(title);
+      this.focusedKey = '';
+    },
+    focusDecision(d){ this.focusedKey = d.key; this.completingCaseId = ''; this.outcomeDraft = ''; },
     async completeCase(caseId){
       // §C: 社長判断の完了は実結果必須（DecisionCase+関連タスク+Outcomeを同時整合）
-      if (!this.outcomeDraft.trim()) return;
+      // 「承認: 」「差戻: 」の接頭辞だけでは完了させない（中身の実結果が必要）
+      if (!this.outcomeDraft.replace(/^(承認|差戻):\s*/, '').trim()) return;
       this.caseError = '';
       try {
         const res = await fetch(`${this.apiBase}/command/intelligence/cases/${caseId}/complete`, {
@@ -1006,7 +1120,7 @@ createApp({
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) { this.caseError = body.error || '完了できませんでした'; return; }
-        this.completingCaseId = ''; this.outcomeDraft = '';
+        this.completingCaseId = ''; this.outcomeDraft = ''; this.focusedKey = '';
         await this.loadDecisions(); // 完了は即時にホームから消える（履歴・Outcomeは保持）
       } catch { this.caseError = '接続できないため完了を記録できません'; }
     },
