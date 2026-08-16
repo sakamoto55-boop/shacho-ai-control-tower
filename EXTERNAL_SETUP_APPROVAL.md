@@ -38,8 +38,8 @@
 | Cloud Storage bucket（自動作成・共有扱い） | Cloud Buildソースアップロード用（gcloud既定名） | **teardownで削除しない** |
 
 **役割分離（deployer / build / runtime）**:
-- **deployer**: setup scriptを実行する社長のgcloudアカウント（preflightでowner/editor権限と対象projectを確認し、不足時は変更前に停止）
-- **build**: `lcc-build@…`（専用SA。下記project-level 3ロールのみ。既定SAの広い権限に依存しない）
+- **deployer**: setup scriptを実行する社長のgcloudアカウント（preflightで対象projectと下記deployer必要ロールを確認し、不足時は変更前に停止）
+- **build**: `lcc-build@…`（専用SA。project-levelは `roles/run.builder` 1件のみ。既定SAの広い権限に依存しない）
 - **runtime**: `lcc-lineworks-relay@…`（リソース単位権限のみ）
 - **公開設定**: `--allow-unauthenticated` は **`allUsers` へ `roles/run.invoker`** を付与する（このサービス1本のみ）。Webhook受口のため必須。アプリ層でBot ID許可+HMAC署名検証を行い、未署名リクエストは処理しない。
 
@@ -128,7 +128,9 @@ scripts\gcloud-teardown-realtime.ps1 -ProjectId lcc-command             # yes入
 ```
 - `data/gcloud-setup-receipt.json`（setupが記録した**作成リソースreceipt**）に記載の自作リソースのみ削除
 - **共有リソースは削除しない**: Artifact Registry repo `cloud-run-source-deploy` は保護（relayイメージのみ削除）・Cloud Build用bucketは保護
-- build SAのproject-level 3ロールも解除
+- build SAのproject-level `roles/run.builder` binding（receipt記載の自作分）も解除
+- receiptはwrite-ahead（PENDING→COMMITTED）方式。setup/teardown冒頭でPENDINGを実在照合し孤児を残さない。IAM bindingは構造化（member/role/targetKind/targetId）で完全一致解除。Artifact Registryはこのdeployが作った**イメージdigestのみ**削除
+- setup開始前にownership preflight: receiptで所有確認できない同名Cloud Run/Secretが存在すれば、他を一切変更せず `CONFIG_COLLISION`（exit 3）で停止（既存を無記録で更新しない）
 - Gmail OAuth取消は手動: https://myaccount.google.com/permissions → 該当クライアント削除 + PCのtokenファイル削除
 
 既存SA `lcc-command-ai@…` への追加はsubscription 2件+outbox bucketのみのため、これらの削除で権限も消滅する。

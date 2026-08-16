@@ -12,12 +12,34 @@ export type ResourceKind =
   | 'api' | 'topic' | 'subscription' | 'service-account' | 'secret'
   | 'run-service' | 'bucket' | 'iam-binding' | 'artifact-image';
 
+/** IAM binding主体（文字列省略せず構造化。teardownは完全一致で解除する） */
+export interface IamBindingRef {
+  member: string; // 例: serviceAccount:gmail-api-push@system.gserviceaccount.com / allUsers
+  role: string; // 例: roles/pubsub.publisher
+  targetKind: 'topic' | 'subscription' | 'secret' | 'bucket' | 'project' | 'run-service';
+  targetId: string;
+}
+
+/**
+ * write-ahead方式のreceiptエントリ状態。
+ * PENDING=外部変更を発行する直前に記録 / COMMITTED=外部変更成功後に確定。
+ * 再setupはPENDINGを実在照合し（存在すればCOMMITTEDへ・不在なら削除）孤児を残さない。
+ */
+export type ReceiptStatus = 'PENDING' | 'COMMITTED';
+
 export interface GcloudResource {
   kind: ResourceKind;
   id: string;
   /** 共有リソース（丸ごと削除禁止）。API有効化も他用途と共有のため削除対象にしない */
   shared?: boolean;
+  /** iam-bindingのみ: 構造化主体 */
+  binding?: IamBindingRef;
+  /** artifact-imageのみ: このdeployが作ったdigest（image path全体ではなくdigestだけ削除） */
+  digest?: string;
+  status?: ReceiptStatus;
 }
+
+export const bindingKey = (b: IamBindingRef): string => `${b.member}|${b.role}|${b.targetKind}:${b.targetId}`;
 
 /** 本設定が必要とするリソースの正準リスト（これ以外は作らない） */
 export function desiredResources(projectId: string, region = 'asia-northeast1'): GcloudResource[] {
@@ -103,6 +125,23 @@ export interface TeardownPlan {
   protected: GcloudResource[];
   /** receiptにあるが既に存在しない（冪等: エラーにしない） */
   alreadyGone: GcloudResource[];
+}
+
+/**
+ * write-ahead照合（再setup/teardownの冒頭で実行）。
+ * PENDINGエントリを実在集合と照合: 実在→COMMITTEDへ昇格（gcloud成功直後にプロセス停止したケース）／
+ * 不在→エントリ削除（gcloud未到達）。孤児を残さない。
+ */
+export function reconcilePending(receipt: SetupReceipt, existingKeys: Set<string>): { receipt: SetupReceipt; promoted: GcloudResource[]; dropped: GcloudResource[] } {
+  const promoted: GcloudResource[] = [];
+  const dropped: GcloudResource[] = [];
+  const created: GcloudResource[] = [];
+  for (const r of receipt.created) {
+    if (r.status !== 'PENDING') { created.push(r); continue; }
+    if (existingKeys.has(key(r))) { const c = { ...r, status: 'COMMITTED' as const }; promoted.push(c); created.push(c); }
+    else dropped.push(r);
+  }
+  return { receipt: { ...receipt, created }, promoted, dropped };
 }
 
 /** teardown計画: receiptの自作リソースのみ削除。共有repo/bucketは保護 */

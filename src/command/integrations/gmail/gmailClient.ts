@@ -102,7 +102,9 @@ export class GmailClient {
   constructor(
     private readonly config: GmailConfig = loadGmailConfig(),
     private readonly fetchImpl: typeof fetch = fetch,
-    private readonly now: () => number = Date.now
+    private readonly now: () => number = Date.now,
+    /** テスト注入用: token保存（既定は saveTokens。ACL/rename失敗はthrow） */
+    private readonly persistTokens: (config: GmailConfig, tokens: GmailTokens) => void = saveTokens
   ) {
     if (existsSync(config.tokenFile)) {
       try { this.tokens = JSON.parse(readFileSync(config.tokenFile, 'utf8')) as GmailTokens; } catch { this.tokens = null; }
@@ -133,9 +135,20 @@ export class GmailClient {
       scope: String(data.scope ?? GMAIL_READONLY_SCOPE)
     };
     if (!tokens.accessToken) throw new Error('Gmail tokenレスポンス不正');
+    // 保存（書込・ACL・rename）が成功した後にのみメモリへ反映する。
+    // いずれかが失敗した場合はthis.tokens=null＝以後のwatch/listHistory/getMessageMetaはAUTH_REQUIREDで失敗
+    // （ディスクに残らないtokenをメモリだけで使い続けない）
+    try {
+      this.persistTokens(this.config, tokens);
+    } catch (e) {
+      this.tokens = null;
+      throw new Error(`Gmail token保存に失敗したため認証を無効化しました（AUTH_REQUIRED）: ${e instanceof Error ? e.message : String(e)}`);
+    }
     this.tokens = tokens;
-    saveTokens(this.config, tokens);
   }
+
+  /** 認証済みか（保存に成功したtokenがメモリにある） */
+  isAuthenticated(): boolean { return this.tokens !== null; }
 
   private async refreshIfNeeded(): Promise<void> {
     if (!this.tokens) throw new Error('Gmail未認証（AUTH_REQUIRED）');

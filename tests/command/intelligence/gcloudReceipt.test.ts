@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bindingKey,
   buildReceipt,
   desiredResources,
   mergeReceipts,
   planSetup,
   planTeardown,
+  reconcilePending,
   resourceKey
 } from '../../../src/command/integrations/gcloud/receipt.js';
 
@@ -70,6 +72,28 @@ describe('GCloud setup/teardown計画（receipt方式・ps1と同一規則のmoc
     expect(r3.created).toHaveLength(2);
     // 別projectのreceiptへは追記できない
     expect(() => mergeReceipts(r2, 'other-project', 'asia-northeast1', [], 'now')).toThrow(/projectId不一致/);
+  });
+
+  it('write-ahead reconcile: PENDINGは実在すればCOMMITTEDへ・不在なら削除（孤児を残さない）', () => {
+    const receipt = {
+      projectId: P, region: 'asia-northeast1', createdAt: 'now',
+      created: [
+        { kind: 'topic' as const, id: 't-done', status: 'COMMITTED' as const },
+        { kind: 'topic' as const, id: 't-created-then-killed', status: 'PENDING' as const },
+        { kind: 'secret' as const, id: 's-never-created', status: 'PENDING' as const }
+      ]
+    };
+    const r = reconcilePending(receipt, new Set(['topic:t-done', 'topic:t-created-then-killed']));
+    expect(r.promoted.map((p) => p.id)).toEqual(['t-created-then-killed']);
+    expect(r.dropped.map((d) => d.id)).toEqual(['s-never-created']);
+    expect(r.receipt.created.every((c) => c.status === 'COMMITTED')).toBe(true);
+    expect(r.receipt.created).toHaveLength(2);
+  });
+
+  it('IAM binding主体は構造化され、完全一致キーで照合される', () => {
+    const b = { member: 'serviceAccount:gmail-api-push@system.gserviceaccount.com', role: 'roles/pubsub.publisher', targetKind: 'topic' as const, targetId: 'lcc-gmail-events' };
+    expect(bindingKey(b)).toBe('serviceAccount:gmail-api-push@system.gserviceaccount.com|roles/pubsub.publisher|topic:lcc-gmail-events');
+    expect(bindingKey({ ...b, role: 'roles/pubsub.subscriber' })).not.toBe(bindingKey(b));
   });
 
   it('正準リスト: outbox bucket・build SA・runtime SAが分離定義されている', () => {

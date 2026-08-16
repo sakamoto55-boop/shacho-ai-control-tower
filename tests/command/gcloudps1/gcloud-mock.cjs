@@ -23,6 +23,14 @@ const fail = (code = 1, msg = '') => { if (msg) process.stderr.write(msg); proce
 if (process.env.MOCK_GCLOUD_FAIL_MATCH && joined.includes(process.env.MOCK_GCLOUD_FAIL_MATCH)) {
   fail(1, `mock injected failure: ${process.env.MOCK_GCLOUD_FAIL_MATCH}\n`);
 }
+// 「gcloud成功直後にプロセス停止」注入: 対象コマンドの成功後、呼出側PS1を強制終了させるための合図。
+// gcloud自身は成功して状態を保存し、exit code 99を返す（PS1側Invoke-GCはこれを失敗として即停止＝
+// receiptがPENDINGのまま残る状況を再現。実環境ではプロセスkillに相当）
+const KILL = process.env.MOCK_GCLOUD_KILL_AFTER;
+function okMaybeKill(out = '') {
+  if (KILL && joined.includes(KILL)) { if (out) process.stdout.write(out); process.exit(99); }
+  ok(out);
+}
 
 const opt = (name) => {
   const eq = args.find((a) => a.startsWith(`${name}=`));
@@ -86,15 +94,15 @@ if (args[0] === 'pubsub') {
   const kind = args[1] === 'topics' ? 'topic' : 'subscription';
   const cmd = args[2]; const name = args[3];
   if (cmd === 'describe') (has(`${kind}:${name}`) ? ok('exists\n') : fail(1));
-  if (cmd === 'create') { add(`${kind}:${name}`); ok('created\n'); }
+  if (cmd === 'create') { add(`${kind}:${name}`); okMaybeKill('created\n'); }
   if (cmd === 'delete') { del(`${kind}:${name}`); ok('deleted\n'); }
 }
 
-// ---- secrets ----
+// ---- secrets（version数を追跡: 未所有secretが無記録更新されていないことの検証用） ----
 if (args[0] === 'secrets') {
   if (args[1] === 'describe') (has(`secret:${args[2]}`) ? ok('exists\n') : fail(1));
-  if (args[1] === 'create') { state.secretData = fs.readFileSync(opt('--data-file'), 'utf8'); add(`secret:${args[2]}`); ok('created\n'); }
-  if (args[1] === 'versions' && args[2] === 'add') { state.secretData = fs.readFileSync(opt('--data-file'), 'utf8'); save(); ok('added\n'); }
+  if (args[1] === 'create') { state.secretData = fs.readFileSync(opt('--data-file'), 'utf8'); state.secretVersions = 1; add(`secret:${args[2]}`); ok('created\n'); }
+  if (args[1] === 'versions' && args[2] === 'add') { state.secretData = fs.readFileSync(opt('--data-file'), 'utf8'); state.secretVersions = (state.secretVersions ?? 1) + 1; save(); ok('added\n'); }
   if (args[1] === 'versions' && args[2] === 'access') ok(state.secretData);
   if (args[1] === 'delete') { del(`secret:${args[2]}`); ok('deleted\n'); }
 }
@@ -118,24 +126,42 @@ if (args[0] === 'storage' && args[1] === 'rm') {
 
 // ---- run ----
 if (args[0] === 'run' && args[1] === 'deploy') {
-  add(`run:${args[2]}@${region}`);
-  // --source deployの自動作成分（共有扱い）
+  const svc = args[2];
+  add(`run:${svc}@${region}`);
+  // --source deployの自動作成分（共有扱い）+ このdeployのイメージdigest（deployごとに一意）
   add('repo:cloud-run-source-deploy');
   add(`bucket:${project}_cloudbuild`);
-  add(`image:${region}-docker.pkg.dev/${project}/cloud-run-source-deploy/${args[2]}`);
-  ok(`Service URL: https://${args[2]}-mock.a.run.app\n`);
+  state.deployCount = (state.deployCount ?? 0) + 1;
+  const digest = `sha256:${String(state.deployCount).padStart(64, '0')}`;
+  const imgPath = `${region}-docker.pkg.dev/${project}/cloud-run-source-deploy/${svc}`;
+  add(`image:${imgPath}@${digest}`);
+  state.runImage = state.runImage || {};
+  state.runImage[`${svc}@${region}`] = `${imgPath}@${digest}`;
+  save();
+  ok(`Service URL: https://${svc}-mock.a.run.app\n`);
 }
 if (args[0] === 'run' && args[1] === 'services') {
-  if (args[2] === 'describe') (has(`run:${args[3]}@${region}`) ? ok('exists\n') : fail(1));
-  if (args[2] === 'delete') { del(`run:${args[3]}@${region}`); ok('deleted\n'); }
+  const svc = args[3];
+  if (args[2] === 'describe') {
+    if (!has(`run:${svc}@${region}`)) fail(1);
+    const fmt = opt('--format');
+    if (fmt && fmt.includes('containers[0].image')) ok(`${(state.runImage || {})[`${svc}@${region}`] || ''}\n`);
+    ok('exists\n');
+  }
+  if (args[2] === 'delete') { del(`run:${svc}@${region}`); ok('deleted\n'); }
+  if (args[2] === 'get-iam-policy') ok('');
   if (args[2] === 'remove-iam-policy-binding') ok('updated\n');
 }
 
-// ---- artifacts ----
+// ---- artifacts（digest単位） ----
 if (args[0] === 'artifacts' && args[1] === 'docker' && args[2] === 'images') {
-  const path = args[4];
-  if (args[3] === 'list') (has(`image:${path}`) ? ok('image\n') : fail(1));
-  if (args[3] === 'delete') { del(`image:${path}`); ok('deleted\n'); }
+  const ref = args[4]; // path@sha256:... または path
+  if (args[3] === 'describe') (has(`image:${ref}`) ? ok('image\n') : fail(1));
+  if (args[3] === 'list') (Object.keys(state.resources).some((k) => k.startsWith(`image:${ref}`)) ? ok('image\n') : fail(1));
+  if (args[3] === 'delete') {
+    if (!ref.includes('@sha256:')) fail(1, 'mock: refusing to delete image path without digest\n'); // path全体削除は禁止
+    del(`image:${ref}`); ok('deleted\n');
+  }
 }
 if (args[0] === 'artifacts' && args[1] === 'repositories' && args[2] === 'delete') {
   del(`repo:${args[3]}`); ok('deleted\n'); // teardownはこれを呼ばないこと（ログで検証）

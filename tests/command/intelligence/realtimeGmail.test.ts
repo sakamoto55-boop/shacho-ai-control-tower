@@ -67,6 +67,30 @@ describe('Gmail Pull同期（構成訂正§1・fixture E2E）', () => {
     expect(existsSync(config.tokenFile)).toBe(false);
   });
 
+  it('E2E-D: token保存失敗→exchangeCode失敗→以後のwatch/listHistoryはAUTH_REQUIREDで失敗しAPI fetchを呼ばない', async () => {
+    const { GmailClient } = await import('../../../src/command/integrations/gmail/gmailClient.js');
+    const calls: string[] = [];
+    const fetchImpl = (async (url: string) => {
+      calls.push(String(url));
+      if (String(url).includes('oauth2.googleapis.com/token')) {
+        return { ok: true, json: async () => ({ access_token: 'a', refresh_token: 'r', expires_in: 3600, scope: 'gmail.readonly' }) };
+      }
+      return { ok: true, json: async () => ({ historyId: '1', expiration: '999' }) };
+    }) as unknown as typeof fetch;
+    const dir = tmp();
+    const config = { clientId: 'id', clientSecret: 'sec', redirectUri: 'http://127.0.0.1:1/x', tokenFile: join(dir, 'gmail-tokens.json'), pubsubTopic: 'projects/p/topics/t' };
+    // 保存（ACL/rename）が失敗する注入
+    const client = new GmailClient(config, fetchImpl, Date.now, () => { throw new Error('icacls denied'); });
+    await expect(client.exchangeCode('code')).rejects.toThrow(/AUTH_REQUIRED/);
+    expect(client.isAuthenticated()).toBe(false); // this.tokens=null
+    const before = calls.length; // token endpointの1回のみ
+    await expect(client.watch()).rejects.toThrow(/AUTH_REQUIRED/);
+    await expect(client.listHistory('1')).rejects.toThrow(/AUTH_REQUIRED/);
+    await expect(client.getMessageMeta('m')).rejects.toThrow(/AUTH_REQUIRED/);
+    expect(calls.length).toBe(before); // Gmail APIへのfetchは一切呼ばれない
+    expect(calls.some((u) => u.includes('gmail.googleapis.com'))).toBe(false);
+  });
+
   it('E2E-2: 11ページ以上のhistoryをnextPageTokenがなくなるまで全件取得する（§E）', async () => {
     const { GmailClient } = await import('../../../src/command/integrations/gmail/gmailClient.js');
     const PAGES = 11;
