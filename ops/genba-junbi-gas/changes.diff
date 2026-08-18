@@ -1,0 +1,88 @@
+--- "gas.orig/\343\202\263\343\203\274\343\203\211.gs"	2026-08-18 23:50:24.963570463 +0000
++++ "gas/\343\202\263\343\203\274\343\203\211.gs"	2026-08-18 23:51:40.289249062 +0000
+@@ -1095,23 +1095,38 @@
+   return date.toISOString().slice(0, 10);
+ }
+ 
++/** "2026-08-19" を "8/19(水)" に整形する。現場は曜日で動くため通知の見出しに使う。 */
++function formatJpDate(yyyyMmDd) {
++  var match = String(yyyyMmDd || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
++  if (!match) return String(yyyyMmDd || "");
++  var date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
++  var youbi = ["日", "月", "火", "水", "木", "金", "土"][date.getUTCDay()];
++  return Number(match[2]) + "/" + Number(match[3]) + "(" + youbi + ")";
++}
++
+ function buildLineworksText() {
+   var summary = buildSummary();
+-  var lines = [
+-    "準備確認 " + summary.today,
+-    "未作成/作成中: " + summary.unmade + "件、期限超過: " + summary.overdue + "件、本日必要: " + summary.dueToday + "件、道具・備品: " + summary.supplyActive + "件",
+-    ""
+-  ].concat(summary.checklist.slice(0, 12));
++  // 0件の項目は出さない(1件しかない日に同じ1件を何度も数えて見せないため)
++  var counts = [];
++  if (summary.unmade) counts.push("未作成/作成中: " + summary.unmade + "件");
++  if (summary.overdue) counts.push("期限超過: " + summary.overdue + "件");
++  if (summary.dueToday) counts.push("本日必要: " + summary.dueToday + "件");
++  if (summary.supplyActive) counts.push("道具・備品: " + summary.supplyActive + "件");
++
++  var lines = ["準備確認 " + formatJpDate(summary.today)];
++  // 明細が3件以上ある日だけ件数行を出す。1〜2件の日は明細に全部書いてあるので、
++  // 件数行は同じ1件を「未作成1件・本日必要1件・道具備品1件」と3回数えて見せるだけになる。
++  if (counts.length && summary.checklist.length >= 3) lines.push(counts.join("、"));
++  lines.push("");
++  lines = lines.concat(summary.checklist.slice(0, 12));
+   if (!summary.checklist.length) lines.push("直近3日以内の未完了依頼はありません。");
+-  // 登録漏れ・対応漏れに気づけるよう、受信箱とメールの未処理も知らせる
++  // 現場向けの通知なので、現場が動かせる「受信箱の未登録依頼」だけ知らせる。
++  // メール未対応の件数は事務の指標なので、社長宛の朝ブリーフィング(MorningBrief.gs)側に集約した。
+   try {
+     var intakePending = readIntake().filter(function (item) {
+       return ((item.parsed || {}).intakeKind || "request") !== "chat";
+     }).length;
+-    var mailUnhandled = buildMailSummary().unhandled || 0;
+-    if (intakePending || mailUnhandled) {
+-      lines.push("", "受信箱の未登録依頼: " + intakePending + "件 / メール未対応: " + mailUnhandled + "件");
+-    }
++    if (intakePending) lines.push("", "受信箱の未登録依頼: " + intakePending + "件");
+   } catch (error) {
+     // 集計に失敗しても通知自体は送る
+   }
+@@ -1193,8 +1208,9 @@
+   var today = todayJst();
+   var state = readState();
+   if (state.notifyLastAutoDate === today) return; // 二重送信防止
+-  writeStateValues({ notifyLastAutoDate: today });
++  // 送信より先にフラグを立てると、送信が失敗した日の通知が黙って消える。必ず送信成功後に記録する。
+   postToLineworks(buildLineworksText());
++  writeStateValues({ notifyLastAutoDate: today });
+ }
+ 
+ /**
+--- gas.orig/MorningBrief.gs	2026-08-18 23:50:24.969529664 +0000
++++ gas/MorningBrief.gs	2026-08-18 23:50:53.945170451 +0000
+@@ -16,17 +16,20 @@
+ }
+ 
+ function mbDeliver_(text){
++  // getConfig() は引数を取らず設定オブジェクトを返す。getConfig("BRIEF_WEBHOOK_URL") と呼ぶと
++  // オブジェクトがそのまま返り、String() が "[object Object]" になって URL として fetch され、毎朝失敗していた。
+   var url = "";
+-  try { url = String(getConfig("BRIEF_WEBHOOK_URL") || "").trim(); } catch(e){}
++  try { url = String((getConfig() || {}).BRIEF_WEBHOOK_URL || "").trim(); } catch(e){ url = ""; }
+   if (url) {
+     UrlFetchApp.fetch(url, {
+       method: "post", contentType: "application/json",
+       payload: JSON.stringify({ content: { type: "text", text: text } }),
+       muteHttpExceptions: true
+     });
+-  } else {
+-    throw new Error("BRIEF_WEBHOOK_URL が未設定です。設定シートに社長専用ルームのWebhook URLを登録してください。");
++    return;
+   }
++  // Webhook 未設定でも止めない。ファイル冒頭の設計どおり社長メールへ届ける。
++  MailApp.sendEmail(MB_TO, "☀️ 朝ブリーフィング " + todayJst(), text);
+ }
+ 
+ function morningBriefBuild_(){
