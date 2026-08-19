@@ -1,0 +1,25 @@
+{
+  "name": "solo-ai-sanbo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "一人事業のためのAI参謀。決めるのは自分、調べる・書く・数えるはAI。",
+  "scripts": {
+    "sanbo": "tsx --no-warnings src/cli/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

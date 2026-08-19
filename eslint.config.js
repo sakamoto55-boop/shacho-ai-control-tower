@@ -5,7 +5,7 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ['dist/**', 'node_modules/**', 'data/**'],
+    ignores: ['dist/**', 'node_modules/**', 'data/**', 'solo-ai-sanbo/**'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module'
