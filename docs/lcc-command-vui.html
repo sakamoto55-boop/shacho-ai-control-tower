@@ -426,6 +426,23 @@
 
       <div v-if="site.headline" class="fx-card"><p class="text-[14px] font-bold">{{ site.headline }}</p></div>
 
+      <!-- 案件ステータス（総件数・状態別・金額確認カバレッジ／実データ集計） -->
+      <div v-if="site.summary" class="fx-card glow">
+        <div class="fx-head"><span class="bar"></span><h2 class="text-[13px]">案件ステータス</h2>
+          <span class="ml-auto fx-num on" style="font-size:20px">{{ Number(site.summary.total).toLocaleString('ja-JP') }}<span class="text-[11px] text-[color:var(--text-low)] font-normal">件</span></span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mb-2">
+          <div class="fx-tile" style="padding:10px"><p class="lab">進行中（受注・施工）</p><p class="fx-num on" style="font-size:20px">{{ site.summary.activeCount }}</p></div>
+          <div class="fx-tile" style="padding:10px"><p class="lab">状態未確認</p><p class="fx-num off" style="font-size:20px">{{ (site.summary.byStage.find(s=>s.stage==='unknown')||{}).count || 0 }}</p></div>
+          <div class="fx-tile" style="padding:10px"><p class="lab">金額確認済</p><p class="fx-num" :class="site.summary.amount.coveragePct?'on':'off'" style="font-size:20px">{{ site.summary.amount.coveragePct }}<span class="text-[11px] font-normal">%</span></p></div>
+        </div>
+        <div v-for="st in site.summary.byStage" :key="st.stage" class="py-1">
+          <div class="flex justify-between text-[11px]"><span>{{ st.label }}</span><span class="font-bold">{{ st.count.toLocaleString('ja-JP') }}件</span></div>
+          <div class="fx-bar mt-0.5"><i :style="{width: Math.max(2, Math.round(st.count / site.summary.total * 100)) + '%', opacity: st.stage==='unknown' ? .4 : 1}"></i></div>
+        </div>
+        <p class="text-[10px] text-[color:var(--text-low)] mt-2">※「状態未確認」はSource側status値の意味監査が未了のもの（勝手に確定ステージへ変換していません）。金額は確認済のみ集計（未確認を0円換算しない）。</p>
+      </div>
+
       <!-- 推奨アクション（実案件名付き） -->
       <div class="fx-card glow" v-if="site.actions.length">
         <div class="fx-head"><span class="bar"></span><h2 class="text-[13px]">今すぐの推奨アクション</h2></div>
@@ -948,7 +965,7 @@ createApp({
       deferredCaseIds: [], deferredTitles: [], focusedKey: '',
       /* FXダッシュボード（資金・粗利／案件・現場／人員・配置）実データ。未取得は—で正直に */
       money: { loaded: false, error: '', kpis: [], cash: null, alerts: [], gaps: [], target: null },
-      site: { loaded: false, error: '', actions: [], projectAlerts: [], quality: [], headline: '' },
+      site: { loaded: false, error: '', actions: [], projectAlerts: [], quality: [], headline: '', summary: null },
       people: { loaded: false, error: '', sources: [] },
       health: { loaded: false, connections: [], okCount: 0, limitedCount: 0, reason: '' },
       navItems: [
@@ -1314,16 +1331,18 @@ createApp({
     async loadSite(){
       this.site.error = '';
       try {
-        const [brief, alerts, quality] = await Promise.all([
-          this.fxGet('brief').catch(() => null), this.fxGet('alerts').catch(() => null), this.fxGet('data-quality').catch(() => null)
+        const [brief, alerts, quality, summary] = await Promise.all([
+          this.fxGet('brief').catch(() => null), this.fxGet('alerts').catch(() => null),
+          this.fxGet('data-quality').catch(() => null), this.fxGet('projects/summary?scope=' + this.scope).catch(() => null)
         ]);
         const site = { loaded: true, error: '' };
+        site.summary = summary || null;
         site.headline = (brief && brief.headline) || '';
         site.actions = (brief && brief.recommendedActions) || [];
         site.projectAlerts = ((alerts && alerts.alerts) || []).filter(a => a.projectId || /project|案件|工事|現場|工程|受注|失注|見積/i.test((a.kind || '') + (a.title || '')));
         site.quality = (quality && quality.issues) || [];
         this.site = site;
-      } catch (e) { this.site = { loaded: false, error: e.message === 'AUTH' ? '認証が必要' : '接続できません', actions: [], projectAlerts: [], quality: [], headline: '' }; }
+      } catch (e) { this.site = { loaded: false, error: e.message === 'AUTH' ? '認証が必要' : '接続できません', actions: [], projectAlerts: [], quality: [], headline: '', summary: null }; }
     },
     async loadPeople(){
       this.people.error = '';

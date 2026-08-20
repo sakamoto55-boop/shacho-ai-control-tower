@@ -30,6 +30,7 @@ import { createCommandRepository } from '../repositories/CommandRepository.js';
 import { buildAlerts } from '../engines/alerts.js';
 import { computeCashForecast, diffCashForecast } from '../engines/cashForecast.js';
 import { computeKpiSnapshot } from '../engines/kpi.js';
+import { summarizeProjects, summarizePersonnel } from '../engines/rosterSummary.js';
 import { generateExecutiveBrief } from '../brief/generateBrief.js';
 import { datasetAvailability } from '../sources/SourceAdapter.js';
 import {
@@ -522,6 +523,26 @@ export function createCommandApp(
     try {
       const { scope, dataset } = await scopedDataset(c);
       return c.json({ scope, issues: checkDataQuality(dataset, scope) });
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // 案件サマリ（状態別件数・金額確認カバレッジ。決定論・READ ONLY）
+  app.get('/projects/summary', async (c) => {
+    try {
+      const { scope, dataset } = await scopedDataset(c);
+      return c.json(summarizeProjects(dataset, scope));
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // 人員サマリ（社員数・役割内訳・協力会社・予定配置/日報件数。決定論・READ ONLY）
+  app.get('/personnel/summary', async (c) => {
+    try {
+      const { scope, dataset } = await scopedDataset(c);
+      return c.json(summarizePersonnel(dataset, scope));
     } catch (error) {
       return handleError(c, error);
     }
