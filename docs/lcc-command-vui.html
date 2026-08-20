@@ -97,6 +97,45 @@
   .h2-details summary::-webkit-details-marker{display:none}
   .h2-details[open] summary .chev{transform:rotate(90deg)}
   .chev{display:inline-block;transition:transform .2s ease}
+  /* ============ FX DASHBOARD（未来的・テック：発光・グリッド・アニメーション）============ */
+  .fx{--fx-a:#37e6ff;--fx-b:#7a5cff;--fx-ok:#3ef2a3;--fx-warn:#ffcf5a;--fx-bad:#ff5d73}
+  .fx-head{display:flex;align-items:center;gap:10px;margin:2px 0 2px}
+  .fx-head .bar{width:3px;height:20px;border-radius:2px;background:linear-gradient(180deg,var(--fx-a),var(--fx-b));box-shadow:0 0 10px var(--fx-a)}
+  .fx-head h2{font-size:15px;font-weight:900;letter-spacing:.04em;color:var(--text-hi)}
+  .fx-head .sub{font-size:10px;color:var(--text-low);letter-spacing:.14em;text-transform:uppercase}
+  .fx-card{position:relative;border-radius:var(--radius-l);padding:16px;background:
+      linear-gradient(180deg,rgba(20,32,64,.55),rgba(10,18,40,.55));
+    border:1px solid rgba(90,140,255,.18);overflow:hidden;
+    box-shadow:0 0 0 1px rgba(60,120,255,.05),0 10px 40px -12px rgba(0,20,60,.7),inset 0 0 30px -18px var(--fx-a)}
+  .fx-card::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background-image:linear-gradient(rgba(90,150,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(90,150,255,.06) 1px,transparent 1px);
+    background-size:22px 22px;mask-image:radial-gradient(120% 90% at 0% 0%,#000 30%,transparent 80%)}
+  .fx-card.glow{border-color:rgba(55,230,255,.4);box-shadow:0 0 24px -6px var(--fx-a),0 10px 40px -12px rgba(0,20,60,.7)}
+  .fx-tile{position:relative;border-radius:16px;padding:14px 14px 12px;background:linear-gradient(180deg,rgba(18,30,60,.6),rgba(9,16,36,.6));border:1px solid rgba(90,140,255,.16);overflow:hidden}
+  .fx-tile .lab{font-size:10px;letter-spacing:.1em;color:var(--text-low);text-transform:uppercase}
+  .fx-num{font-size:26px;font-weight:900;line-height:1.05;margin-top:4px;font-variant-numeric:tabular-nums;color:var(--text-hi)}
+  .fx-num.on{color:#dff6ff;text-shadow:0 0 16px rgba(55,230,255,.55)}
+  .fx-num.off{color:var(--text-low);text-shadow:none}
+  .fx-sub{font-size:10px;margin-top:3px;color:var(--text-low)}
+  .fx-pill{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;letter-spacing:.04em}
+  .fx-pill .dot{width:6px;height:6px;border-radius:50%}
+  .fx-pill.ok{color:var(--fx-ok);background:rgba(62,242,163,.12)} .fx-pill.ok .dot{background:var(--fx-ok);box-shadow:0 0 8px var(--fx-ok);animation:fxpulse 2s infinite}
+  .fx-pill.warn{color:var(--fx-warn);background:rgba(255,207,90,.12)} .fx-pill.warn .dot{background:var(--fx-warn)}
+  .fx-pill.off{color:var(--text-low);background:rgba(255,255,255,.05)} .fx-pill.off .dot{background:var(--text-low)}
+  @keyframes fxpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+  .fx-scan{position:absolute;left:0;right:0;height:40%;top:-40%;background:linear-gradient(180deg,transparent,rgba(55,230,255,.09),transparent);animation:fxscan 5.5s linear infinite;pointer-events:none}
+  @keyframes fxscan{0%{top:-40%}100%{top:120%}}
+  .fx-chart path.line{fill:none;stroke:url(#fxgrad);stroke-width:2.5;filter:drop-shadow(0 0 6px rgba(55,230,255,.6));stroke-linecap:round;stroke-linejoin:round}
+  .fx-chart path.line.draw{stroke-dasharray:1000;stroke-dashoffset:1000;animation:fxdraw 1.6s ease forwards}
+  @keyframes fxdraw{to{stroke-dashoffset:0}}
+  .fx-chart .area{fill:url(#fxarea);opacity:.5}
+  .fx-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:96px;color:var(--text-low);font-size:12px;text-align:center;
+    border:1px dashed rgba(90,140,255,.25);border-radius:14px;background:repeating-linear-gradient(45deg,rgba(90,140,255,.03),rgba(90,140,255,.03) 8px,transparent 8px,transparent 16px)}
+  .fx-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid rgba(90,140,255,.1)}
+  .fx-row:last-child{border-bottom:0}
+  .fx-bar{height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+  .fx-bar > i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--fx-a),var(--fx-b));box-shadow:0 0 8px var(--fx-a)}
+  @media (prefers-reduced-motion: reduce){.fx-scan,.fx-pill .dot,.fx-chart path.line.draw{animation:none !important}.fx-chart path.line.draw{stroke-dashoffset:0}}
   /* Mobile bottom-nav（PC縮小ではなくiPhone用の再構成・タッチ44px以上・safe-area内） */
   .bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:var(--z-nav);display:flex;background:rgba(6,12,30,0.92);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
   .bottom-nav button{flex:1;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--text-mid)}
@@ -315,6 +354,134 @@
      </div>
     </section>
 
+    <!-- ============ 資金・粗利（FX DASHBOARD・実データ／未接続は—）============ -->
+    <section v-if="view === 'money' && !authRequired" class="fx flex-1 overflow-y-auto px-4 pb-28 lg:pb-4 space-y-3 max-w-3xl w-full mx-auto" aria-label="資金・粗利">
+      <div class="fx-head"><span class="bar"></span><div><h2>資金・粗利</h2><p class="sub">CASH & GROSS MARGIN</p></div>
+        <span class="ml-auto fx-pill" :class="money.loaded ? (money.cash && money.cash.balanceKnown ? 'ok' : 'warn') : 'off'"><span class="dot"></span>{{ money.loaded ? (money.cash && money.cash.balanceKnown ? '実データ接続' : '一部未接続') : '取得中' }}</span>
+      </div>
+
+      <!-- KPIタイル -->
+      <div class="grid grid-cols-2 gap-3">
+        <div v-for="k in (money.kpis.length ? money.kpis.slice(0,4) : [{label:'現預金'},{label:'30日後現金予測'},{label:'当月売上'},{label:'粗利率'}])" :key="k.label" class="fx-tile">
+          <div class="fx-scan"></div>
+          <p class="lab">{{ k.label }}</p>
+          <p class="fx-num" :class="(k.value !== null && k.value !== undefined) ? 'on' : 'off'">{{ (k.value !== null && k.value !== undefined) ? (k.unit === 'yen' ? fxYen(k.value) : (k.unit === 'percent' ? (Math.round(k.value*10)/10)+'%' : k.value)) : '—' }}</p>
+          <p class="fx-sub">{{ (k.value !== null && k.value !== undefined) ? ((k.freshness && k.freshness.source) || '') : '銀行・会計 未接続' }}</p>
+        </div>
+      </div>
+
+      <!-- 資金推移（実データのみ描画。未接続は空表示） -->
+      <div class="fx-card">
+        <div class="fx-head"><span class="bar"></span><h2 class="text-[13px]">資金推移（90日）</h2></div>
+        <template v-if="money.cash && money.cash.balanceKnown && fxSparkPath((money.cash.dailyBalances||[]).map(p=>p.balance), 600, 120)">
+          <svg class="fx-chart w-full" viewBox="0 0 600 120" preserveAspectRatio="none" style="height:120px">
+            <defs>
+              <linearGradient id="fxgrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#37e6ff"/><stop offset="1" stop-color="#7a5cff"/></linearGradient>
+              <linearGradient id="fxarea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#37e6ff" stop-opacity=".35"/><stop offset="1" stop-color="#37e6ff" stop-opacity="0"/></linearGradient>
+            </defs>
+            <path class="area" :d="fxSparkPath((money.cash.dailyBalances||[]).map(p=>p.balance), 600, 120).area"/>
+            <path class="line draw" :d="fxSparkPath((money.cash.dailyBalances||[]).map(p=>p.balance), 600, 120).line"/>
+          </svg>
+        </template>
+        <div v-else class="fx-empty">
+          <span style="font-size:22px">🏦</span>
+          <span>銀行残高が未接続のため、資金予測は表示できません</span>
+          <button @click="view='connections'; loadHealth()" class="text-[11px] font-bold" style="color:var(--fx-a)">接続状態を見る →</button>
+        </div>
+      </div>
+
+      <!-- 売上目標 -->
+      <div class="fx-card">
+        <div class="fx-head"><span class="bar"></span><h2 class="text-[13px]">当月 売上目標</h2></div>
+        <p v-if="money.target" class="fx-num on">{{ fxYen(money.target.value) || money.target.label }}</p>
+        <div v-else class="fx-empty" style="min-height:60px"><span>売上目標が未設定です（設定すると目標比・着地予測が出せます）</span></div>
+      </div>
+
+      <!-- 資金アラート -->
+      <div v-if="money.alerts.length" class="fx-card glow">
+        <div class="fx-head"><span class="bar" style="background:linear-gradient(180deg,var(--fx-warn),var(--fx-bad))"></span><h2 class="text-[13px]">資金アラート</h2></div>
+        <div v-for="a in money.alerts.slice(0,4)" :key="a.alertId" class="fx-row">
+          <div><p class="text-[12px] font-bold" style="color:var(--fx-warn)">{{ a.title }}</p><p class="text-[10px] text-[color:var(--text-mid)]">{{ (a.detail||'').slice(0,80) }}</p></div>
+          <span class="fx-pill warn"><span class="dot"></span>{{ a.severity }}</span>
+        </div>
+      </div>
+
+      <!-- データギャップ（なぜ数字が—なのかを正直に） -->
+      <details class="h2-details fx-card" v-if="money.gaps.length">
+        <summary><span class="chev">▶</span>なぜ「—」なのか（データギャップ {{ money.gaps.length }}件）</summary>
+        <div v-for="g in money.gaps" :key="g.gapId" class="fx-row">
+          <div><p class="text-[11px] font-bold">{{ g.gapId }}: {{ g.description }}</p><p class="text-[10px] text-[color:var(--text-low)]">要件: {{ (g.requiredFor||[]).join(' / ') }}</p></div>
+          <span class="fx-pill off"><span class="dot"></span>{{ g.severity }}</span>
+        </div>
+      </details>
+
+      <p v-if="money.error" class="text-[12px] text-[color:var(--bad)]">{{ money.error }}</p>
+    </section>
+
+    <!-- ============ 案件・現場（FX DASHBOARD・実データ）============ -->
+    <section v-if="view === 'site' && !authRequired" class="fx flex-1 overflow-y-auto px-4 pb-28 lg:pb-4 space-y-3 max-w-3xl w-full mx-auto" aria-label="案件・現場">
+      <div class="fx-head"><span class="bar"></span><div><h2>案件・現場</h2><p class="sub">PROJECTS & SITES</p></div>
+        <span class="ml-auto fx-pill" :class="site.loaded ? 'ok' : 'off'"><span class="dot"></span>{{ site.loaded ? '実データ接続' : '取得中' }}</span>
+      </div>
+
+      <div v-if="site.headline" class="fx-card"><p class="text-[14px] font-bold">{{ site.headline }}</p></div>
+
+      <!-- 推奨アクション（実案件名付き） -->
+      <div class="fx-card glow" v-if="site.actions.length">
+        <div class="fx-head"><span class="bar"></span><h2 class="text-[13px]">今すぐの推奨アクション</h2></div>
+        <div v-for="(a,i) in site.actions.slice(0,6)" :key="i" class="fx-row">
+          <p class="text-[12px]"><span class="font-black" style="color:var(--fx-a)">{{ i+1 }}.</span> {{ a }}</p>
+        </div>
+      </div>
+
+      <!-- 要注意案件（アラート） -->
+      <div class="fx-card" v-if="site.projectAlerts.length">
+        <div class="fx-head"><span class="bar" style="background:linear-gradient(180deg,var(--fx-warn),var(--fx-bad))"></span><h2 class="text-[13px]">要注意案件 {{ site.projectAlerts.length }}件</h2></div>
+        <div v-for="a in site.projectAlerts.slice(0,6)" :key="a.alertId" class="fx-row">
+          <div><p class="text-[12px] font-bold">{{ a.title }}</p><p class="text-[10px] text-[color:var(--text-mid)]">{{ (a.detail||'').slice(0,80) }}</p></div>
+          <span class="fx-pill" :class="a.severity==='WARNING'?'warn':'off'"><span class="dot"></span>{{ a.severity }}</span>
+        </div>
+      </div>
+
+      <!-- データ品質（顧客2,268件由来の実問題） -->
+      <details class="h2-details fx-card" v-if="site.quality.length">
+        <summary><span class="chev">▶</span>データ品質の要確認 {{ site.quality.length }}件（顧客・案件の重複など）</summary>
+        <div v-for="(q,i) in site.quality.slice(0,12)" :key="i" class="fx-row">
+          <p class="text-[11px]">{{ q.detail }}</p>
+          <span class="fx-pill off"><span class="dot"></span>{{ q.severity }}</span>
+        </div>
+      </details>
+
+      <div v-if="site.loaded && !site.actions.length && !site.projectAlerts.length && !site.quality.length" class="fx-empty">要対応の案件・現場データは今のところありません</div>
+      <p v-if="site.error" class="text-[12px] text-[color:var(--bad)]">{{ site.error }}</p>
+    </section>
+
+    <!-- ============ 人員・配置（FX DASHBOARD・接続状態を正直に）============ -->
+    <section v-if="view === 'people' && !authRequired" class="fx flex-1 overflow-y-auto px-4 pb-28 lg:pb-4 space-y-3 max-w-3xl w-full mx-auto" aria-label="人員・配置">
+      <div class="fx-head"><span class="bar"></span><div><h2>人員・配置</h2><p class="sub">WORKFORCE & DISPATCH</p></div>
+        <span class="ml-auto fx-pill" :class="people.loaded ? 'warn' : 'off'"><span class="dot"></span>{{ people.loaded ? '一部接続' : '取得中' }}</span>
+      </div>
+
+      <div class="fx-card">
+        <div class="fx-head"><span class="bar"></span><h2 class="text-[13px]">データ接続の状態</h2></div>
+        <div v-for="(c,ci) in people.sources" :key="ci" class="fx-row">
+          <div><p class="text-[12px] font-bold">{{ c.system || c.label || c.name || '—' }}</p><p class="text-[10px] text-[color:var(--text-low)]">{{ (c.records !== undefined && c.records !== null) ? Number(c.records).toLocaleString('ja-JP') + '件' : '' }}{{ c.lastSyncedAt ? ('　最終同期 ' + String(c.lastSyncedAt).slice(5,16).replace('T',' ')) : '' }}{{ (c.errors && c.errors.length) ? ('　⚠ ' + c.errors.length + '件の警告') : '' }}</p></div>
+          <span class="fx-pill" :class="/LIVE|OK/i.test(c.classification||'') ? 'ok' : (/LIMIT|PARTIAL|STALE/i.test(c.classification||'') ? 'warn' : 'off')"><span class="dot"></span>{{ c.classification || '未接続' }}</span>
+        </div>
+        <div v-if="!people.sources.length" class="fx-empty" style="min-height:60px">接続状態を取得できません</div>
+      </div>
+
+      <div class="fx-card">
+        <div class="fx-head"><span class="bar" style="background:linear-gradient(180deg,var(--fx-warn),var(--fx-bad))"></span><h2 class="text-[13px]">配置・日報の運用データ</h2></div>
+        <div class="fx-empty">
+          <span style="font-size:22px">🧭</span>
+          <span>社員・車両・協力会社の<b>マスタは接続済み</b>ですが、<br>日々の<b>配置・日報の運用データは未取込</b>のため、欠員・当日配置はまだ表示できません。</span>
+          <button @click="view='connections'; loadHealth()" class="text-[11px] font-bold" style="color:var(--fx-a)">接続状態を見る →</button>
+        </div>
+      </div>
+      <p v-if="people.error" class="text-[12px] text-[color:var(--bad)]">{{ people.error }}</p>
+    </section>
+
     <!-- ============ データ接続画面（技術情報はここに集約） ============ -->
     <section v-if="view === 'connections'" class="flex-1 overflow-y-auto px-4 pb-28 lg:pb-4 space-y-3" aria-label="データ接続">
       <div class="surface p-4">
@@ -482,7 +649,7 @@
 
     <!-- Mobile bottom navigation（iPhone用再構成。未認証時は非表示） -->
     <nav v-if="!authRequired" class="bottom-nav lg:hidden" aria-label="モバイルナビゲーション">
-      <button v-for="nv in navItems.filter(n => ['home', 'chat', 'people', 'connections', 'settings'].includes(n.key))" :key="nv.key" @click="navTo(nv)" :class="{current: view === nv.view && !nv.ask}" :aria-current="view === nv.view ? 'page' : null">
+      <button v-for="nv in navItems.filter(n => ['home', 'money', 'site', 'people', 'chat'].includes(n.key))" :key="nv.key" @click="navTo(nv)" :class="{current: view === nv.view && !nv.ask}" :aria-current="view === nv.view ? 'page' : null">
         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path :d="nv.icon"/></svg>
         <span>{{ nv.short || nv.label }}</span>
       </button>
@@ -491,7 +658,7 @@
 
   <!-- ============ RIGHT: Contextual Intelligence（Desktop・§6） ============ -->
   <!-- HOME V2: ホームでは右カラムを出さない（判断1件に集中）。会話・他画面では従来どおり -->
-  <aside v-if="view !== 'home'" class="hidden lg:flex flex-col gap-3 w-72 shrink-0 pt-5 pr-4 pb-4 overflow-y-auto no-scrollbar" aria-label="コンテキスト情報">
+  <aside v-if="!['home','money','site','people'].includes(view)" class="hidden lg:flex flex-col gap-3 w-72 shrink-0 pt-5 pr-4 pb-4 overflow-y-auto no-scrollbar" aria-label="コンテキスト情報">
     <div class="glass px-3 py-2.5">
       <p class="text-[10px] font-bold text-[color:var(--text-low)] tracking-wider">現在の活動</p>
       <p class="text-sm mt-1">{{ coreSpec.label }}</p>
@@ -779,13 +946,17 @@ createApp({
       completingCaseId: '', outcomeDraft: '', caseError: '',
       /* HOME V2: 「後で」（この画面内の保留。追跡は継続・サーバー状態は変えない）と表示中の切替 */
       deferredCaseIds: [], deferredTitles: [], focusedKey: '',
+      /* FXダッシュボード（資金・粗利／案件・現場／人員・配置）実データ。未取得は—で正直に */
+      money: { loaded: false, error: '', kpis: [], cash: null, alerts: [], gaps: [], target: null },
+      site: { loaded: false, error: '', actions: [], projectAlerts: [], quality: [], headline: '' },
+      people: { loaded: false, error: '', sources: [] },
       health: { loaded: false, connections: [], okCount: 0, limitedCount: 0, reason: '' },
       navItems: [
         { key: 'home', label: '朝の管制', short: '管制', view: 'home', icon: 'M3 12l9-8 9 8M5 10v10h14V10' },
         { key: 'chat', label: 'AIに聞く', short: 'AI', view: 'chat', icon: 'M4 5h16v10H8l-4 4V5z' },
-        { key: 'money', label: '資金・粗利', short: '資金', view: 'chat', ask: '今月どう？', icon: 'M12 3v18M7 7h7a3 3 0 010 6H8a3 3 0 000 6h9' },
-        { key: 'site', label: '案件・現場', short: '案件', view: 'chat', ask: '一番危ないのは？', icon: 'M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6' },
-        { key: 'people', label: '人員・配置', short: '配置', view: 'chat', ask: '今日の配置、欠員、未提出日報を教えて', icon: 'M16 21v-2a4 4 0 00-8 0v2M12 11a4 4 0 100-8 4 4 0 000 8' },
+        { key: 'money', label: '資金・粗利', short: '資金', view: 'money', icon: 'M12 3v18M7 7h7a3 3 0 010 6H8a3 3 0 000 6h9' },
+        { key: 'site', label: '案件・現場', short: '案件', view: 'site', icon: 'M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6' },
+        { key: 'people', label: '人員・配置', short: '配置', view: 'people', icon: 'M16 21v-2a4 4 0 00-8 0v2M12 11a4 4 0 100-8 4 4 0 000 8' },
         { key: 'connections', label: 'データ接続', short: '接続', view: 'connections', icon: 'M9 12h6M5 12a7 7 0 0114 0M12 3v3M12 18v3' },
         { key: 'settings', label: '設定', short: '設定', view: 'settings', icon: 'M12 8a4 4 0 100 8 4 4 0 000-8zM19 12h2M3 12h2M12 3v2M12 19v2' }
       ],
@@ -989,6 +1160,9 @@ createApp({
     navTo(nv){
       this.view = nv.view;
       if (nv.view === 'connections') this.loadHealth();
+      else if (nv.view === 'money') this.loadMoney();
+      else if (nv.view === 'site') this.loadSite();
+      else if (nv.view === 'people') this.loadPeople();
       if (nv.ask) this.send(nv.ask);
       else if (nv.view === 'chat') this.$nextTick(() => this.focusInput());
     },
@@ -1107,6 +1281,67 @@ createApp({
       this.focusedKey = '';
     },
     focusDecision(d){ this.focusedKey = d.key; this.completingCaseId = ''; this.outcomeDraft = ''; },
+    fxYen(v){
+      // 実数値のみ整形。null/未接続は「—」（架空数値を出さない）
+      if (v === null || v === undefined || v === '' || Number.isNaN(Number(v))) return null;
+      const n = Number(v);
+      if (Math.abs(n) >= 1e8) return (n / 1e8).toFixed(2).replace(/\.00$/, '') + '億円';
+      if (Math.abs(n) >= 1e4) return Math.round(n / 1e4).toLocaleString('ja-JP') + '万円';
+      return Math.round(n).toLocaleString('ja-JP') + '円';
+    },
+    async fxGet(path){
+      const res = await fetch(`${this.apiBase}/command/${path}`, { headers: this.authHeaders() });
+      if (!res.ok) { if (this.markAuth(res.status)) throw new Error('AUTH'); throw new Error('HTTP ' + res.status); }
+      return res.json();
+    },
+    async loadMoney(){
+      this.money.error = '';
+      try {
+        const [kpi, cash, alerts, gaps, targets] = await Promise.all([
+          this.fxGet('kpi').catch(() => null), this.fxGet('cash/forecast').catch(() => null),
+          this.fxGet('alerts').catch(() => null), this.fxGet('data-gaps').catch(() => null),
+          this.fxGet('targets').catch(() => null)
+        ]);
+        const money = { loaded: true, error: '' };
+        money.kpis = (kpi && kpi.kpis) || [];
+        money.cash = cash || null;
+        money.alerts = ((alerts && alerts.alerts) || []).filter(a => /cash|fund|資金|入金|残高|請求/i.test((a.kind || '') + (a.title || '')));
+        money.gaps = ((gaps && gaps.gaps) || []).filter(g => /FINANCE|ACCOUNT|CASH|BANK|BILL|資金|会計|銀行|請求|入金/i.test((g.domain || '') + (g.description || '')));
+        money.target = (targets && targets.targets && targets.targets[0]) || null;
+        this.money = money;
+      } catch (e) { this.money = { loaded: false, error: e.message === 'AUTH' ? '認証が必要' : '接続できません', kpis: [], cash: null, alerts: [], gaps: [], target: null }; }
+    },
+    async loadSite(){
+      this.site.error = '';
+      try {
+        const [brief, alerts, quality] = await Promise.all([
+          this.fxGet('brief').catch(() => null), this.fxGet('alerts').catch(() => null), this.fxGet('data-quality').catch(() => null)
+        ]);
+        const site = { loaded: true, error: '' };
+        site.headline = (brief && brief.headline) || '';
+        site.actions = (brief && brief.recommendedActions) || [];
+        site.projectAlerts = ((alerts && alerts.alerts) || []).filter(a => a.projectId || /project|案件|工事|現場|工程|受注|失注|見積/i.test((a.kind || '') + (a.title || '')));
+        site.quality = (quality && quality.issues) || [];
+        this.site = site;
+      } catch (e) { this.site = { loaded: false, error: e.message === 'AUTH' ? '認証が必要' : '接続できません', actions: [], projectAlerts: [], quality: [], headline: '' }; }
+    },
+    async loadPeople(){
+      this.people.error = '';
+      try {
+        const h = await this.fxGet('health/connections').catch(() => null);
+        this.people = { loaded: true, error: '', sources: (h && h.connections) || [] };
+      } catch (e) { this.people = { loaded: false, error: e.message === 'AUTH' ? '認証が必要' : '接続できません', sources: [] }; }
+    },
+    fxSparkPath(vals, w, hgt){
+      // 実数配列→SVGパス（点が2未満なら null=空表示）
+      if (!Array.isArray(vals) || vals.length < 2) return null;
+      const max = Math.max(...vals), min = Math.min(...vals), span = (max - min) || 1;
+      const dx = w / (vals.length - 1);
+      const pts = vals.map((v, i) => [i * dx, hgt - ((v - min) / span) * (hgt - 8) - 4]);
+      const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+      const area = line + ` L${w} ${hgt} L0 ${hgt} Z`;
+      return { line, area };
+    },
     async completeCase(caseId){
       // §C: 社長判断の完了は実結果必須（DecisionCase+関連タスク+Outcomeを同時整合）
       // 「承認: 」「差戻: 」の接頭辞だけでは完了させない（中身の実結果が必要）

@@ -79,7 +79,8 @@ describe('/command API', () => {
         decision: 'A案件は粗利より完工を優先',
         reason: '顧客との完工約束を優先する',
         decisionMaker: '社長',
-        validUntil: '2026-08-20',
+        // validUntilは「未来かつ180日以内」が必須。相対で30日後にし、日付直書きの時限失敗を防ぐ
+        validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
         suppressAlertKinds: ['margin_drop']
       })
     });
