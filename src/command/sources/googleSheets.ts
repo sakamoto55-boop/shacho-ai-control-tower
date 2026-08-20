@@ -67,6 +67,7 @@ export interface ServiceAccountCredentials {
 }
 
 const SHEETS_READONLY_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly';
+export const DRIVE_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 
 function base64url(input: Buffer | string): string {
   return Buffer.from(input).toString('base64url');
@@ -78,21 +79,24 @@ export class ServiceAccountTokenProvider {
   private readonly fetchImpl: typeof fetch;
   private readonly nowMs: () => number;
 
+  private readonly scope: string;
+
   constructor(
     private readonly credentials: ServiceAccountCredentials,
-    options: { fetchImpl?: typeof fetch; nowMs?: () => number } = {}
+    options: { fetchImpl?: typeof fetch; nowMs?: () => number; scope?: string } = {}
   ) {
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.nowMs = options.nowMs ?? Date.now;
+    this.scope = options.scope ?? SHEETS_READONLY_SCOPE;
   }
 
-  /** RS256署名のJWT（scope=spreadsheets.readonly固定）を作る */
+  /** RS256署名のJWT（scopeは生成時指定・既定 spreadsheets.readonly）を作る */
   buildAssertion(nowSec: number): string {
     const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
     const claims = base64url(
       JSON.stringify({
         iss: this.credentials.client_email,
-        scope: SHEETS_READONLY_SCOPE,
+        scope: this.scope,
         aud: this.credentials.token_uri ?? 'https://oauth2.googleapis.com/token',
         iat: nowSec,
         exp: nowSec + 3600
@@ -129,7 +133,8 @@ export class ServiceAccountTokenProvider {
 
 /** GOOGLE_SERVICE_ACCOUNT_JSON（インラインJSON）/ _FILE（パス）から資格情報を読む */
 export function createServiceAccountFromEnv(
-  env = process.env
+  env = process.env,
+  options: { scope?: string } = {}
 ): ServiceAccountTokenProvider | null {
   let raw = env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!raw && env.GOOGLE_SERVICE_ACCOUNT_FILE) {
@@ -143,7 +148,7 @@ export function createServiceAccountFromEnv(
   try {
     const parsed = JSON.parse(raw) as ServiceAccountCredentials;
     if (!parsed.client_email || !parsed.private_key) return null;
-    return new ServiceAccountTokenProvider(parsed);
+    return new ServiceAccountTokenProvider(parsed, { scope: options.scope });
   } catch {
     return null;
   }

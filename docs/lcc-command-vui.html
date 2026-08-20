@@ -357,37 +357,56 @@
     <!-- ============ 資金・粗利（FX DASHBOARD・実データ／未接続は—）============ -->
     <section v-if="view === 'money' && !authRequired" class="fx flex-1 overflow-y-auto px-4 pb-28 lg:pb-4 space-y-3 max-w-3xl w-full mx-auto" aria-label="資金・粗利">
       <div class="fx-head"><span class="bar"></span><div><h2>資金・粗利</h2><p class="sub">CASH & GROSS MARGIN</p></div>
-        <span class="ml-auto fx-pill" :class="money.loaded ? (money.cash && money.cash.balanceKnown ? 'ok' : 'warn') : 'off'"><span class="dot"></span>{{ money.loaded ? (money.cash && money.cash.balanceKnown ? '実データ接続' : '一部未接続') : '取得中' }}</span>
+        <span class="ml-auto fx-pill" :class="money.loaded ? (money.keiri ? 'ok' : 'warn') : 'off'"><span class="dot"></span>{{ money.loaded ? (money.keiri ? '資金繰表 接続' : '一部未接続') : '取得中' }}</span>
       </div>
 
-      <!-- KPIタイル -->
+      <!-- KPIタイル（現預金は資金繰表の実残高で上書き） -->
       <div class="grid grid-cols-2 gap-3">
         <div v-for="k in (money.kpis.length ? money.kpis.slice(0,4) : [{label:'現預金'},{label:'30日後現金予測'},{label:'当月売上'},{label:'粗利率'}])" :key="k.label" class="fx-tile">
           <div class="fx-scan"></div>
           <p class="lab">{{ k.label }}</p>
-          <p class="fx-num" :class="(k.value !== null && k.value !== undefined) ? 'on' : 'off'">{{ (k.value !== null && k.value !== undefined) ? (k.unit === 'yen' ? fxYen(k.value) : (k.unit === 'percent' ? (Math.round(k.value*10)/10)+'%' : k.value)) : '—' }}</p>
-          <p class="fx-sub">{{ (k.value !== null && k.value !== undefined) ? ((k.freshness && k.freshness.source) || '') : '銀行・会計 未接続' }}</p>
+          <p class="fx-num" :class="fxMoneyTile(k).on ? 'on' : 'off'">{{ fxMoneyTile(k).value }}</p>
+          <p class="fx-sub">{{ fxMoneyTile(k).sub }}</p>
         </div>
       </div>
 
-      <!-- 資金推移（実データのみ描画。未接続は空表示） -->
+      <!-- 資金推移（資金繰表の実残高。未接続時のみ空表示） -->
       <div class="fx-card">
-        <div class="fx-head"><span class="bar"></span><h2 class="text-[13px]">資金推移（90日）</h2></div>
-        <template v-if="money.cash && money.cash.balanceKnown && fxSparkPath((money.cash.dailyBalances||[]).map(p=>p.balance), 600, 120)">
+        <div class="fx-head"><span class="bar"></span><h2 class="text-[13px]">資金推移（資金繰表・当月）</h2>
+          <span v-if="money.keiri && money.keiri.snapshot.trough" class="ml-auto text-[11px]" :class="money.keiri.snapshot.trough.balance < 0 ? 'text-[color:var(--fx-bad)]' : 'text-[color:var(--text-mid)]'">資金の谷 {{ fxYen(money.keiri.snapshot.trough.balance) }}（{{ money.keiri.snapshot.trough.date }}・計画上）</span>
+        </div>
+        <template v-if="money.keiri && money.keiri.snapshot.series.length >= 2">
           <svg class="fx-chart w-full" viewBox="0 0 600 120" preserveAspectRatio="none" style="height:120px">
             <defs>
               <linearGradient id="fxgrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#37e6ff"/><stop offset="1" stop-color="#7a5cff"/></linearGradient>
               <linearGradient id="fxarea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#37e6ff" stop-opacity=".35"/><stop offset="1" stop-color="#37e6ff" stop-opacity="0"/></linearGradient>
             </defs>
-            <path class="area" :d="fxSparkPath((money.cash.dailyBalances||[]).map(p=>p.balance), 600, 120).area"/>
-            <path class="line draw" :d="fxSparkPath((money.cash.dailyBalances||[]).map(p=>p.balance), 600, 120).line"/>
+            <path class="area" :d="fxSparkPath(money.keiri.snapshot.series.map(p=>p.balance), 600, 120).area"/>
+            <path class="line draw" :d="fxSparkPath(money.keiri.snapshot.series.map(p=>p.balance), 600, 120).line"/>
           </svg>
+          <div class="flex justify-between text-[10px] text-[color:var(--text-low)] mt-1">
+            <span>{{ money.keiri.snapshot.series[0].date }}</span>
+            <span>現在 {{ fxYen(money.keiri.snapshot.currentBalance) }}（{{ money.keiri.snapshot.balanceDate }}）</span>
+            <span>{{ money.keiri.snapshot.series[money.keiri.snapshot.series.length-1].date }}</span>
+          </div>
         </template>
         <div v-else class="fx-empty">
           <span style="font-size:22px">🏦</span>
-          <span>銀行残高が未接続のため、資金予測は表示できません</span>
+          <span>資金繰表が未接続です（アプリのSAへ閲覧共有で表示されます）</span>
           <button @click="view='connections'; loadHealth()" class="text-[11px] font-bold" style="color:var(--fx-a)">接続状態を見る →</button>
         </div>
+      </div>
+
+      <!-- 人別 立替・貸付（資金繰表由来・PRESIDENT限定） -->
+      <div v-if="money.keiri && money.keiri.snapshot.loans.length" class="fx-card">
+        <div class="fx-head"><span class="bar"></span><h2 class="text-[13px]">人別 立替・貸付</h2>
+          <span class="ml-auto fx-num on" style="font-size:18px">{{ fxYen(money.keiri.snapshot.loanTotal) }}</span>
+        </div>
+        <div v-for="(l,i) in money.keiri.snapshot.loans.slice(0,10)" :key="i" class="fx-row">
+          <div><p class="text-[12px] font-bold">{{ l.payParty }}</p><p class="text-[10px] text-[color:var(--text-low)]">[{{ l.month }}] {{ l.memo }}</p></div>
+          <span class="text-[13px] font-bold" style="color:var(--fx-warn)">{{ fxYen(l.amount) }}</span>
+        </div>
+        <p class="text-[10px] text-[color:var(--text-low)] mt-2">※資金繰表の「立替／貸付」行を集計。社長以外の名前＝その人への立替・貸付。</p>
       </div>
 
       <!-- 売上目標 -->
@@ -964,7 +983,7 @@ createApp({
       /* HOME V2: 「後で」（この画面内の保留。追跡は継続・サーバー状態は変えない）と表示中の切替 */
       deferredCaseIds: [], deferredTitles: [], focusedKey: '',
       /* FXダッシュボード（資金・粗利／案件・現場／人員・配置）実データ。未取得は—で正直に */
-      money: { loaded: false, error: '', kpis: [], cash: null, alerts: [], gaps: [], target: null },
+      money: { loaded: false, error: '', kpis: [], cash: null, alerts: [], gaps: [], target: null, keiri: null },
       site: { loaded: false, error: '', actions: [], projectAlerts: [], quality: [], headline: '', summary: null },
       people: { loaded: false, error: '', sources: [] },
       health: { loaded: false, connections: [], okCount: 0, limitedCount: 0, reason: '' },
@@ -1306,6 +1325,16 @@ createApp({
       if (Math.abs(n) >= 1e4) return Math.round(n / 1e4).toLocaleString('ja-JP') + '万円';
       return Math.round(n).toLocaleString('ja-JP') + '円';
     },
+    fxMoneyTile(k){
+      // 現預金は資金繰表（keiri）由来の実残高で上書き。他は/kpi由来（未接続は—）
+      const kb = this.money.keiri && this.money.keiri.snapshot;
+      if (k.label && k.label.indexOf('現預金') === 0 && kb && kb.currentBalance !== null && kb.currentBalance !== undefined) {
+        return { value: this.fxYen(kb.currentBalance), on: true, sub: '資金繰表 ' + (kb.balanceDate || '') + '時点' };
+      }
+      const has = (k.value !== null && k.value !== undefined);
+      const v = has ? (k.unit === 'yen' ? this.fxYen(k.value) : (k.unit === 'percent' ? (Math.round(k.value * 10) / 10) + '%' : k.value)) : '—';
+      return { value: v, on: has, sub: has ? ((k.freshness && k.freshness.source) || '') : '銀行・会計 未接続' };
+    },
     async fxGet(path){
       const res = await fetch(`${this.apiBase}/command/${path}`, { headers: this.authHeaders() });
       if (!res.ok) { if (this.markAuth(res.status)) throw new Error('AUTH'); throw new Error('HTTP ' + res.status); }
@@ -1314,19 +1343,20 @@ createApp({
     async loadMoney(){
       this.money.error = '';
       try {
-        const [kpi, cash, alerts, gaps, targets] = await Promise.all([
+        const [kpi, cash, alerts, gaps, targets, keiri] = await Promise.all([
           this.fxGet('kpi').catch(() => null), this.fxGet('cash/forecast').catch(() => null),
           this.fxGet('alerts').catch(() => null), this.fxGet('data-gaps').catch(() => null),
-          this.fxGet('targets').catch(() => null)
+          this.fxGet('targets').catch(() => null), this.fxGet('keiri/cash').catch(() => null)
         ]);
         const money = { loaded: true, error: '' };
+        money.keiri = (keiri && keiri.available) ? keiri : null;
         money.kpis = (kpi && kpi.kpis) || [];
         money.cash = cash || null;
         money.alerts = ((alerts && alerts.alerts) || []).filter(a => /cash|fund|資金|入金|残高|請求/i.test((a.kind || '') + (a.title || '')));
         money.gaps = ((gaps && gaps.gaps) || []).filter(g => /FINANCE|ACCOUNT|CASH|BANK|BILL|資金|会計|銀行|請求|入金/i.test((g.domain || '') + (g.description || '')));
         money.target = (targets && targets.targets && targets.targets[0]) || null;
         this.money = money;
-      } catch (e) { this.money = { loaded: false, error: e.message === 'AUTH' ? '認証が必要' : '接続できません', kpis: [], cash: null, alerts: [], gaps: [], target: null }; }
+      } catch (e) { this.money = { loaded: false, error: e.message === 'AUTH' ? '認証が必要' : '接続できません', kpis: [], cash: null, alerts: [], gaps: [], target: null, keiri: null }; }
     },
     async loadSite(){
       this.site.error = '';

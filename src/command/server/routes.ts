@@ -31,6 +31,7 @@ import { buildAlerts } from '../engines/alerts.js';
 import { computeCashForecast, diffCashForecast } from '../engines/cashForecast.js';
 import { computeKpiSnapshot } from '../engines/kpi.js';
 import { summarizeProjects, summarizePersonnel } from '../engines/rosterSummary.js';
+import { loadKeiriCash } from '../sources/keiriCash.js';
 import { generateExecutiveBrief } from '../brief/generateBrief.js';
 import { datasetAvailability } from '../sources/SourceAdapter.js';
 import {
@@ -543,6 +544,20 @@ export function createCommandApp(
     try {
       const { scope, dataset } = await scopedDataset(c);
       return c.json(summarizePersonnel(dataset, scope));
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
+  // 資金繰表（Drive xlsx）由来の現預金・資金推移・人別立替。PRESIDENTのみ。未接続は available:false で正直に返す
+  app.get('/keiri/cash', async (c) => {
+    try {
+      const principal = c.get('principal');
+      if (principal.role !== 'PRESIDENT') {
+        throw new AccessDeniedError('資金繰表（現預金）はPRESIDENTのみ閲覧できます');
+      }
+      const asOf = validateAsOf(c.req.query('asOf')) ?? nowIso();
+      return c.json(await loadKeiriCash(asOf));
     } catch (error) {
       return handleError(c, error);
     }
