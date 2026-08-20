@@ -1072,6 +1072,21 @@ export function createCommandApp(
   });
 
   // §C: 社長判断の完了（実結果必須）。DecisionCase・関連ActionItem・Outcomeを同時に整合させる
+  // 営業日報・現場報告への「返信アドバイス下書き」（決定論・承認制・自動送信なし）
+  app.get('/intelligence/cases/:id/advice', async (c) => {
+    try {
+      const { IntelligenceStore } = await import('../intelligence/store.js');
+      const { buildAdviceDraft } = await import('../intelligence/adviceDraft.js');
+      const store = new IntelligenceStore();
+      const found = store.cases().find((x) => x.caseId === c.req.param('id'));
+      if (!found) return c.json({ error: 'case not found' }, 404);
+      const to = c.req.query('to') ?? (found.entities?.[0]?.name ?? '');
+      return c.json(buildAdviceDraft(found, to));
+    } catch (error) {
+      return c.json({ error: errorMessage(error) }, 400);
+    }
+  });
+
   app.post('/intelligence/cases/:id/complete', async (c) => {
     const principal = c.get('principal');
     if (!canDecideApproval(principal)) {

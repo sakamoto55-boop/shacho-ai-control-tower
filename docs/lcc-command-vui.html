@@ -314,6 +314,25 @@
             <button @click="askFromHome('今日の要対応を、重要度順に根拠付きで教えて')" class="font-bold text-[color:var(--info)] min-h-[44px] lg:min-h-0">AIに詳しく聞く →</button>
           </div>
         </details>
+
+        <!-- 営業・現場への返信案（下書き・承認制・自動送信なし）。LINE WORKS等の報告に対して -->
+        <details v-if="currentDecision.caseId" class="h2-details" @toggle="$event.target.open && loadAdvice(currentDecision.caseId)">
+          <summary><span class="chev">▶</span>営業への返信案を作る<span class="text-[color:var(--text-low)] font-normal">（下書き・送信は承認後）</span></summary>
+          <div class="pb-1">
+            <p v-if="advice.loading" class="text-[12px] text-[color:var(--text-low)]">下書きを作成中…</p>
+            <p v-else-if="advice.error" class="text-[12px] text-[color:var(--bad)]">{{ advice.error }}</p>
+            <template v-else-if="advice.data && advice.caseId === currentDecision.caseId">
+              <div class="rounded-xl bg-black/30 border border-white/10 p-3">
+                <p class="text-[13px] whitespace-pre-wrap leading-relaxed">{{ advice.data.draft }}</p>
+              </div>
+              <p class="text-[10px] text-[color:var(--warn)] mt-1.5">{{ advice.data.guard }}</p>
+              <div class="flex gap-3 mt-1.5">
+                <button @click="copyText(advice.data.draft)" class="text-[11px] font-bold text-[color:var(--info)] min-h-[44px] lg:min-h-0">コピーする</button>
+                <span class="text-[10px] text-[color:var(--text-low)] self-center">根拠: 確認事実{{ advice.data.basis.confirmedFacts }}件・不足{{ advice.data.basis.missingInformation }}件</span>
+              </div>
+            </template>
+          </div>
+        </details>
       </div>
 
       <!-- 判断なし／全件保留／取得不能 -->
@@ -986,6 +1005,7 @@ createApp({
       money: { loaded: false, error: '', kpis: [], cash: null, alerts: [], gaps: [], target: null, keiri: null },
       site: { loaded: false, error: '', actions: [], projectAlerts: [], quality: [], headline: '', summary: null },
       people: { loaded: false, error: '', sources: [] },
+      advice: { caseId: '', loading: false, data: null, error: '' },
       health: { loaded: false, connections: [], okCount: 0, limitedCount: 0, reason: '' },
       navItems: [
         { key: 'home', label: '朝の管制', short: '管制', view: 'home', icon: 'M3 12l9-8 9 8M5 10v10h14V10' },
@@ -1390,6 +1410,16 @@ createApp({
       const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
       const area = line + ` L${w} ${hgt} L0 ${hgt} Z`;
       return { line, area };
+    },
+    copyText(t){ try { navigator.clipboard.writeText(t); } catch (e) { /* クリップボード不可環境は無視 */ } },
+    async loadAdvice(caseId){
+      // 営業日報への返信アドバイス下書き（決定論・承認制・自動送信なし）を取得
+      this.advice = { caseId, loading: true, data: null, error: '' };
+      try {
+        const res = await fetch(this.apiBase + '/command/intelligence/cases/' + caseId + '/advice', { headers: this.authHeaders() });
+        if (!res.ok) { this.advice = { caseId, loading: false, data: null, error: '取得できませんでした' }; return; }
+        this.advice = { caseId, loading: false, data: await res.json(), error: '' };
+      } catch { this.advice = { caseId, loading: false, data: null, error: '接続できません' }; }
     },
     async completeCase(caseId){
       // §C: 社長判断の完了は実結果必須（DecisionCase+関連タスク+Outcomeを同時整合）
