@@ -549,6 +549,18 @@ export function createCommandApp(
     }
   });
 
+  // 会社の動き（Drive最近更新のメタ情報を業務シグナル化）。SA共有範囲のみ。READ ONLY
+  app.get('/company/activity', async (c) => {
+    try {
+      const { loadCompanyActivity } = await import('../sources/driveActivity.js');
+      const days = Math.min(30, Math.max(1, Number(c.req.query('days') ?? 7)));
+      const since = new Date(new Date(nowIso()).getTime() - days * 24 * 60 * 60 * 1000).toISOString();
+      return c.json(await loadCompanyActivity(since));
+    } catch (error) {
+      return handleError(c, error);
+    }
+  });
+
   // 資金繰表（Drive xlsx）由来の現預金・資金推移・人別立替。PRESIDENTのみ。未接続は available:false で正直に返す
   app.get('/keiri/cash', async (c) => {
     try {

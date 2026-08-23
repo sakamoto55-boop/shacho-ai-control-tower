@@ -537,6 +537,32 @@
       <p v-if="people.error" class="text-[12px] text-[color:var(--bad)]">{{ people.error }}</p>
     </section>
 
+    <!-- ============ 会社の動き（Driveアクティビティ・SA共有範囲）============ -->
+    <section v-if="view === 'activity' && !authRequired" class="fx flex-1 overflow-y-auto px-4 pb-28 lg:pb-4 space-y-3 max-w-3xl w-full mx-auto" aria-label="会社の動き">
+      <div class="fx-head"><span class="bar"></span><div><h2>会社の動き</h2><p class="sub">COMPANY ACTIVITY</p></div>
+        <span class="ml-auto fx-pill" :class="activity.loaded && !activity.error ? 'ok' : 'off'"><span class="dot"></span>{{ activity.loaded ? (activity.error ? '未接続' : '直近7日') : '取得中' }}</span>
+      </div>
+
+      <div class="fx-card">
+        <div class="fx-head"><span class="bar"></span><h2 class="text-[13px]">最近更新されたもの（会社が動いている場所）</h2></div>
+        <div v-if="activity.items.length">
+          <div v-for="(a,i) in activity.items" :key="i" class="fx-row">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="fx-pill" :style="{color: activitySignalColor(a.signal), background:'rgba(255,255,255,.05)'}"><span class="dot" :style="{background: activitySignalColor(a.signal)}"></span>{{ a.signal }}</span>
+                <span v-if="a.headcount" class="text-[11px] font-bold" style="color:var(--fx-a)">👷 {{ a.headcount }}名</span>
+              </div>
+              <p class="text-[12px] mt-0.5 truncate">{{ a.name }}</p>
+            </div>
+            <span class="text-[10px] text-[color:var(--text-low)] shrink-0">{{ String(a.modifiedTime).slice(5,16).replace('T',' ') }}</span>
+          </div>
+        </div>
+        <div v-else-if="activity.loaded && activity.error" class="fx-empty"><span>{{ activity.error }}</span></div>
+        <div v-else class="fx-empty"><span>直近7日の更新はありません</span></div>
+        <p v-if="activity.note" class="text-[10px] text-[color:var(--text-low)] mt-2">{{ activity.note }}</p>
+      </div>
+    </section>
+
     <!-- ============ データ接続画面（技術情報はここに集約） ============ -->
     <section v-if="view === 'connections'" class="flex-1 overflow-y-auto px-4 pb-28 lg:pb-4 space-y-3" aria-label="データ接続">
       <div class="surface p-4">
@@ -713,7 +739,7 @@
 
   <!-- ============ RIGHT: Contextual Intelligence（Desktop・§6） ============ -->
   <!-- HOME V2: ホームでは右カラムを出さない（判断1件に集中）。会話・他画面では従来どおり -->
-  <aside v-if="!['home','money','site','people'].includes(view)" class="hidden lg:flex flex-col gap-3 w-72 shrink-0 pt-5 pr-4 pb-4 overflow-y-auto no-scrollbar" aria-label="コンテキスト情報">
+  <aside v-if="!['home','money','site','people','activity'].includes(view)" class="hidden lg:flex flex-col gap-3 w-72 shrink-0 pt-5 pr-4 pb-4 overflow-y-auto no-scrollbar" aria-label="コンテキスト情報">
     <div class="glass px-3 py-2.5">
       <p class="text-[10px] font-bold text-[color:var(--text-low)] tracking-wider">現在の活動</p>
       <p class="text-sm mt-1">{{ coreSpec.label }}</p>
@@ -1005,6 +1031,7 @@ createApp({
       money: { loaded: false, error: '', kpis: [], cash: null, alerts: [], gaps: [], target: null, keiri: null },
       site: { loaded: false, error: '', actions: [], projectAlerts: [], quality: [], headline: '', summary: null },
       people: { loaded: false, error: '', sources: [] },
+      activity: { loaded: false, error: '', items: [], note: '' },
       advice: { caseId: '', loading: false, data: null, error: '' },
       health: { loaded: false, connections: [], okCount: 0, limitedCount: 0, reason: '' },
       navItems: [
@@ -1013,6 +1040,7 @@ createApp({
         { key: 'money', label: '資金・粗利', short: '資金', view: 'money', icon: 'M12 3v18M7 7h7a3 3 0 010 6H8a3 3 0 000 6h9' },
         { key: 'site', label: '案件・現場', short: '案件', view: 'site', icon: 'M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6' },
         { key: 'people', label: '人員・配置', short: '配置', view: 'people', icon: 'M16 21v-2a4 4 0 00-8 0v2M12 11a4 4 0 100-8 4 4 0 000 8' },
+        { key: 'activity', label: '会社の動き', short: '動き', view: 'activity', icon: 'M3 12h4l3 8 4-16 3 8h4' },
         { key: 'connections', label: 'データ接続', short: '接続', view: 'connections', icon: 'M9 12h6M5 12a7 7 0 0114 0M12 3v3M12 18v3' },
         { key: 'settings', label: '設定', short: '設定', view: 'settings', icon: 'M12 8a4 4 0 100 8 4 4 0 000-8zM19 12h2M3 12h2M12 3v2M12 19v2' }
       ],
@@ -1219,6 +1247,7 @@ createApp({
       else if (nv.view === 'money') this.loadMoney();
       else if (nv.view === 'site') this.loadSite();
       else if (nv.view === 'people') this.loadPeople();
+      else if (nv.view === 'activity') this.loadActivity();
       if (nv.ask) this.send(nv.ask);
       else if (nv.view === 'chat') this.$nextTick(() => this.focusInput());
     },
@@ -1400,6 +1429,17 @@ createApp({
         const h = await this.fxGet('health/connections').catch(() => null);
         this.people = { loaded: true, error: '', sources: (h && h.connections) || [] };
       } catch (e) { this.people = { loaded: false, error: e.message === 'AUTH' ? '認証が必要' : '接続できません', sources: [] }; }
+    },
+    async loadActivity(){
+      this.activity.error = '';
+      try {
+        const r = await this.fxGet('company/activity?days=7');
+        if (r && r.available) this.activity = { loaded: true, error: '', items: r.items || [], note: r.note || '' };
+        else this.activity = { loaded: true, error: (r && r.reason) || '未接続', items: [], note: '' };
+      } catch (e) { this.activity = { loaded: false, error: e.message === 'AUTH' ? '認証が必要' : '接続できません', items: [], note: '' }; }
+    },
+    activitySignalColor(sig){
+      return ({ '資金':'var(--fx-ok)', '現場日報':'var(--fx-a)', '見積':'var(--fx-b)', '契約':'var(--fx-warn)', '施工':'var(--fx-a)', '産廃':'var(--text-mid)', '請求':'var(--fx-warn)', '連絡':'var(--fx-b)', '人員':'var(--fx-a)' })[sig] || 'var(--text-low)';
     },
     fxSparkPath(vals, w, hgt){
       // 実数配列→SVGパス（点が2未満なら null=空表示）
