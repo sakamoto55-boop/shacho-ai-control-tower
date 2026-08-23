@@ -385,6 +385,18 @@
           </div>
         </div>
       </details>
+
+      <!-- 会社の動き（直近）ホームからの覗き見。詳細は「会社の動き」タブ -->
+      <details class="h2-details fx" v-if="activity.loaded && activity.items.length" @toggle="$event.target.open && !activity.items.length && loadActivity()">
+        <summary><span class="chev">▶</span>会社の動き（直近）<span class="text-[color:var(--text-low)] font-normal">最新{{ Math.min(3, activity.items.length) }}件</span></summary>
+        <div class="pb-1">
+          <div v-for="(a,i) in activity.items.slice(0,3)" :key="i" class="fx-row">
+            <div class="min-w-0"><span class="text-[11px] font-bold" :style="{color: activitySignalColor(a.signal)}">{{ a.signal }}</span><span v-if="a.headcount" class="text-[11px] ml-1" style="color:var(--fx-a)">👷{{ a.headcount }}名</span><p class="text-[11px] truncate">{{ a.name }}</p></div>
+            <span class="text-[10px] text-[color:var(--text-low)] shrink-0">{{ fxRelTime(a.modifiedTime) }}</span>
+          </div>
+          <button @click="navTo({key:'activity',view:'activity'})" class="text-[11px] font-bold mt-1" style="color:var(--fx-a)">すべての動きを見る →</button>
+        </div>
+      </details>
      </div>
     </section>
 
@@ -2186,6 +2198,7 @@ createApp({
     this.loadDecisions();
     this.loadHealth();
     this.loadHomeCash();
+    this.loadActivity();
     this.morningGreeting();
     this.initCore();
     if ('speechSynthesis' in window) this.refreshVoiceList();
