@@ -244,6 +244,13 @@
      <div class="max-w-3xl w-full mx-auto space-y-3">
       <p class="text-[10px] tracking-widest text-[color:var(--text-low)] font-bold">MORNING COMMAND BRIEF ｜ 今日、将軍の判断が必要なのは<span v-if="decisions.loaded">{{ pendingDecisionTotal }}件</span><span v-else>—件（{{ decisions.reason || '取得不能' }}）</span></p>
 
+      <!-- 資金の谷 警告（資金繰表の計画上、残高がマイナス/低水準に触れる場合のみ・PRESIDENT） -->
+      <button v-if="homeCash && homeCash.trough && homeCash.trough.balance < 0" @click="navTo({key:'money',view:'money'})" class="w-full text-left h2-card" style="border-left-color:var(--bad);background:rgba(255,93,115,.08)">
+        <div class="flex items-center gap-2"><span style="font-size:20px">⚠️</span><p class="text-[14px] font-black" style="color:var(--bad)">資金の谷：{{ fxYen(homeCash.trough.balance) }}（{{ homeCash.trough.date }}・計画上）</p></div>
+        <p class="text-[12px] text-[color:var(--text-mid)] mt-1">資金繰表の計画では、この日に残高がマイナスになります。今のうちに対策を。（現在 {{ fxYen(homeCash.currentBalance) }}）</p>
+        <p class="text-[11px] font-bold mt-1" style="color:var(--fx-a)">資金・粗利を見る →</p>
+      </button>
+
       <!-- 3数字（押すと該当画面へ） -->
       <div class="grid grid-cols-3 gap-2" role="list" aria-label="今日の状況">
         <button role="listitem" class="h2-stat red" @click="deferredCaseIds = []" aria-label="今日判断する件数">
@@ -1043,6 +1050,7 @@ createApp({
       people: { loaded: false, error: '', sources: [] },
       activity: { loaded: false, error: '', items: [], note: '' },
       advice: { caseId: '', loading: false, data: null, error: '' },
+      homeCash: null,
       health: { loaded: false, connections: [], okCount: 0, limitedCount: 0, reason: '' },
       navItems: [
         { key: 'home', label: '朝の管制', short: '管制', view: 'home', icon: 'M3 12l9-8 9 8M5 10v10h14V10' },
@@ -1439,6 +1447,13 @@ createApp({
         const h = await this.fxGet('health/connections').catch(() => null);
         this.people = { loaded: true, error: '', sources: (h && h.connections) || [] };
       } catch (e) { this.people = { loaded: false, error: e.message === 'AUTH' ? '認証が必要' : '接続できません', sources: [] }; }
+    },
+    async loadHomeCash(){
+      // ホームの資金警告用。資金繰表の谷/現預金（PRESIDENTのみ取得可・失敗は無視）
+      try {
+        const r = await this.fxGet('keiri/cash');
+        if (r && r.available) this.homeCash = r.snapshot;
+      } catch { /* 未接続/権限なしは無視（ホームは判断が主役） */ }
     },
     async loadActivity(){
       this.activity.error = '';
@@ -2136,6 +2151,7 @@ createApp({
     await this.loadKpi();
     this.loadDecisions();
     this.loadHealth();
+    this.loadHomeCash();
     this.morningGreeting();
     this.initCore();
     if ('speechSynthesis' in window) this.refreshVoiceList();
