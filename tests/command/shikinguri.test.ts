@@ -92,4 +92,18 @@ describe('資金繰表の解析（決定論・シート記載値のみ）', () =
     expect(t.income).toBe(700000);
     expect(t.expense).toBe(400000);
   });
+
+  it('monthTotals: 「合計（振込・引落）」等の集計行を二重計上しない', () => {
+    const period = { start: d('2026-08-06'), end: d('2026-09-06') };
+    const rows: RawRow[] = [
+      { date: d('2026-08-10'), incomeParty: 'ハナウララ', incomeAmount: 2900000, payAmount: null },
+      { date: d('2026-08-12'), payParty: '給料', incomeAmount: null, payAmount: 7620057 },
+      // 集計行（明細の合計）→ 除外されるべき
+      { date: d('2026-08-31'), incomeParty: '合計（振込・引落）', incomeAmount: 2900000, payAmount: null },
+      { date: d('2026-08-31'), payParty: '合計（振込・引落）', incomeAmount: null, payAmount: 7620057 }
+    ];
+    const t = monthTotals(rows, period);
+    expect(t.income).toBe(2900000);
+    expect(t.expense).toBe(7620057);
+  });
 });

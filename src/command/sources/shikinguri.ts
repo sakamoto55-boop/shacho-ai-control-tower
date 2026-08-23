@@ -44,6 +44,12 @@ export interface CashSnapshot {
   monthExpense: number | null;
 }
 
+/** 合計・小計・繰越などの集計行か（明細合計の二重計上を避けるため除外する） */
+export function isSummaryRow(row: RawRow): boolean {
+  const s = `${row.incomeParty ?? ''} ${row.payParty ?? ''} ${row.memo ?? ''}`;
+  return /合計|小計|総計|請求計|繰越/.test(s);
+}
+
 /** カンマ・円・空白・▲ を処理して数値化（▲/△/(...)/末尾-はマイナス） */
 export function toNumber(v: unknown): number | null {
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
@@ -102,6 +108,7 @@ export function extractUpcoming(
     const amt = row.payAmount ?? null;
     const party = (row.payParty ?? '').trim();
     if (!amt || amt <= 0 || !party || carried == null) continue;
+    if (isSummaryRow(row)) continue; // 「合計」等の集計行は予定支払に出さない
     if (carried <= asOf) continue;
     if (period && (carried < period.start || carried > period.end)) continue;
     out.push({ date: carried.toISOString().slice(0, 10), payParty: party, amount: amt, memo: (row.memo ?? '').trim() });
@@ -120,6 +127,7 @@ export function monthTotals(
   for (const row of rows) {
     if (row.date) carried = row.date;
     if (period && carried && (carried < period.start || carried > period.end)) continue;
+    if (isSummaryRow(row)) continue; // 「合計（振込・引落）」等の集計行は二重計上しない
     if (typeof row.incomeAmount === 'number' && row.incomeAmount > 0) income += row.incomeAmount;
     if (typeof row.payAmount === 'number' && row.payAmount > 0) expense += row.payAmount;
   }
