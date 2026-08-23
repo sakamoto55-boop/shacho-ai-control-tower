@@ -71,7 +71,7 @@ describe('資金繰表の解析（決定論・シート記載値のみ）', () =
     const rows: RawRow[] = [
       { date: d('2026-08-10'), payParty: '過去支払', payAmount: 100 }, // asOf以前→除外
       { date: d('2026-08-25'), payParty: '鳥銀', payAmount: 350000, memo: '返済' },
-      { date: d('2026-09-10'), payParty: '給料', payAmount: 7000000 },
+      { date: d('2026-09-05'), payParty: '給料', payAmount: 7000000 }, // 期間内（8/6-9/6）
       { date: d('2026-08-22'), incomeAmount: 500000, payParty: '', payAmount: null }, // 入金・支払先なし→除外
       { date: d('2026-09-20'), payParty: '期間外', payAmount: 999 } // 期間外→除外
     ];
