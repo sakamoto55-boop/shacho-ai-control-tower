@@ -254,7 +254,7 @@
 
       <!-- 資金の谷 警告（資金繰表の計画上、残高がマイナス/低水準に触れる場合のみ・PRESIDENT） -->
       <button v-if="homeCash && homeCash.trough && homeCash.trough.balance < 0" @click="navTo({key:'money',view:'money'})" class="w-full text-left h2-card" style="border-left-color:var(--bad);background:rgba(255,93,115,.08)">
-        <div class="flex items-center gap-2"><span style="font-size:20px">⚠️</span><p class="text-[14px] font-black" style="color:var(--bad)">資金の谷：{{ fxYen(homeCash.trough.balance) }}（{{ homeCash.trough.date }}・計画上）</p></div>
+        <div class="flex items-center gap-2"><span style="font-size:20px">⚠️</span><p class="text-[14px] font-black" style="color:var(--bad)">資金の谷：{{ fxYen(homeCash.trough.balance) }}（{{ homeCash.trough.date }}<template v-if="fxDaysUntil(homeCash.trough.date) !== null && fxDaysUntil(homeCash.trough.date) >= 0">・あと{{ fxDaysUntil(homeCash.trough.date) }}日</template>・計画上）</p></div>
         <p class="text-[12px] text-[color:var(--text-mid)] mt-1">資金繰表の計画では、この日に残高がマイナスになります。今のうちに対策を。（現在 {{ fxYen(homeCash.currentBalance) }}）</p>
         <p class="text-[11px] font-bold mt-1" style="color:var(--fx-a)">資金・粗利を見る →</p>
       </button>
@@ -1508,6 +1508,7 @@ createApp({
       const area = line + ` L${w} ${hgt} L0 ${hgt} Z`;
       return { line, area };
     },
+    fxDaysUntil(dateStr){ try { var d=new Date(dateStr+'T00:00:00'); var now=new Date(); now.setHours(0,0,0,0); return Math.round((d-now)/86400000); } catch(e){ return null; } },
     copyText(t){ try { navigator.clipboard.writeText(t); } catch (e) { /* クリップボード不可環境は無視 */ } },
     async loadAdvice(caseId){
       // 営業日報への返信アドバイス下書き（決定論・承認制・自動送信なし）を取得
