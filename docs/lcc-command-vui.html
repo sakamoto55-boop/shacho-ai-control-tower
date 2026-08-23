@@ -592,7 +592,7 @@
               </div>
               <p class="text-[12px] mt-0.5 truncate">{{ a.name }}</p>
             </div>
-            <span class="text-[10px] text-[color:var(--text-low)] shrink-0">{{ String(a.modifiedTime).slice(5,16).replace('T',' ') }}</span>
+            <span class="text-[10px] text-[color:var(--text-low)] shrink-0">{{ fxRelTime(a.modifiedTime) }}</span>
           </div>
         </div>
         <div v-else-if="activity.loaded && activity.error" class="fx-empty"><span>{{ activity.error }}</span></div>
@@ -1508,6 +1508,7 @@ createApp({
       const area = line + ` L${w} ${hgt} L0 ${hgt} Z`;
       return { line, area };
     },
+    fxRelTime(iso){ try { var t=new Date(iso).getTime(); var m=Math.round((Date.now()-t)/60000); if(m<1)return'たった今'; if(m<60)return m+'分前'; var h=Math.round(m/60); if(h<24)return h+'時間前'; var d=Math.round(h/24); return d+'日前'; } catch(e){ return String(iso).slice(5,16).replace('T',' '); } },
     fxDaysUntil(dateStr){ try { var d=new Date(dateStr+'T00:00:00'); var now=new Date(); now.setHours(0,0,0,0); return Math.round((d-now)/86400000); } catch(e){ return null; } },
     copyText(t){ try { navigator.clipboard.writeText(t); } catch (e) { /* クリップボード不可環境は無視 */ } },
     async loadAdvice(caseId){
