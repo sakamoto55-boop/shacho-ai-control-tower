@@ -1,0 +1,1413 @@
+<title>AI参謀</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  /* 測量野帳（フィールドノート）の見立て。方眼の紙に鉛筆と朱書き。 */
+  :root {
+    --ground: #F5F7F3;
+    --surface: #FFFFFF;
+    --surface-2: #EBEFE8;
+    --ink: #1B1F1D;
+    --ink-2: #59635C;
+    --ink-3: #8A938C;
+    --line: #D7DDD3;
+    --grid: #E5EADF;
+    --accent: #2F6B4F;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #E1EDE5;
+    --alert: #A93C27;
+    --alert-soft: #F7E5E0;
+    --warn: #8A6412;
+    --warn-soft: #F4EBD6;
+    --shadow: 0 1px 2px rgba(27, 31, 29, .06), 0 6px 16px rgba(27, 31, 29, .05);
+
+    --fs-xs: .75rem;
+    --fs-sm: .8125rem;
+    --fs-base: .9375rem;
+    --fs-lg: 1.0625rem;
+    --fs-xl: 1.375rem;
+    --fs-2xl: 1.875rem;
+    --radius: 5px;
+    --sans: "Zen Kaku Gothic New", ui-sans-serif, system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #131614;
+      --surface: #1C201D;
+      --surface-2: #242924;
+      --ink: #E9ECE7;
+      --ink-2: #A3ACA5;
+      --ink-3: #78817A;
+      --line: #2F3632;
+      --grid: #1A1F1B;
+      --accent: #6FBF95;
+      --accent-ink: #10231A;
+      --accent-soft: #1D3A2B;
+      --alert: #E28068;
+      --alert-soft: #38201A;
+      --warn: #D9A441;
+      --warn-soft: #33290F;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 6px 16px rgba(0, 0, 0, .25);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #131614;
+    --surface: #1C201D;
+    --surface-2: #242924;
+    --ink: #E9ECE7;
+    --ink-2: #A3ACA5;
+    --ink-3: #78817A;
+    --line: #2F3632;
+    --grid: #1A1F1B;
+    --accent: #6FBF95;
+    --accent-ink: #10231A;
+    --accent-soft: #1D3A2B;
+    --alert: #E28068;
+    --alert-soft: #38201A;
+    --warn: #D9A441;
+    --warn-soft: #33290F;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 6px 16px rgba(0, 0, 0, .25);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background-color: var(--ground);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 26px 26px;
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--fs-base);
+    line-height: 1.7;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .shell {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 0 14px calc(84px + env(safe-area-inset-bottom));
+  }
+
+  /* ---- 見出し ---- */
+  header.top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 20px 2px 14px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 16px;
+  }
+  .wordmark {
+    font-size: var(--fs-lg);
+    font-weight: 700;
+    letter-spacing: .04em;
+    margin: 0;
+  }
+  .wordmark span { color: var(--accent); }
+  .today-stamp {
+    font-family: var(--mono);
+    font-size: var(--fs-xs);
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  h2.section {
+    font-size: var(--fs-xs);
+    font-family: var(--mono);
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 26px 2px 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2.section::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  /* ---- カード ---- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px;
+    box-shadow: var(--shadow);
+  }
+  .stack { display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row-tight { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .spread { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+
+  /* 左の色帯で、その項目が何ごとかを一目で伝える */
+  .item {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--ink-3);
+    border-radius: var(--radius);
+    padding: 11px 13px;
+  }
+  .item.is-alert { border-left-color: var(--alert); }
+  .item.is-warn { border-left-color: var(--warn); }
+  .item.is-accent { border-left-color: var(--accent); }
+  .item-head {
+    font-weight: 700;
+    font-size: var(--fs-base);
+    line-height: 1.5;
+    text-wrap: balance;
+  }
+  .item-fact {
+    white-space: pre-wrap;
+    color: var(--ink-2);
+    font-size: var(--fs-sm);
+    margin-top: 5px;
+  }
+  .options { margin: 9px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+  .options li {
+    font-size: var(--fs-sm);
+    color: var(--ink-2);
+    padding-left: 15px;
+    position: relative;
+  }
+  .options li::before {
+    content: "";
+    position: absolute;
+    left: 2px; top: .72em;
+    width: 6px; height: 1px;
+    background: var(--ink-3);
+  }
+
+  .decide-note {
+    font-size: var(--fs-sm);
+    color: var(--ink-2);
+    margin: 0 2px 14px;
+  }
+
+  /* ---- 部品 ---- */
+  .chip {
+    font: inherit;
+    font-size: var(--fs-sm);
+    background: var(--surface);
+    color: var(--ink-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 7px 13px;
+    cursor: pointer;
+    transition: background .12s ease, color .12s ease, border-color .12s ease;
+  }
+  .chip[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 500;
+  }
+  .chip:hover { border-color: var(--accent); }
+
+  .btn {
+    font: inherit;
+    font-weight: 500;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 10px 16px;
+    cursor: pointer;
+    min-height: 42px;
+  }
+  .btn.ghost { background: transparent; color: var(--ink-2); border-color: var(--line); }
+  .btn.ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.small { padding: 6px 11px; min-height: 0; font-size: var(--fs-sm); }
+  .btn.danger { background: transparent; color: var(--alert); border-color: var(--alert-soft); }
+
+  /* 時間記録の大きいボタン。夜、片手で押せる大きさにする */
+  .minutes {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 7px;
+  }
+  .minutes button {
+    font: inherit;
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: var(--fs-lg);
+    background: var(--surface-2);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 15px 0 12px;
+    cursor: pointer;
+    line-height: 1.1;
+  }
+  .minutes button small {
+    display: block;
+    font-family: var(--sans);
+    font-size: var(--fs-xs);
+    font-weight: 400;
+    color: var(--ink-3);
+  }
+  .minutes button:hover { border-color: var(--accent); color: var(--accent); }
+
+  label.field { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--ink-2); }
+  input, select, textarea {
+    font: inherit;
+    font-size: var(--fs-base);
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 9px 10px;
+    width: 100%;
+    min-height: 42px;
+  }
+  textarea { min-height: 66px; resize: vertical; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible,
+  button:focus-visible, a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+
+  /* ---- 数字 ---- */
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 11px 12px;
+  }
+  .kpi-label { font-size: var(--fs-xs); color: var(--ink-3); letter-spacing: .04em; }
+  .kpi-value { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--fs-xl); font-weight: 600; line-height: 1.3; }
+
+  .bar-row { display: flex; flex-direction: column; gap: 4px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+  .bar-row:last-child { border-bottom: 0; }
+  .bar-track { height: 9px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--accent); border-radius: 2px; }
+  .bar-fill.zero { background: var(--ink-3); }
+  .bar-meta { font-size: var(--fs-xs); color: var(--ink-3); }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: var(--fs-xs);
+    letter-spacing: .04em;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 1px 6px;
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+  .tag.accent { border-color: var(--accent); color: var(--accent); }
+  .tag.alert { border-color: var(--alert); color: var(--alert); background: var(--alert-soft); }
+  .tag.warn { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); }
+
+  .empty { color: var(--ink-3); font-size: var(--fs-sm); padding: 6px 2px; }
+
+  /* ---- 下のタブ。親指で届く位置に置く ---- */
+  nav.tabs {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 20;
+  }
+  .tabs-inner { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); }
+  .tabs button {
+    font: inherit;
+    font-size: var(--fs-sm);
+    background: none;
+    border: 0;
+    border-top: 2px solid transparent;
+    color: var(--ink-3);
+    padding: 11px 0 12px;
+    cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { color: var(--accent); border-top-color: var(--accent); font-weight: 700; }
+
+  dialog {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--ink);
+    padding: 0;
+    width: min(460px, calc(100vw - 28px));
+    box-shadow: var(--shadow);
+  }
+  dialog::backdrop { background: rgba(12, 16, 14, .45); }
+  .dialog-body { padding: 16px; display: flex; flex-direction: column; gap: 11px; }
+  .dialog-title { font-weight: 700; font-size: var(--fs-lg); margin: 0; }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(74px + env(safe-area-inset-bottom));
+    transform: translateX(-50%) translateY(8px);
+    background: var(--ink);
+    color: var(--ground);
+    font-size: var(--fs-sm);
+    padding: 9px 16px;
+    border-radius: 999px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease;
+    z-index: 40;
+    max-width: calc(100vw - 32px);
+    text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .hidden { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+<div class="shell">
+  <header class="top">
+    <h1 class="wordmark">AI<span>参謀</span></h1>
+    <span class="today-stamp" id="todayStamp"></span>
+  </header>
+
+  <!-- 最初の一度だけ出る。何もない状態から3本の柱を立てる -->
+  <section id="onboard" class="hidden">
+    <div class="card stack">
+      <div>
+        <h2 class="dialog-title">まず、試している柱を並べます</h2>
+        <p class="decide-note" style="margin:8px 0 0">
+          「いつまでに、いくら稼げなかったらやめるか」を先に決めておきます。決めないと、やめどきが来ません。
+          数字は今の実感で構いません。あとから直せます。
+        </p>
+      </div>
+      <div id="onboardRows" class="stack"></div>
+      <div class="row">
+        <button class="btn" id="onboardStart">この3本ではじめる</button>
+        <button class="btn ghost" id="onboardSkip">自分で入れる</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 今日 -->
+  <section id="view-today" class="hidden">
+    <p class="decide-note">決めるのはあなたです。ここには事実と、選べる手だけを置きます。</p>
+    <div id="briefItems" class="stack"></div>
+
+    <h2 class="section">時間を記録する</h2>
+    <div class="card stack">
+      <div>
+        <div class="kpi-label">どの柱に使ったか</div>
+        <div class="row" id="timePillars" style="margin-top:6px"></div>
+      </div>
+      <div>
+        <div class="kpi-label">何をしていたか</div>
+        <div class="row" id="timeCats" style="margin-top:6px"></div>
+      </div>
+      <div class="minutes">
+        <button data-min="15">15<small>分</small></button>
+        <button data-min="30">30<small>分</small></button>
+        <button data-min="60">60<small>分</small></button>
+        <button data-min="120">120<small>分</small></button>
+      </div>
+      <div class="row">
+        <button class="btn ghost small" id="timeOther">別の分数で入れる</button>
+        <button class="btn ghost small" id="timeYesterday" aria-pressed="false">昨日として記録</button>
+      </div>
+      <div id="timeToday" class="bar-meta"></div>
+    </div>
+
+    <h2 class="section">お金を記録する</h2>
+    <div class="row">
+      <button class="btn" id="moneyIn">入金を記録</button>
+      <button class="btn ghost" id="moneyOut">支出を記録</button>
+    </div>
+  </section>
+
+  <!-- 案件 -->
+  <section id="view-deals" class="hidden">
+    <div class="row" style="margin-bottom:12px">
+      <button class="btn" id="dealAdd">案件を足す</button>
+      <button class="btn ghost" id="dealToggleClosed">終わった案件も見る</button>
+    </div>
+    <div id="dealList" class="stack"></div>
+  </section>
+
+  <!-- 数字 -->
+  <section id="view-numbers" class="hidden">
+    <div class="row" style="margin-bottom:12px" id="rangeChips"></div>
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="kpi-label">使った時間</div>
+        <div class="kpi-value" id="kpiHours">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">粗利</div>
+        <div class="kpi-value" id="kpiProfit">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">未入金</div>
+        <div class="kpi-value" id="kpiUnpaid">—</div>
+      </div>
+    </div>
+
+    <h2 class="section">柱ごとの時給</h2>
+    <div class="card" id="hourlyBars"></div>
+    <p class="bar-meta" style="margin:8px 2px 0">
+      時間の記録がない柱は時給を出しません。0円と読み違えないためです。
+    </p>
+
+    <h2 class="section">気づいたこと</h2>
+    <div id="reviewItems" class="stack"></div>
+  </section>
+
+  <!-- 設定 -->
+  <section id="view-settings" class="hidden">
+    <h2 class="section">柱</h2>
+    <div id="pillarList" class="stack"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="pillarAdd">柱を足す</button>
+    </div>
+
+    <h2 class="section">自分の時間の値段</h2>
+    <div class="card stack">
+      <label class="field">
+        これを下回る柱は「数字」で指摘されます（円/時）
+        <input type="number" id="minHourly" min="0" step="100" inputmode="numeric">
+      </label>
+      <p class="bar-meta" style="margin:0">決めておかないと、安い仕事で埋まります。</p>
+    </div>
+
+    <h2 class="section">記録の持ち出し</h2>
+    <div class="card stack">
+      <p class="bar-meta" style="margin:0">
+        記録はこの端末のブラウザにだけ残ります。別の端末へ移すときや、控えを取るときは書き出してください。
+        書き出したファイルは、パソコン版（CLI）の <span class="num">data/sanbo.json</span> としてそのまま使えます。
+      </p>
+      <div class="row">
+        <button class="btn ghost" id="exportBtn">記録を書き出す</button>
+        <button class="btn ghost" id="importBtn">記録を読み込む</button>
+      </div>
+      <div id="exportArea" class="hidden stack">
+        <textarea id="exportText" readonly rows="6" class="num" style="font-size:var(--fs-xs)"></textarea>
+        <button class="btn ghost small" id="copyExport">この文字をコピー</button>
+      </div>
+      <div id="importArea" class="hidden stack">
+        <textarea id="importText" rows="6" placeholder="書き出した中身をここに貼る" class="num" style="font-size:var(--fs-xs)"></textarea>
+        <button class="btn small" id="doImport">読み込む（今の記録は置き換わります）</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<nav class="tabs">
+  <div class="tabs-inner" role="tablist">
+    <button role="tab" data-view="today" aria-selected="true">今日</button>
+    <button role="tab" data-view="deals" aria-selected="false">案件</button>
+    <button role="tab" data-view="numbers" aria-selected="false">数字</button>
+    <button role="tab" data-view="settings" aria-selected="false">設定</button>
+  </div>
+</nav>
+
+<dialog id="modal">
+  <form method="dialog" class="dialog-body" id="modalForm">
+    <h2 class="dialog-title" id="modalTitle"></h2>
+    <div id="modalFields" class="stack"></div>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn ghost" value="cancel" type="submit" formnovalidate>やめる</button>
+      <button class="btn" value="ok" type="submit">決定</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ============ 保存 ============ */
+  const KEY = 'sanbo.v1';
+  const empty = () => ({ pillars: [], deals: [], timeEntries: [], moneyEntries: [], settings: { minHourly: 3000 } });
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return empty();
+      const parsed = JSON.parse(raw);
+      return { ...empty(), ...parsed, settings: { ...empty().settings, ...(parsed.settings || {}) } };
+    } catch (e) {
+      return empty();
+    }
+  }
+
+  let db = load();
+  let storageWarned = false;
+
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(db));
+    } catch (e) {
+      // プライベートウィンドウなど、保存できない環境がある。黙って消えるより伝える。
+      if (!storageWarned) {
+        storageWarned = true;
+        toast('この画面では記録を保存できません。設定から書き出して控えてください。');
+      }
+    }
+  }
+
+  const uid = () =>
+    (crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Math.random().toString(36).slice(2) + Date.now();
+
+  /* ============ 日付とお金 ============ */
+  const pad = (n) => String(n).padStart(2, '0');
+  const todayIso = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  function shiftIso(iso, days) {
+    const [y, m, d] = iso.split('-').map(Number);
+    const t = new Date(y, m - 1, d + days);
+    return todayIso(t);
+  }
+
+  function daysBetween(from, to) {
+    const toDate = (iso) => { const [y, m, d] = iso.split('-').map(Number); return Date.UTC(y, m - 1, d); };
+    return Math.round((toDate(to) - toDate(from)) / 86400000);
+  }
+
+  const inRange = (iso, from, to) => (!from || iso >= from) && (!to || iso <= to);
+
+  function formatYen(yen) {
+    if (!yen) return '0円';
+    const man = yen / 10000;
+    if (Math.abs(man) >= 10) return Math.round(man).toLocaleString('ja-JP') + '万円';
+    return (Math.round(man * 10) / 10) + '万円';
+  }
+  const formatHours = (h) => (Math.round(h * 10) / 10) + '時間';
+  const formatHourly = (y) => y === null ? '—' : Math.round(y).toLocaleString('ja-JP') + '円/時';
+
+  function parseYen(input) {
+    const v = String(input || '').trim().replace(/[,，\s円]/g, '');
+    const man = v.match(/^(\d+(?:\.\d+)?)万$/);
+    if (man) return Math.round(Number(man[1]) * 10000);
+    if (/^\d+(?:\.\d+)?$/.test(v)) return Math.round(Number(v));
+    return null;
+  }
+
+  /* ============ 決まりごと（CLI版と同じ） ============ */
+  const STAGES = ['inquiry', 'talking', 'quoted', 'won', 'delivering', 'invoiced', 'paid', 'lost'];
+  const STAGE_LABELS = {
+    inquiry: '引き合い', talking: 'やり取り中', quoted: '見積提出済', won: '受注',
+    delivering: '作業中', invoiced: '請求済', paid: '入金済', lost: '失注'
+  };
+  const OPEN_STAGES = ['inquiry', 'talking', 'quoted', 'won', 'delivering', 'invoiced'];
+  const STALL_DAYS = { inquiry: 2, talking: 4, quoted: 5, won: 7, delivering: 7, invoiced: 14, paid: Infinity, lost: Infinity };
+  const WIN_PROB = { inquiry: .1, talking: .3, quoted: .5, won: 1, delivering: 1, invoiced: 1, paid: 1, lost: 0 };
+  const KIND_LABELS = { service: '受注仕事', content: '発信', contract: '受託・代行', other: 'その他' };
+  const CATEGORIES = [
+    { key: 'delivery', label: '実作業' }, { key: 'sales', label: '営業' }, { key: 'content', label: '発信' },
+    { key: 'admin', label: '事務' }, { key: 'learning', label: '学習' }
+  ];
+  const REVENUE_FACING = ['sales', 'delivery', 'content'];
+
+  const isOpen = (deal) => OPEN_STAGES.includes(deal.stage);
+  const pillarOf = (id) => db.pillars.find((p) => p.id === id);
+  const dealOf = (id) => db.deals.find((d) => d.id === id);
+
+  function receivedYen(deal) {
+    return db.moneyEntries
+      .filter((m) => m.dealId === deal.id && m.kind === 'income')
+      .reduce((s, m) => s + m.amountYen, 0);
+  }
+
+  // 段階だけで判定すると、入金を記録して段階を進め忘れた案件が永遠に未入金になる
+  function unpaidYen(deal) {
+    if (deal.stage !== 'invoiced') return 0;
+    const rest = (deal.amountYen || 0) - receivedYen(deal);
+    return rest > 0 ? rest : 0;
+  }
+
+  function checkStall(deal, today) {
+    const idle = daysBetween(deal.lastTouchedOn, today);
+    const limit = STALL_DAYS[deal.stage];
+    return { stalled: isOpen(deal) && idle > limit, idle, limit };
+  }
+
+  function summarize(pillar, from, to) {
+    const deals = db.deals.filter((d) => d.pillarId === pillar.id);
+    const minutes = db.timeEntries
+      .filter((t) => t.pillarId === pillar.id && inRange(t.date, from, to))
+      .reduce((s, t) => s + t.minutes, 0);
+    const money = db.moneyEntries.filter((m) => m.pillarId === pillar.id && inRange(m.date, from, to));
+    const hours = minutes / 60;
+    const income = money.filter((m) => m.kind === 'income').reduce((s, m) => s + m.amountYen, 0);
+    const expense = money.filter((m) => m.kind === 'expense').reduce((s, m) => s + m.amountYen, 0);
+    const profit = income - expense;
+    const open = deals.filter(isOpen);
+    return {
+      pillar, hours, income, expense, profit,
+      hourly: hours > 0 ? profit / hours : null,
+      openCount: open.length,
+      pipeline: Math.round(open.reduce((s, d) => s + ((d.amountYen || 0) - (d.costYen || 0)) * WIN_PROB[d.stage], 0)),
+      unpaid: deals.reduce((s, d) => s + unpaidYen(d), 0)
+    };
+  }
+
+  function rankByHourly(list) {
+    return [...list].sort((a, b) => {
+      if (a.hourly === null && b.hourly === null) return 0;
+      if (a.hourly === null) return 1;
+      if (b.hourly === null) return -1;
+      return b.hourly - a.hourly;
+    });
+  }
+
+  const isReviewDue = (p, today) => p.status !== 'dropped' && p.reviewOn && p.reviewOn <= today;
+
+  /* ============ 朝の材料 ============ */
+  function describeDeal(deal) {
+    const p = pillarOf(deal.pillarId);
+    const amount = deal.amountYen == null ? '金額未定' : formatYen(deal.amountYen);
+    return `${deal.title}（${deal.clientName || '相手未記入'}／${p ? p.name : '柱未設定'}／${STAGE_LABELS[deal.stage]}／${amount}）`;
+  }
+
+  function buildBrief() {
+    const today = todayIso();
+    const open = db.deals.filter(isOpen);
+    const overdue = open.filter((d) => d.nextActionOn && d.nextActionOn < today);
+    const dueToday = open.filter((d) => d.nextActionOn === today);
+    const stalled = open
+      .filter((d) => !overdue.includes(d) && !dueToday.includes(d))
+      .map((d) => ({ deal: d, stall: checkStall(d, today) }))
+      .filter((x) => x.stall.stalled)
+      .sort((a, b) => b.stall.idle - a.stall.idle);
+    const unpaid = db.deals.map((d) => ({ deal: d, rest: unpaidYen(d) })).filter((x) => x.rest > 0);
+    const settled = db.deals.filter((d) => d.stage === 'invoiced' && unpaidYen(d) === 0);
+    const reviewDue = db.pillars.filter((p) => isReviewDue(p, today));
+    const items = [];
+
+    if (overdue.length) items.push({
+      tone: 'alert',
+      headline: `期限を過ぎた次アクション ${overdue.length}件`,
+      fact: overdue.map((d) => `・${describeDeal(d)}\n  期限${d.nextActionOn}／${d.nextAction || '次アクション未記入'}`).join('\n'),
+      options: ['今日やる（案件の「動かした」で期限を引き直す）', '期限を先に延ばす', '落とす（失注にする）']
+    });
+
+    if (dueToday.length) items.push({
+      tone: 'accent',
+      headline: `今日が期限の次アクション ${dueToday.length}件`,
+      fact: dueToday.map((d) => `・${describeDeal(d)}\n  ${d.nextAction || '次アクション未記入'}`).join('\n'),
+      options: ['先にこれを片付ける', '午後に回す（時間を確保しておく）']
+    });
+
+    if (stalled.length) items.push({
+      tone: 'warn',
+      headline: `連絡が途切れている案件 ${stalled.length}件`,
+      fact: stalled.slice(0, 5).map(({ deal, stall }) =>
+        `・${describeDeal(deal)}\n  ${stall.idle}日動いていない（この段階の目安は${stall.limit}日）`).join('\n'),
+      options: ['一言だけ連絡を入れる', '見込みなしとして閉じる']
+    });
+
+    if (unpaid.length) items.push({
+      tone: 'warn',
+      headline: `請求済みで未入金 ${unpaid.length}件（${formatYen(unpaid.reduce((s, x) => s + x.rest, 0))}）`,
+      fact: unpaid.map(({ deal, rest }) => `・${describeDeal(deal)}／残り${formatYen(rest)}`).join('\n'),
+      options: ['入金を確認して記録する', '入金予定日を相手に確認する']
+    });
+
+    if (settled.length) items.push({
+      tone: 'accent',
+      headline: `入金は済んでいるが請求済みのままの案件 ${settled.length}件`,
+      fact: settled.map((d) => `・${describeDeal(d)}`).join('\n'),
+      options: ['段階を「入金済」に進めて閉じる', '一部入金なら金額を直す']
+    });
+
+    if (reviewDue.length) items.push({
+      tone: 'alert',
+      headline: `見直し日が来た柱 ${reviewDue.length}本`,
+      fact: reviewDue.map((p) => {
+        const s = summarize(p, shiftIso(today, -30), today);
+        const target = p.targetMonthlyProfitYen ? `基準${formatYen(p.targetMonthlyProfitYen)}` : '基準未設定';
+        return `・${p.name}／直近30日の粗利${formatYen(s.profit)}（${target}）`;
+      }).join('\n'),
+      options: ['続ける（次の判断日を置く）', '主力にする', 'やめる']
+    });
+
+    if (!items.length) items.push({
+      tone: '',
+      headline: '期限も放置案件もありません',
+      fact: `進行中の案件は${open.length}件です。`,
+      options: ['前に進める仕事に時間を使う（営業・発信）', '数字を見る']
+    });
+
+    return items;
+  }
+
+  /* ============ 週の気づき ============ */
+  function buildReview(days) {
+    const to = todayIso();
+    const from = shiftIso(to, -(days - 1));
+    const summaries = rankByHourly(
+      db.pillars.filter((p) => p.status !== 'dropped').map((p) => summarize(p, from, to))
+    );
+    const withHourly = summaries.filter((s) => s.hourly !== null);
+    const items = [];
+
+    if (withHourly.length >= 2) {
+      const best = withHourly[0];
+      const worst = withHourly[withHourly.length - 1];
+      items.push({
+        tone: 'accent',
+        headline: '時間あたりで見ると差が出ています',
+        fact: `一番高い: ${best.pillar.name} ${formatHourly(best.hourly)}\n一番低い: ${worst.pillar.name} ${formatHourly(worst.hourly)}`,
+        options: [
+          `${best.pillar.name}に来週の時間を寄せる`,
+          `${worst.pillar.name}の単価か進め方を変える`,
+          `${worst.pillar.name}を止めて時間を空ける`,
+          '判断材料が足りないので、もう1週分ためる'
+        ]
+      });
+    }
+
+    const bleeding = summaries.filter((s) => s.hours >= 5 && s.profit <= 0);
+    if (bleeding.length) items.push({
+      tone: 'alert',
+      headline: `時間を使ったのに粗利が出ていない柱 ${bleeding.length}本`,
+      fact: bleeding.map((s) => `・${s.pillar.name}／${formatHours(s.hours)}使って粗利 ${formatYen(s.profit)}`).join('\n'),
+      options: ['仕込み期間だと割り切って、いつまで続けるかを決める', '無料の作業が混ざっていないか記録を見る', '止める']
+    });
+
+    const min = db.settings.minHourly || 0;
+    const below = withHourly.filter((s) => s.hourly > 0 && s.hourly < min);
+    if (below.length) items.push({
+      tone: 'warn',
+      headline: `決めた時給（${min.toLocaleString('ja-JP')}円/時）を下回っている柱`,
+      fact: below.map((s) => `・${s.pillar.name}／${formatHourly(s.hourly)}`).join('\n'),
+      options: ['単価を上げる', '作業時間を削る（外注・手順の見直し）', '受ける案件を選ぶ']
+    });
+
+    const missed = summaries.filter((s) => s.pillar.targetMonthlyProfitYen != null && s.profit < s.pillar.targetMonthlyProfitYen);
+    if (missed.length) items.push({
+      tone: 'warn',
+      headline: `自分で決めた基準に届いていない柱 ${missed.length}本`,
+      fact: missed.map((s) => `・${s.pillar.name}／粗利 ${formatYen(s.profit)}（基準 ${formatYen(s.pillar.targetMonthlyProfitYen)}）`).join('\n'),
+      options: ['基準が高すぎたので直す', '打ち手を変えてもう一度試す', '基準どおり撤退する']
+    });
+
+    const weekTime = db.timeEntries.filter((t) => inRange(t.date, from, to));
+    const byCat = {};
+    weekTime.forEach((t) => { byCat[t.category] = (byCat[t.category] || 0) + t.minutes; });
+    const allMin = Object.values(byCat).reduce((s, v) => s + v, 0);
+    if (allMin > 0) {
+      const revMin = REVENUE_FACING.reduce((s, k) => s + (byCat[k] || 0), 0);
+      const ratio = Math.round((revMin / allMin) * 100);
+      items.push({
+        tone: '',
+        headline: `お金につながる時間は全体の${ratio}%`,
+        fact: Object.entries(byCat).sort((a, b) => b[1] - a[1])
+          .map(([k, v]) => `・${(CATEGORIES.find((c) => c.key === k) || {}).label || k} ${formatHours(v / 60)}`).join('\n'),
+        options: ratio < 50
+          ? ['事務・学習を減らす日を決める', '事務をまとめて片付ける日を作る', '今はこれでよいと決める']
+          : ['この配分を来週も保つ', '実作業に寄りすぎていないか、営業の時間を確保する']
+      });
+    }
+
+    if (!items.length) items.push({
+      tone: '',
+      headline: 'まだ判断できるだけの記録がありません',
+      fact: '時間とお金の記録が足りません。',
+      options: ['1日の終わりに、使った時間を1回だけ押す', '入金と支出が出たら記録する']
+    });
+
+    return { from, to, summaries, items };
+  }
+
+  /* ============ 画面 ============ */
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+  let toastTimer;
+  function toast(message) {
+    const node = $('toast');
+    node.textContent = message;
+    node.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => node.classList.remove('show'), 2600);
+  }
+
+  const modal = $('modal');
+  function openModal(title, fields) {
+    return new Promise((resolve) => {
+      $('modalTitle').textContent = title;
+      const box = $('modalFields');
+      box.innerHTML = fields.map((f) => {
+        const common = `name="${esc(f.key)}" id="f_${esc(f.key)}"${f.required ? ' required' : ''}`;
+        let control;
+        if (f.type === 'select') {
+          control = `<select ${common}>${f.options.map((o) =>
+            `<option value="${esc(o.value)}"${o.value === f.value ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`;
+        } else if (f.type === 'textarea') {
+          control = `<textarea ${common} placeholder="${esc(f.placeholder || '')}">${esc(f.value || '')}</textarea>`;
+        } else {
+          const mode = f.type === 'number' ? ' inputmode="numeric"' : '';
+          control = `<input type="${f.type || 'text'}" ${common}${mode} value="${esc(f.value == null ? '' : f.value)}" placeholder="${esc(f.placeholder || '')}">`;
+        }
+        return `<label class="field" for="f_${esc(f.key)}">${esc(f.label)}${control}</label>`;
+      }).join('');
+
+      const onClose = () => {
+        modal.removeEventListener('close', onClose);
+        if (modal.returnValue !== 'ok') { resolve(null); return; }
+        const out = {};
+        fields.forEach((f) => { out[f.key] = box.querySelector(`[name="${f.key}"]`).value.trim(); });
+        resolve(out);
+      };
+      modal.addEventListener('close', onClose);
+      modal.returnValue = '';
+      modal.showModal();
+    });
+  }
+
+  function itemHtml(item) {
+    return `<div class="item ${item.tone ? 'is-' + item.tone : ''}">
+      <div class="item-head">${esc(item.headline)}</div>
+      <div class="item-fact">${esc(item.fact)}</div>
+      <ul class="options">${item.options.map((o) => `<li>${esc(o)}</li>`).join('')}</ul>
+    </div>`;
+  }
+
+  const pillarOptions = () => db.pillars.filter((p) => p.status !== 'dropped');
+
+  /* ---- 今日 ---- */
+  let timePillarId = null;
+  let timeCategory = 'delivery';
+  let timeIsYesterday = false;
+
+  function renderToday() {
+    $('briefItems').innerHTML = buildBrief().map(itemHtml).join('');
+
+    const actives = pillarOptions();
+    if (!actives.find((p) => p.id === timePillarId)) timePillarId = actives.length ? actives[0].id : null;
+
+    $('timePillars').innerHTML = actives.length
+      ? actives.map((p) => `<button class="chip" data-pillar="${esc(p.id)}" aria-pressed="${p.id === timePillarId}">${esc(p.name)}</button>`).join('')
+      : '<span class="empty">設定から柱を足すと、ここに出ます。</span>';
+
+    $('timeCats').innerHTML = CATEGORIES.map((c) =>
+      `<button class="chip" data-cat="${c.key}" aria-pressed="${c.key === timeCategory}">${c.label}</button>`).join('');
+
+    const today = todayIso();
+    const mins = db.timeEntries.filter((t) => t.date === today).reduce((s, t) => s + t.minutes, 0);
+    $('timeToday').textContent = mins > 0
+      ? `今日はここまで ${formatHours(mins / 60)} 記録しています。`
+      : 'まだ今日の記録はありません。';
+  }
+
+  function addTime(minutes) {
+    if (!timePillarId) { toast('先に柱を足してください（設定）'); return; }
+    db.timeEntries.push({
+      id: uid(), pillarId: timePillarId, dealId: null,
+      date: timeIsYesterday ? shiftIso(todayIso(), -1) : todayIso(),
+      minutes, category: timeCategory, note: '', createdAt: new Date().toISOString()
+    });
+    save();
+    const label = (CATEGORIES.find((c) => c.key === timeCategory) || {}).label;
+    toast(`${timeIsYesterday ? '昨日' : '今日'}／${label} ${minutes}分を記録しました`);
+    renderToday();
+  }
+
+  /* ---- 案件 ---- */
+  let showClosedDeals = false;
+
+  function renderDeals() {
+    const today = todayIso();
+    const list = showClosedDeals ? db.deals : db.deals.filter(isOpen);
+    $('dealToggleClosed').textContent = showClosedDeals ? '進行中だけ見る' : '終わった案件も見る';
+
+    if (!list.length) {
+      $('dealList').innerHTML = '<p class="empty">案件がありません。「案件を足す」から入れてください。</p>';
+      return;
+    }
+
+    $('dealList').innerHTML = list
+      .slice()
+      .sort((a, b) => (a.nextActionOn || '9999').localeCompare(b.nextActionOn || '9999'))
+      .map((d) => {
+        const p = pillarOf(d.pillarId);
+        const stall = checkStall(d, today);
+        const overdue = isOpen(d) && d.nextActionOn && d.nextActionOn < today;
+        const tone = overdue ? 'alert' : stall.stalled ? 'warn' : isOpen(d) ? 'accent' : '';
+        const tags = [
+          `<span class="tag">${STAGE_LABELS[d.stage]}</span>`,
+          `<span class="tag num">${d.amountYen == null ? '金額未定' : formatYen(d.amountYen)}</span>`,
+          d.nextActionOn ? `<span class="tag num ${overdue ? 'alert' : ''}">期限 ${d.nextActionOn}</span>` : '',
+          stall.stalled ? `<span class="tag warn num">${stall.idle}日放置</span>` : ''
+        ].join('');
+        const nextIdx = STAGES.indexOf(d.stage);
+        const canAdvance = nextIdx >= 0 && nextIdx < 6;
+        return `<div class="item ${tone ? 'is-' + tone : ''}">
+          <div class="spread">
+            <div class="item-head">${esc(d.title)}</div>
+          </div>
+          <div class="item-fact">${esc(d.clientName || '相手未記入')}／${esc(p ? p.name : '柱未設定')}
+${esc(d.nextAction ? '次: ' + d.nextAction : '次アクション未記入')}</div>
+          <div class="row-tight" style="margin-top:8px">${tags}</div>
+          <div class="row" style="margin-top:10px">
+            ${canAdvance ? `<button class="btn small" data-action="advance" data-id="${esc(d.id)}">${STAGE_LABELS[STAGES[nextIdx + 1]]}へ進める</button>` : ''}
+            <button class="btn ghost small" data-action="touch" data-id="${esc(d.id)}">動かした</button>
+            <button class="btn ghost small" data-action="edit" data-id="${esc(d.id)}">直す</button>
+            ${isOpen(d) ? `<button class="btn danger small" data-action="lose" data-id="${esc(d.id)}">失注</button>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+  }
+
+  async function dealForm(existing) {
+    const actives = pillarOptions();
+    if (!actives.length) { toast('先に柱を足してください（設定）'); return; }
+    const values = await openModal(existing ? '案件を直す' : '案件を足す', [
+      { key: 'title', label: '案件名', value: existing ? existing.title : '', required: true },
+      { key: 'clientName', label: '相手', value: existing ? existing.clientName : '' },
+      { key: 'pillarId', label: 'どの柱か', type: 'select', value: existing ? existing.pillarId : actives[0].id,
+        options: actives.map((p) => ({ value: p.id, label: p.name })) },
+      { key: 'amount', label: '金額（30万 / 300000。未定なら空欄）', value: existing && existing.amountYen != null ? String(existing.amountYen) : '' },
+      { key: 'cost', label: '直接かかる費用（処分費・外注など）', value: existing ? String(existing.costYen || '') : '' },
+      { key: 'nextAction', label: '次にやること', value: existing ? existing.nextAction : '' },
+      { key: 'nextActionOn', label: 'その期限', type: 'date', value: existing ? (existing.nextActionOn || '') : '' }
+    ]);
+    if (!values) return;
+
+    const amountYen = values.amount ? parseYen(values.amount) : null;
+    if (values.amount && amountYen === null) { toast('金額が読めませんでした（例: 30万）'); return; }
+    const costYen = values.cost ? parseYen(values.cost) : 0;
+    if (values.cost && costYen === null) { toast('費用が読めませんでした（例: 5万）'); return; }
+
+    if (existing) {
+      Object.assign(existing, {
+        title: values.title, clientName: values.clientName, pillarId: values.pillarId,
+        amountYen, costYen: costYen || 0, nextAction: values.nextAction,
+        nextActionOn: values.nextActionOn || null,
+        lastTouchedOn: todayIso(), updatedAt: new Date().toISOString()
+      });
+      toast('直しました');
+    } else {
+      db.deals.push({
+        id: uid(), pillarId: values.pillarId, title: values.title, clientName: values.clientName,
+        contact: '', stage: 'inquiry', amountYen, costYen: costYen || 0,
+        nextAction: values.nextAction, nextActionOn: values.nextActionOn || null,
+        lastTouchedOn: todayIso(), memo: '',
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      });
+      toast(values.nextActionOn ? '案件を足しました' : '案件を足しました（期限を入れると朝に出ます）');
+    }
+    save();
+    renderDeals();
+  }
+
+  /* ---- 数字 ---- */
+  let rangeDays = 7;
+  const RANGES = [{ days: 7, label: '直近7日' }, { days: 30, label: '直近30日' }, { days: 90, label: '直近90日' }];
+
+  function renderNumbers() {
+    $('rangeChips').innerHTML = RANGES.map((r) =>
+      `<button class="chip" data-range="${r.days}" aria-pressed="${r.days === rangeDays}">${r.label}</button>`).join('');
+
+    const review = buildReview(rangeDays);
+    const totals = review.summaries.reduce((acc, s) => ({
+      hours: acc.hours + s.hours, profit: acc.profit + s.profit, unpaid: acc.unpaid + s.unpaid
+    }), { hours: 0, profit: 0, unpaid: 0 });
+
+    $('kpiHours').textContent = formatHours(totals.hours);
+    $('kpiProfit').textContent = formatYen(totals.profit);
+    $('kpiUnpaid').textContent = formatYen(totals.unpaid);
+
+    if (!review.summaries.length) {
+      $('hourlyBars').innerHTML = '<p class="empty">柱がありません。設定から足してください。</p>';
+    } else {
+      const max = Math.max(1, ...review.summaries.map((s) => s.hourly || 0));
+      $('hourlyBars').innerHTML = review.summaries.map((s) => {
+        const width = s.hourly && s.hourly > 0 ? Math.max(2, (s.hourly / max) * 100) : 0;
+        return `<div class="bar-row">
+          <div class="spread">
+            <strong>${esc(s.pillar.name)}</strong>
+            <span class="num" style="font-weight:600">${formatHourly(s.hourly)}</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill${s.hourly && s.hourly > 0 ? '' : ' zero'}" style="width:${width}%"></div></div>
+          <div class="bar-meta num">${formatHours(s.hours)}／粗利 ${formatYen(s.profit)}／進行中 ${s.openCount}件（期待値 ${formatYen(s.pipeline)}）</div>
+        </div>`;
+      }).join('');
+    }
+
+    $('reviewItems').innerHTML = review.items.map(itemHtml).join('');
+  }
+
+  /* ---- 設定 ---- */
+  function renderSettings() {
+    const today = todayIso();
+    $('pillarList').innerHTML = db.pillars.length
+      ? db.pillars.map((p) => {
+          const s = summarize(p, shiftIso(today, -30), today);
+          const due = isReviewDue(p, today);
+          return `<div class="item ${due ? 'is-alert' : p.status === 'dropped' ? '' : 'is-accent'}">
+            <div class="spread">
+              <div class="item-head">${esc(p.name)}</div>
+              <span class="tag">${KIND_LABELS[p.kind] || p.kind}</span>
+            </div>
+            <div class="item-fact num">直近30日 粗利 ${formatYen(s.profit)}／${formatHourly(s.hourly)}
+状態 ${esc(p.status)}／見直し ${p.reviewOn ? esc(p.reviewOn) + (due ? '（期限）' : '') : 'なし'}／基準 ${p.targetMonthlyProfitYen ? formatYen(p.targetMonthlyProfitYen) : 'なし'}</div>
+            <div class="row" style="margin-top:10px">
+              <button class="btn ghost small" data-paction="edit" data-id="${esc(p.id)}">直す</button>
+              ${p.status !== 'active' ? `<button class="btn ghost small" data-paction="active" data-id="${esc(p.id)}">主力にする</button>` : ''}
+              ${p.status !== 'dropped' ? `<button class="btn danger small" data-paction="drop" data-id="${esc(p.id)}">やめる</button>` : `<button class="btn ghost small" data-paction="revive" data-id="${esc(p.id)}">戻す</button>`}
+            </div>
+          </div>`;
+        }).join('')
+      : '<p class="empty">柱がありません。</p>';
+
+    $('minHourly').value = db.settings.minHourly;
+  }
+
+  async function pillarForm(existing) {
+    const values = await openModal(existing ? '柱を直す' : '柱を足す', [
+      { key: 'name', label: '柱の名前', value: existing ? existing.name : '', required: true, placeholder: '例: 解体の個人受注' },
+      { key: 'kind', label: '種類', type: 'select', value: existing ? existing.kind : 'service',
+        options: Object.entries(KIND_LABELS).map(([value, label]) => ({ value, label })) },
+      { key: 'target', label: '撤退基準（月の粗利。例: 30万）', value: existing && existing.targetMonthlyProfitYen ? String(existing.targetMonthlyProfitYen) : '' },
+      { key: 'reviewOn', label: '見直し日', type: 'date', value: existing ? (existing.reviewOn || '') : shiftIso(todayIso(), 30) }
+    ]);
+    if (!values) return;
+
+    const target = values.target ? parseYen(values.target) : null;
+    if (values.target && target === null) { toast('基準の金額が読めませんでした（例: 30万）'); return; }
+
+    if (existing) {
+      Object.assign(existing, {
+        name: values.name, kind: values.kind, targetMonthlyProfitYen: target,
+        reviewOn: values.reviewOn || null, updatedAt: new Date().toISOString()
+      });
+      toast('直しました');
+    } else {
+      db.pillars.push({
+        id: uid(), name: values.name, kind: values.kind, status: 'testing',
+        startedOn: todayIso(), reviewOn: values.reviewOn || null,
+        targetMonthlyProfitYen: target, note: '',
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      });
+      toast(values.reviewOn ? '柱を足しました' : '柱を足しました（見直し日を入れると判断を促します）');
+    }
+    save();
+    renderSettings();
+    renderToday();
+  }
+
+  /* ---- お金 ---- */
+  async function moneyForm(kind) {
+    const actives = pillarOptions();
+    if (!actives.length) { toast('先に柱を足してください（設定）'); return; }
+    const openDeals = db.deals.filter(isOpen);
+    const values = await openModal(kind === 'income' ? '入金を記録' : '支出を記録', [
+      { key: 'amount', label: '金額（30万 / 300000）', value: '', required: true },
+      { key: 'dealId', label: '案件（あれば）', type: 'select', value: '',
+        options: [{ value: '', label: '案件なし' }].concat(openDeals.map((d) => ({ value: d.id, label: d.title }))) },
+      { key: 'pillarId', label: '柱（案件を選んだときはそちらが優先）', type: 'select', value: actives[0].id,
+        options: actives.map((p) => ({ value: p.id, label: p.name })) },
+      { key: 'label', label: '内訳', value: '', placeholder: kind === 'income' ? '例: 解体一式' : '例: 処分費と回送' },
+      { key: 'date', label: '日付', type: 'date', value: todayIso() }
+    ]);
+    if (!values) return;
+
+    const amountYen = parseYen(values.amount);
+    if (amountYen === null || amountYen <= 0) { toast('金額が読めませんでした（例: 30万）'); return; }
+
+    const deal = values.dealId ? dealOf(values.dealId) : null;
+    db.moneyEntries.push({
+      id: uid(),
+      pillarId: deal ? deal.pillarId : values.pillarId,
+      dealId: deal ? deal.id : null,
+      date: values.date || todayIso(),
+      kind, amountYen, label: values.label, createdAt: new Date().toISOString()
+    });
+    save();
+    toast(`${kind === 'income' ? '入金' : '支出'} ${formatYen(amountYen)} を記録しました`);
+    renderToday();
+  }
+
+  /* ---- 最初の3本 ---- */
+  const PRESETS = [
+    { name: '解体の個人受注', kind: 'service', target: '30万', days: 30 },
+    { name: '発信', kind: 'content', target: '5万', days: 60 },
+    { name: 'AI活用の受託', kind: 'contract', target: '20万', days: 30 }
+  ];
+
+  function renderOnboard() {
+    $('onboardRows').innerHTML = PRESETS.map((p, i) => `
+      <div class="card stack" style="box-shadow:none">
+        <label class="field">柱の名前
+          <input type="text" data-ob="name" data-i="${i}" value="${esc(p.name)}">
+        </label>
+        <div class="grid-2">
+          <label class="field">この額を下回ったらやめる
+            <input type="text" data-ob="target" data-i="${i}" value="${esc(p.target)}" inputmode="numeric">
+          </label>
+          <label class="field">判断する日
+            <input type="date" data-ob="review" data-i="${i}" value="${shiftIso(todayIso(), p.days)}">
+          </label>
+        </div>
+      </div>`).join('');
+  }
+
+  function startFromPresets() {
+    const rows = PRESETS.map((preset, i) => {
+      const get = (k) => document.querySelector(`[data-ob="${k}"][data-i="${i}"]`).value.trim();
+      return { name: get('name') || preset.name, kind: preset.kind, target: get('target'), review: get('review') };
+    });
+    const now = new Date().toISOString();
+    rows.forEach((row) => {
+      db.pillars.push({
+        id: uid(), name: row.name, kind: row.kind, status: 'testing',
+        startedOn: todayIso(), reviewOn: row.review || null,
+        targetMonthlyProfitYen: row.target ? parseYen(row.target) : null,
+        note: '', createdAt: now, updatedAt: now
+      });
+    });
+    save();
+    $('onboard').classList.add('hidden');
+    show('today');
+    toast('3本立てました。今夜、使った時間を1回押してください。');
+  }
+
+  /* ============ 画面の切り替えと操作 ============ */
+  const VIEWS = ['today', 'deals', 'numbers', 'settings'];
+  let currentView = 'today';
+
+  function show(view) {
+    currentView = view;
+    VIEWS.forEach((v) => $('view-' + v).classList.toggle('hidden', v !== view));
+    document.querySelectorAll('.tabs button').forEach((b) =>
+      b.setAttribute('aria-selected', String(b.dataset.view === view)));
+    if (view === 'today') renderToday();
+    if (view === 'deals') renderDeals();
+    if (view === 'numbers') renderNumbers();
+    if (view === 'settings') renderSettings();
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  document.querySelector('.tabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-view]');
+    if (btn) show(btn.dataset.view);
+  });
+
+  $('timePillars').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-pillar]');
+    if (!btn) return;
+    timePillarId = btn.dataset.pillar;
+    renderToday();
+  });
+
+  $('timeCats').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-cat]');
+    if (!btn) return;
+    timeCategory = btn.dataset.cat;
+    renderToday();
+  });
+
+  document.querySelector('.minutes').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-min]');
+    if (btn) addTime(Number(btn.dataset.min));
+  });
+
+  $('timeOther').addEventListener('click', async () => {
+    const values = await openModal('時間を記録', [
+      { key: 'minutes', label: '何分', type: 'number', value: '45', required: true },
+      { key: 'note', label: 'ひとこと（あとで見返す用）', value: '' }
+    ]);
+    if (!values) return;
+    const minutes = Number(values.minutes);
+    if (!Number.isFinite(minutes) || minutes <= 0) { toast('分数が読めませんでした'); return; }
+    if (!timePillarId) { toast('先に柱を足してください（設定）'); return; }
+    db.timeEntries.push({
+      id: uid(), pillarId: timePillarId, dealId: null,
+      date: timeIsYesterday ? shiftIso(todayIso(), -1) : todayIso(),
+      minutes: Math.round(minutes), category: timeCategory, note: values.note,
+      createdAt: new Date().toISOString()
+    });
+    save();
+    toast(`${Math.round(minutes)}分を記録しました`);
+    renderToday();
+  });
+
+  $('timeYesterday').addEventListener('click', (e) => {
+    timeIsYesterday = !timeIsYesterday;
+    e.currentTarget.setAttribute('aria-pressed', String(timeIsYesterday));
+    e.currentTarget.textContent = timeIsYesterday ? '昨日として記録中' : '昨日として記録';
+  });
+
+  $('moneyIn').addEventListener('click', () => moneyForm('income'));
+  $('moneyOut').addEventListener('click', () => moneyForm('expense'));
+
+  $('dealAdd').addEventListener('click', () => dealForm(null));
+  $('dealToggleClosed').addEventListener('click', () => { showClosedDeals = !showClosedDeals; renderDeals(); });
+
+  $('dealList').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const deal = dealOf(btn.dataset.id);
+    if (!deal) return;
+
+    if (btn.dataset.action === 'edit') { await dealForm(deal); return; }
+
+    if (btn.dataset.action === 'touch') {
+      const values = await openModal('動かした', [
+        { key: 'nextAction', label: '次にやること', value: deal.nextAction },
+        { key: 'nextActionOn', label: 'その期限', type: 'date', value: deal.nextActionOn || '' }
+      ]);
+      if (!values) return;
+      deal.nextAction = values.nextAction;
+      deal.nextActionOn = values.nextActionOn || null;
+      deal.lastTouchedOn = todayIso();
+      deal.updatedAt = new Date().toISOString();
+      save();
+      toast('動かしました');
+      renderDeals();
+      return;
+    }
+
+    if (btn.dataset.action === 'lose') {
+      deal.stage = 'lost';
+      deal.lastTouchedOn = todayIso();
+      deal.updatedAt = new Date().toISOString();
+      save();
+      renderDeals();
+      return;
+    }
+
+    if (btn.dataset.action === 'advance') {
+      const next = STAGES[STAGES.indexOf(deal.stage) + 1];
+      deal.stage = next;
+      deal.lastTouchedOn = todayIso();
+      deal.updatedAt = new Date().toISOString();
+      save();
+      renderDeals();
+      // 段階を進めただけでは帳簿に載らない。時給が狂うので、その場で記録に誘導する。
+      if (next === 'paid' && receivedYen(deal) < (deal.amountYen || 0)) {
+        toast('入金の記録がまだです');
+        await moneyForm('income');
+        renderDeals();
+      } else {
+        toast(`${STAGE_LABELS[next]}にしました`);
+      }
+    }
+  });
+
+  $('rangeChips').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-range]');
+    if (!btn) return;
+    rangeDays = Number(btn.dataset.range);
+    renderNumbers();
+  });
+
+  $('pillarAdd').addEventListener('click', () => pillarForm(null));
+
+  $('pillarList').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-paction]');
+    if (!btn) return;
+    const pillar = pillarOf(btn.dataset.id);
+    if (!pillar) return;
+    const action = btn.dataset.paction;
+
+    if (action === 'edit') { await pillarForm(pillar); return; }
+    if (action === 'active') pillar.status = 'active';
+    if (action === 'drop') { pillar.status = 'dropped'; pillar.reviewOn = null; }
+    if (action === 'revive') pillar.status = 'testing';
+    pillar.updatedAt = new Date().toISOString();
+    save();
+    renderSettings();
+  });
+
+  $('minHourly').addEventListener('change', (e) => {
+    const value = Number(e.target.value);
+    db.settings.minHourly = Number.isFinite(value) && value >= 0 ? Math.round(value) : 3000;
+    e.target.value = db.settings.minHourly;
+    save();
+    toast('自分の時間の値段を更新しました');
+  });
+
+  $('exportBtn').addEventListener('click', () => {
+    const payload = {
+      pillars: db.pillars, deals: db.deals,
+      timeEntries: db.timeEntries, moneyEntries: db.moneyEntries
+    };
+    $('exportText').value = JSON.stringify(payload, null, 2);
+    $('exportArea').classList.remove('hidden');
+    $('importArea').classList.add('hidden');
+  });
+
+  $('copyExport').addEventListener('click', async () => {
+    const text = $('exportText');
+    try {
+      await navigator.clipboard.writeText(text.value);
+      toast('コピーしました');
+    } catch (err) {
+      text.select();
+      toast('コピーできませんでした。選択して手でコピーしてください。');
+    }
+  });
+
+  $('importBtn').addEventListener('click', () => {
+    $('importArea').classList.remove('hidden');
+    $('exportArea').classList.add('hidden');
+  });
+
+  $('doImport').addEventListener('click', () => {
+    try {
+      const parsed = JSON.parse($('importText').value);
+      if (!Array.isArray(parsed.pillars)) throw new Error('形式が違います');
+      db = {
+        ...empty(),
+        pillars: parsed.pillars || [],
+        deals: parsed.deals || [],
+        timeEntries: parsed.timeEntries || [],
+        moneyEntries: parsed.moneyEntries || [],
+        settings: db.settings
+      };
+      save();
+      $('importArea').classList.add('hidden');
+      $('importText').value = '';
+      show(currentView);
+      toast('読み込みました');
+    } catch (err) {
+      toast('読み込めませんでした。書き出した中身をそのまま貼ってください。');
+    }
+  });
+
+  $('onboardStart').addEventListener('click', startFromPresets);
+  $('onboardSkip').addEventListener('click', () => {
+    $('onboard').classList.add('hidden');
+    show('settings');
+  });
+
+  /* ============ 起動 ============ */
+  const stamp = new Date();
+  $('todayStamp').textContent =
+    `${stamp.getFullYear()}.${pad(stamp.getMonth() + 1)}.${pad(stamp.getDate())} ${'日月火水木金土'[stamp.getDay()]}`;
+
+  if (db.pillars.length === 0) {
+    renderOnboard();
+    $('onboard').classList.remove('hidden');
+    document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', 'false'));
+  } else {
+    show('today');
+  }
+})();
+</script>
