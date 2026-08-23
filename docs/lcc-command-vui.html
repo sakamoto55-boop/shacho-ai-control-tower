@@ -768,7 +768,7 @@
 
     <!-- Mobile bottom navigation（iPhone用再構成。未認証時は非表示） -->
     <nav v-if="!authRequired" class="bottom-nav lg:hidden" aria-label="モバイルナビゲーション">
-      <button v-for="nv in navItems.filter(n => ['home', 'money', 'site', 'people', 'chat'].includes(n.key))" :key="nv.key" @click="navTo(nv)" :class="{current: view === nv.view && !nv.ask}" :aria-current="view === nv.view ? 'page' : null">
+      <button v-for="nv in navItems.filter(n => ['home', 'money', 'site', 'people', 'activity', 'chat'].includes(n.key))" :key="nv.key" @click="navTo(nv)" :class="{current: view === nv.view && !nv.ask}" :aria-current="view === nv.view ? 'page' : null">
         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path :d="nv.icon"/></svg>
         <span>{{ nv.short || nv.label }}</span>
       </button>
