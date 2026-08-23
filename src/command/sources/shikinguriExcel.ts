@@ -8,6 +8,7 @@ import {
   currentBalance,
   dailySeries,
   extractLoans,
+  extractUpcoming,
   toNumber,
   type CashSnapshot,
   type LoanRow,
@@ -103,6 +104,13 @@ export async function snapshotFromBuffer(buffer: ArrayBuffer | Buffer, asOfIso: 
   }
   const loanTotal = loans.reduce((s, l) => s + l.amount, 0);
 
+  // 予定支払（当月＋先月タブ・asOf以降の支出行）。近い順・上位12件
+  const upcoming: CashSnapshot['upcoming'] = [];
+  for (const { ws, period } of forwardSheets) {
+    upcoming.push(...extractUpcoming(sheetToRows(ws), asOf, period));
+  }
+  upcoming.sort((a, b) => a.date.localeCompare(b.date));
+
   return {
     asOf: asOfIso,
     currentBalance: cur ? cur.balance : null,
@@ -110,6 +118,7 @@ export async function snapshotFromBuffer(buffer: ArrayBuffer | Buffer, asOfIso: 
     series,
     trough,
     loans,
-    loanTotal
+    loanTotal,
+    upcoming: upcoming.slice(0, 12)
   };
 }

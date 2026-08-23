@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toNumber, currentBalance, dailySeries, extractLoans, type RawRow } from '../../src/command/sources/shikinguri.js';
+import { toNumber, currentBalance, dailySeries, extractLoans, extractUpcoming, type RawRow } from '../../src/command/sources/shikinguri.js';
 
 const d = (s: string) => new Date(s + 'T00:00:00Z');
 
@@ -63,5 +63,20 @@ describe('資金繰表の解析（決定論・シート記載値のみ）', () =
     expect(loans).toHaveLength(3);
     expect(loans.reduce((s, l) => s + l.amount, 0)).toBe(61000);
     expect(loans.some((l) => l.memo.includes('鳥越'))).toBe(true);
+  });
+
+  it('extractUpcoming: asOf以降の支出行を近い順に返す（過去・入金・期間外は除外）', () => {
+    const period = { start: d('2026-08-06'), end: d('2026-09-06') };
+    const asOf = d('2026-08-20');
+    const rows: RawRow[] = [
+      { date: d('2026-08-10'), payParty: '過去支払', payAmount: 100 }, // asOf以前→除外
+      { date: d('2026-08-25'), payParty: '鳥銀', payAmount: 350000, memo: '返済' },
+      { date: d('2026-09-10'), payParty: '給料', payAmount: 7000000 },
+      { date: d('2026-08-22'), incomeAmount: 500000, payParty: '', payAmount: null }, // 入金・支払先なし→除外
+      { date: d('2026-09-20'), payParty: '期間外', payAmount: 999 } // 期間外→除外
+    ];
+    const up = extractUpcoming(rows, asOf, period);
+    expect(up.map((u) => u.payParty)).toEqual(['鳥銀', '給料']);
+    expect(up[0].date).toBe('2026-08-25');
   });
 });

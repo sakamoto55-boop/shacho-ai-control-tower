@@ -37,6 +37,8 @@ export interface CashSnapshot {
   trough: { balance: number; date: string | null } | null;
   loans: LoanRow[];
   loanTotal: number;
+  /** asOf以降の予定支払（支出行・日付>asOf・期間内）。近い順・上位 */
+  upcoming: Array<{ date: string; payParty: string; amount: number; memo: string }>;
 }
 
 /** カンマ・円・空白・▲ を処理して数値化（▲/△/(...)/末尾-はマイナス） */
@@ -82,6 +84,26 @@ export function dailySeries(rows: RawRow[], period?: { start: Date; end: Date })
     byDay.set(carried.toISOString().slice(0, 10), row.balance);
   }
   return [...byDay.entries()].map(([date, balance]) => ({ date, balance })).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** asOf以降の予定支払（支出行）を近い順に抽出。日付繰越・期間内・金額>0のみ。 */
+export function extractUpcoming(
+  rows: RawRow[],
+  asOf: Date,
+  period?: { start: Date; end: Date }
+): Array<{ date: string; payParty: string; amount: number; memo: string }> {
+  let carried: Date | null = null;
+  const out: Array<{ date: string; payParty: string; amount: number; memo: string }> = [];
+  for (const row of rows) {
+    if (row.date) carried = row.date;
+    const amt = row.payAmount ?? null;
+    const party = (row.payParty ?? '').trim();
+    if (!amt || amt <= 0 || !party || carried == null) continue;
+    if (carried <= asOf) continue;
+    if (period && (carried < period.start || carried > period.end)) continue;
+    out.push({ date: carried.toISOString().slice(0, 10), payParty: party, amount: amt, memo: (row.memo ?? '').trim() });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /** 立替・貸付の支出行を抽出（会社が誰かの分を立て替えた金額） */
