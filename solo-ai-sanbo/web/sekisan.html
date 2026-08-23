@@ -1,0 +1,867 @@
+<title>解体積算ワークシート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --paper: #FFFFFF;
+    --ground: #EFF2F5;
+    --surface-2: #E6EBF0;
+    --ink: #15191D;
+    --ink-2: #4C555D;
+    --ink-3: #818B93;
+    --line: #D6DCE1;
+    --navy: #1B3A5C;
+    --navy-soft: #E3EAF2;
+    --vermilion: #A8382A;
+    --vermilion-soft: #F7E6E3;
+    --amber: #7E6015;
+    --amber-soft: #F3EBD8;
+    --green: #2C6146;
+    --mincho: "Shippori Mincho", ui-serif, "Hiragino Mincho ProN", "Yu Mincho", serif;
+    --sans: "Zen Kaku Gothic New", ui-sans-serif, system-ui, "Hiragino Sans", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #171C21; --ground: #0E1215; --surface-2: #1E252B; --ink: #E7ECF0;
+      --ink-2: #A6B0B8; --ink-3: #7A848C; --line: #2A3239; --navy: #7FB0DC;
+      --navy-soft: #16293C; --vermilion: #E08A76; --vermilion-soft: #351D18;
+      --amber: #D6A94C; --amber-soft: #2E2611; --green: #6FBF95;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #171C21; --ground: #0E1215; --surface-2: #1E252B; --ink: #E7ECF0;
+    --ink-2: #A6B0B8; --ink-3: #7A848C; --line: #2A3239; --navy: #7FB0DC;
+    --navy-soft: #16293C; --vermilion: #E08A76; --vermilion-soft: #351D18;
+    --amber: #D6A94C; --amber-soft: #2E2611; --green: #6FBF95;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 14px 90px;
+    background: var(--ground); color: var(--ink);
+    font-family: var(--sans); font-size: 15px; line-height: 1.75;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+
+  header.top {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 14px; padding: 20px 2px 14px; border-bottom: 2px solid var(--ink); margin-bottom: 18px;
+  }
+  .wordmark { font-family: var(--mincho); font-size: 1.2rem; font-weight: 700; margin: 0; }
+  .wordmark em { font-style: normal; color: var(--vermilion); }
+  .top-note { font-family: var(--mono); font-size: .72rem; color: var(--ink-3); letter-spacing: .08em; }
+
+  nav.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); margin-bottom: 20px; overflow-x: auto; }
+  nav.tabs button {
+    font: inherit; font-size: .9375rem; background: none; border: 0;
+    border-bottom: 3px solid transparent; color: var(--ink-3);
+    padding: 10px 14px; cursor: pointer; white-space: nowrap;
+  }
+  nav.tabs button[aria-selected="true"] { color: var(--navy); border-bottom-color: var(--navy); font-weight: 700; }
+
+  h2 {
+    font-family: var(--mincho); font-size: 1.15rem; font-weight: 700;
+    margin: 26px 0 10px; padding-left: 11px; border-left: 4px solid var(--navy);
+  }
+  h2:first-child { margin-top: 0; }
+  .hint { font-size: .8125rem; color: var(--ink-3); margin: -4px 0 12px; }
+
+  .card { background: var(--paper); border: 1px solid var(--line); padding: 18px 20px; margin-bottom: 16px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  label.f { display: flex; flex-direction: column; gap: 3px; font-size: .8125rem; color: var(--ink-2); }
+  input, select, textarea {
+    font: inherit; font-size: .9375rem; background: var(--paper); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 2px; padding: 8px 9px; width: 100%; min-height: 38px;
+  }
+  input[type="number"] { font-family: var(--mono); text-align: right; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+    outline: 2px solid var(--navy); outline-offset: 1px;
+  }
+  .checks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .checks label {
+    display: inline-flex; align-items: center; gap: 6px; font-size: .875rem;
+    border: 1px solid var(--line); padding: 7px 12px; border-radius: 2px; cursor: pointer; background: var(--paper);
+  }
+  .checks input { width: auto; min-height: 0; }
+  .checks label:has(input:checked) { border-color: var(--navy); background: var(--navy-soft); font-weight: 500; }
+
+  .btn {
+    font: inherit; font-weight: 500; background: var(--navy); color: #fff;
+    border: 1px solid var(--navy); border-radius: 2px; padding: 9px 16px; cursor: pointer; min-height: 40px;
+  }
+  :root[data-theme="dark"] .btn, :root:not([data-theme="light"]) .btn { color: #0E1215; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .btn { color: #fff; } }
+  .btn.ghost { background: transparent; color: var(--ink-2); border-color: var(--line); }
+  .btn.ghost:hover { border-color: var(--navy); color: var(--navy); }
+  .btn.small { padding: 5px 10px; min-height: 0; font-size: .8125rem; }
+  .btn.warn { background: transparent; color: var(--vermilion); border-color: var(--vermilion); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  /* 積算表 */
+  .table-wrap { overflow-x: auto; background: var(--paper); border: 1px solid var(--line); }
+  table.est { width: 100%; border-collapse: collapse; font-size: .875rem; min-width: 720px; }
+  table.est th, table.est td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+  table.est th {
+    font-family: var(--mono); font-size: .68rem; letter-spacing: .06em; color: var(--ink-3);
+    border-bottom-color: var(--ink-3); position: sticky; top: 0; background: var(--paper); z-index: 2;
+  }
+  table.est td.n, table.est th.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  table.est input { min-height: 32px; padding: 4px 6px; font-size: .875rem; }
+  table.est tr.group-head td {
+    background: var(--surface-2); font-weight: 700; font-family: var(--mincho); font-size: .9375rem;
+    border-bottom-color: var(--ink-3);
+  }
+  table.est tr.total td { border-top: 2px solid var(--ink); font-weight: 700; font-size: .9375rem; background: var(--paper); }
+  table.est tr.grand td { background: var(--navy-soft); font-weight: 700; font-size: 1rem; }
+  .w-qty { width: 92px; }
+  .w-unit { width: 56px; }
+  .w-price { width: 108px; }
+  .w-amount { width: 118px; }
+  .w-act { width: 52px; }
+  .del-btn { font-family: var(--mono); font-size: 1rem; line-height: 1; padding: 6px 10px; min-height: 0; color: var(--vermilion); border-color: var(--line); background: transparent; cursor: pointer; border-radius: 2px; border-width: 1px; border-style: solid; }
+  .del-btn:hover { border-color: var(--vermilion); background: var(--vermilion-soft); }
+  .flag { font-family: var(--mono); font-size: .68rem; color: var(--vermilion); display: block; }
+
+  /* チェック */
+  .check-item {
+    background: var(--paper); border: 1px solid var(--line);
+    border-left: 3px solid var(--amber); padding: 13px 16px; margin-bottom: 10px;
+  }
+  .check-item.hard { border-left-color: var(--vermilion); }
+  .check-item.ok { border-left-color: var(--green); }
+  .check-item b { display: block; }
+  .check-item span { color: var(--ink-2); font-size: .875rem; }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .kpi { background: var(--paper); border: 1px solid var(--line); padding: 12px 14px; }
+  .kpi .l { font-size: .72rem; color: var(--ink-3); letter-spacing: .04em; }
+  .kpi .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 1.3rem; font-weight: 600; }
+
+  .empty { color: var(--ink-3); font-size: .875rem; padding: 10px 2px; }
+  .hidden { display: none !important; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(8px);
+    background: var(--ink); color: var(--paper); font-size: .875rem; padding: 9px 18px;
+    border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s;
+    z-index: 50; max-width: calc(100vw - 32px); text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* 見積書 */
+  .quote-sheet { background: var(--paper); border: 1px solid var(--line); padding: 34px 32px; }
+  .quote-sheet h1 {
+    font-family: var(--mincho); font-size: 1.7rem; text-align: center;
+    letter-spacing: .3em; margin: 0 0 24px; padding-bottom: 12px; border-bottom: 2px solid var(--ink);
+  }
+  .quote-head { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
+  .quote-head .to-name { font-size: 1.1rem; font-weight: 700; border-bottom: 1px solid var(--ink); padding-bottom: 3px; }
+  .quote-total { font-family: var(--mono); font-size: 1.5rem; font-weight: 600; border-bottom: 2px solid var(--ink); padding-bottom: 4px; }
+
+  @media print {
+    body { background: #fff; padding: 0; }
+    header.top, nav.tabs, .no-print { display: none !important; }
+    .quote-sheet { border: 0; padding: 0; }
+    table.est { min-width: 0; font-size: 11px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1 class="wordmark">解体積算<em>ワークシート</em></h1>
+    <span class="top-note" id="topNote"></span>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-view="cond" aria-selected="true">1. 条件</button>
+    <button role="tab" data-view="table" aria-selected="false">2. 積算表</button>
+    <button role="tab" data-view="check" aria-selected="false">3. 抜けチェック</button>
+    <button role="tab" data-view="quote" aria-selected="false">4. 見積書</button>
+    <button role="tab" data-view="master" aria-selected="false">単価と原単位</button>
+  </nav>
+
+  <!-- 1. 条件 -->
+  <section id="v-cond" class="hidden">
+    <h2>案件</h2>
+    <div class="card">
+      <div class="grid">
+        <label class="f">案件名<input type="text" data-c="title" placeholder="例: 前橋市○○町 木造2階建 解体"></label>
+        <label class="f">依頼元・施主<input type="text" data-c="client" placeholder="例: ○○建設 御中"></label>
+        <label class="f">所在地<input type="text" data-c="address" placeholder="例: 前橋市○○町1-2-3"></label>
+        <label class="f">回答期限<input type="date" data-c="dueDate"></label>
+      </div>
+    </div>
+
+    <h2>建物</h2>
+    <p class="hint">延床を入れると、外周長・建築面積・廃材量が自動で出ます。分かる範囲で構いません。</p>
+    <div class="card">
+      <div class="grid">
+        <label class="f">構造
+          <select data-c="structure">
+            <option value="wood">木造</option>
+            <option value="lightSteel">軽量鉄骨</option>
+            <option value="steel">鉄骨造（S造）</option>
+            <option value="rc">鉄筋コンクリート造（RC造）</option>
+          </select>
+        </label>
+        <label class="f">階数<input type="number" data-c="floors" min="1" max="10" step="1" value="2"></label>
+        <label class="f">延床面積<input type="number" data-c="floorArea" min="0" step="0.01" placeholder="0"></label>
+        <label class="f">延床の単位
+          <select data-c="areaUnit">
+            <option value="tsubo">坪</option>
+            <option value="m2">㎡</option>
+          </select>
+        </label>
+        <label class="f">敷地面積（㎡・任意）<input type="number" data-c="siteArea" min="0" step="0.01" placeholder="整地の数量に使います"></label>
+        <label class="f">外周長（m・空欄で自動）<input type="number" data-c="perimeter" min="0" step="0.1" placeholder="自動計算"></label>
+      </div>
+    </div>
+
+    <h2>現場条件</h2>
+    <p class="hint">ここが金額を一番動かします。該当するものを押してください。積算表の項目が増減します。</p>
+    <div class="card">
+      <div class="checks">
+        <label><input type="checkbox" data-c="narrowRoad">前面道路が4m未満</label>
+        <label><input type="checkbox" data-c="adjacentClose">隣家が近い（手壊し・養生強化）</label>
+        <label><input type="checkbox" data-c="noHeavyAccess">重機が入れない</label>
+        <label><input type="checkbox" data-c="leftovers">残置物あり</label>
+        <label><input type="checkbox" data-c="asbestosSuspect">アスベスト含有の疑い</label>
+        <label><input type="checkbox" data-c="basement">地下・地中埋設物あり</label>
+        <label><input type="checkbox" data-c="roadPermit">道路使用許可が要りそう</label>
+        <label><input type="checkbox" data-c="wintertime">冬期・積雪の影響</label>
+      </div>
+    </div>
+
+    <h2>外構・付帯</h2>
+    <div class="card">
+      <div class="grid">
+        <label class="f">ブロック塀（m）<input type="number" data-c="blockWall" min="0" step="0.1" placeholder="0"></label>
+        <label class="f">土間コンクリート（㎡）<input type="number" data-c="concreteSlab" min="0" step="0.1" placeholder="0"></label>
+        <label class="f">カーポート・物置（箇所）<input type="number" data-c="carport" min="0" step="1" placeholder="0"></label>
+        <label class="f">樹木・伐根（本）<input type="number" data-c="trees" min="0" step="1" placeholder="0"></label>
+        <label class="f">門扉・フェンス（m）<input type="number" data-c="fence" min="0" step="0.1" placeholder="0"></label>
+        <label class="f">浄化槽（基）<input type="number" data-c="septic" min="0" step="1" placeholder="0"></label>
+      </div>
+    </div>
+
+    <h2>運搬</h2>
+    <div class="card">
+      <div class="grid">
+        <label class="f">処分場までの片道（km）<input type="number" data-c="haulKm" min="0" step="0.1" placeholder="0"></label>
+        <label class="f">運搬車両の往復回数（空欄で自動）<input type="number" data-c="haulTrips" min="0" step="1" placeholder="廃材量から自動"></label>
+        <label class="f">重機回送（往復回数）<input type="number" data-c="machineTrips" min="0" step="1" value="1"></label>
+      </div>
+    </div>
+
+    <div class="row no-print" style="margin-top:18px">
+      <button class="btn" id="toTable">積算表をつくる</button>
+      <button class="btn ghost" id="clearAll">条件を消す</button>
+    </div>
+  </section>
+
+  <!-- 2. 積算表 -->
+  <section id="v-table" class="hidden">
+    <div class="kpis">
+      <div class="kpi"><div class="l">原価合計</div><div class="v" id="kCost">—</div></div>
+      <div class="kpi"><div class="l">諸経費</div><div class="v" id="kOverhead">—</div></div>
+      <div class="kpi"><div class="l">見積金額（税抜）</div><div class="v" id="kTotal">—</div></div>
+      <div class="kpi"><div class="l">延床あたり</div><div class="v" id="kUnit">—</div></div>
+    </div>
+
+    <div class="row no-print" style="margin-bottom:12px">
+      <button class="btn ghost small" id="rebuild">条件から作り直す</button>
+      <button class="btn ghost small" id="addRow">行を足す</button>
+      <label class="f" style="flex-direction:row; align-items:center; gap:6px; font-size:.8125rem">
+        利益率
+        <input type="number" id="marginRate" min="0" max="90" step="1" style="width:70px" value="15"> %
+      </label>
+      <label class="f" style="flex-direction:row; align-items:center; gap:6px; font-size:.8125rem">
+        諸経費率
+        <input type="number" id="overheadRate" min="0" max="50" step="1" style="width:70px" value="10"> %
+      </label>
+    </div>
+    <p class="hint">単価は自分で入れてください。一度入れた単価は覚えて、次の案件から自動で入ります。金額はこちらでは決めません。</p>
+
+    <div class="table-wrap">
+      <table class="est">
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th class="n w-qty">数量</th>
+            <th class="w-unit">単位</th>
+            <th class="n w-price">単価</th>
+            <th class="n w-amount">金額</th>
+            <th class="w-act"></th>
+          </tr>
+        </thead>
+        <tbody id="estBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 3. 抜けチェック -->
+  <section id="v-check" class="hidden">
+    <h2>出す前に確かめること</h2>
+    <p class="hint">条件から自動で出しています。全部つぶしてから返してください。ここが他社との差になります。</p>
+    <div id="checkList"></div>
+  </section>
+
+  <!-- 4. 見積書 -->
+  <section id="v-quote" class="hidden">
+    <div class="row no-print" style="margin-bottom:14px">
+      <button class="btn" id="printQuote">印刷・PDFにする</button>
+      <span class="hint" style="margin:0">印刷ダイアログから「PDFに保存」を選べます。</span>
+    </div>
+    <div class="quote-sheet" id="quoteSheet"></div>
+  </section>
+
+  <!-- 単価と原単位 -->
+  <section id="v-master" class="hidden">
+    <h2>自分の会社の情報</h2>
+    <div class="card">
+      <div class="grid">
+        <label class="f">屋号・氏名<input type="text" data-m="company" placeholder="例: ○○工業／○○"></label>
+        <label class="f">連絡先<input type="text" data-m="contact" placeholder="電話・メール"></label>
+        <label class="f">住所<input type="text" data-m="address" placeholder=""></label>
+        <label class="f">見積の有効期限（日）<input type="number" data-m="validDays" min="1" step="1" value="30"></label>
+      </div>
+    </div>
+
+    <h2>廃材の原単位</h2>
+    <p class="hint">
+      延床1㎡あたり何トン出るかです。<strong>過去の伝票から逆算するのが確実です。</strong>
+      下の逆算欄に、過去案件の延床と実際の処分量を入れると原単位が出ます。
+    </p>
+    <div class="card">
+      <div class="grid">
+        <label class="f">逆算：延床（㎡）<input type="number" id="backArea" min="0" step="0.01" placeholder="120"></label>
+        <label class="f">逆算：実際の処分量（t）<input type="number" id="backTons" min="0" step="0.01" placeholder="60"></label>
+        <label class="f">結果（t/㎡）<input type="text" id="backResult" readonly></label>
+      </div>
+      <div class="grid" style="margin-top:14px">
+        <label class="f">木造（t/㎡）<input type="number" data-r="wood" min="0" step="0.01" placeholder="未設定"></label>
+        <label class="f">軽量鉄骨（t/㎡）<input type="number" data-r="lightSteel" min="0" step="0.01" placeholder="未設定"></label>
+        <label class="f">鉄骨造（t/㎡）<input type="number" data-r="steel" min="0" step="0.01" placeholder="未設定"></label>
+        <label class="f">RC造（t/㎡）<input type="number" data-r="rc" min="0" step="0.01" placeholder="未設定"></label>
+      </div>
+      <p class="hint" style="margin-top:12px; margin-bottom:0">
+        未設定のうちは、廃材の数量欄が空のままになります。数字を作らずに空けておくのは意図的です。
+        推測の数量で見積を出すと、後で利益が消えます。
+      </p>
+    </div>
+
+    <h2>覚えている単価</h2>
+    <p class="hint">積算表で入れた単価を項目ごとに覚えています。ここで直せます。</p>
+    <div class="card"><div id="priceList"></div></div>
+
+    <h2>記録の持ち出し</h2>
+    <div class="card">
+      <div class="row">
+        <button class="btn ghost" id="exportBtn">書き出す</button>
+        <button class="btn ghost" id="importBtn">読み込む</button>
+      </div>
+      <div id="ioArea" class="hidden" style="margin-top:12px">
+        <textarea id="ioText" rows="6" style="font-family:var(--mono); font-size:.75rem"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button class="btn small" id="doImport">この中身を読み込む</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const KEY = 'sekisan.v1';
+  const empty = () => ({
+    cond: { structure: 'wood', floors: 2, areaUnit: 'tsubo', machineTrips: 1 },
+    items: [],
+    master: { company: '', contact: '', address: '', validDays: 30 },
+    rates: {},          // 構造別の廃材原単位 t/㎡（本人が実績から入れる）
+    prices: {},         // 項目キーごとの単価を記憶する
+    marginRate: 15,
+    overheadRate: 10
+  });
+
+  let state = (() => {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return empty();
+      return { ...empty(), ...JSON.parse(raw) };
+    } catch (e) { return empty(); }
+  })();
+
+  let warned = false;
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); }
+    catch (e) {
+      if (!warned) { warned = true; toast('この画面では保存できません。書き出して控えてください。'); }
+    }
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const yen = (n) => Math.round(n || 0).toLocaleString('ja-JP');
+  const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+  const r1 = (n) => Math.round(n * 10) / 10;
+
+  let toastTimer;
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  /* ---- 寸法の換算 ---- */
+  const TSUBO_TO_M2 = 3.305785;
+  function floorAreaM2(c) {
+    const a = num(c.floorArea);
+    return c.areaUnit === 'm2' ? a : a * TSUBO_TO_M2;
+  }
+  function footprintM2(c) {
+    const floors = Math.max(1, num(c.floors) || 1);
+    return floorAreaM2(c) / floors;
+  }
+  // 外周長は敷地形状が分からないので、建築面積を正方形とみなして1.1倍する概算
+  function perimeterM(c) {
+    if (num(c.perimeter) > 0) return num(c.perimeter);
+    const fp = footprintM2(c);
+    return fp > 0 ? r1(4 * Math.sqrt(fp) * 1.1) : 0;
+  }
+  // 外壁の見付面積。階高は3mで見る
+  function wallAreaM2(c) {
+    const floors = Math.max(1, num(c.floors) || 1);
+    return r1(perimeterM(c) * 3 * floors);
+  }
+  function wasteTons(c) {
+    const rate = num(state.rates[c.structure]);
+    if (!rate) return null;   // 原単位が未設定なら数量を作らない
+    return r1(floorAreaM2(c) * rate);
+  }
+
+  const STRUCTURE_LABELS = {
+    wood: '木造', lightSteel: '軽量鉄骨', steel: '鉄骨造', rc: '鉄筋コンクリート造'
+  };
+
+  /* ---- 積算表の組み立て ---- */
+  function buildItems(c) {
+    const out = [];
+    const push = (group, key, name, qty, unit, note) =>
+      out.push({ group, key, name, qty: qty === null ? '' : qty, unit, note: note || '' });
+
+    const m2 = r1(floorAreaM2(c));
+    const fp = r1(footprintM2(c));
+    const peri = perimeterM(c);
+    const wall = wallAreaM2(c);
+    const tons = wasteTons(c);
+    const st = STRUCTURE_LABELS[c.structure] || '';
+
+    /* 仮設 */
+    push('仮設工事', 'temp.fence', '仮囲い・出入口ゲート', peri || '', 'm');
+    push('仮設工事', 'temp.sheet', '養生シート・防音パネル', wall || '', '㎡');
+    if ((num(c.floors) || 1) >= 2) push('仮設工事', 'temp.scaffold', '足場', wall || '', '㎡');
+    if (c.adjacentClose) push('仮設工事', 'temp.extra', '隣家側 追加養生・防音強化', 1, '式', '隣家近接');
+    push('仮設工事', 'temp.water', '散水設備・粉じん対策', 1, '式');
+
+    /* 解体 */
+    push('解体工事', 'demo.inner', '内装解体・分別解体', m2 || '', '㎡');
+    push('解体工事', 'demo.main', `建物本体解体（${st}）`, m2 || '', '㎡');
+    if (c.adjacentClose || c.noHeavyAccess) {
+      push('解体工事', 'demo.hand', '手壊し・小割り割増', '', '㎡', c.noHeavyAccess ? '重機進入不可' : '隣家近接');
+    }
+    push('解体工事', 'demo.foundation', '基礎・土間コンクリート撤去', fp || '', '㎡');
+    if (c.basement) push('解体工事', 'demo.underground', '地下・地中埋設物の撤去', '', '式', '数量は掘ってみないと確定しない');
+
+    /* 外構・付帯 */
+    if (num(c.blockWall)) push('外構・付帯', 'ext.block', 'ブロック塀 撤去', num(c.blockWall), 'm');
+    if (num(c.concreteSlab)) push('外構・付帯', 'ext.slab', '土間コンクリート撤去', num(c.concreteSlab), '㎡');
+    if (num(c.carport)) push('外構・付帯', 'ext.carport', 'カーポート・物置 撤去', num(c.carport), '箇所');
+    if (num(c.trees)) push('外構・付帯', 'ext.tree', '樹木伐採・伐根', num(c.trees), '本');
+    if (num(c.fence)) push('外構・付帯', 'ext.fence', '門扉・フェンス 撤去', num(c.fence), 'm');
+    if (num(c.septic)) push('外構・付帯', 'ext.septic', '浄化槽 撤去・埋戻し', num(c.septic), '基');
+
+    /* 残置物 */
+    if (c.leftovers) {
+      push('残置物', 'left.remove', '残置物 撤去・分別', '', '㎥', '現地で㎥を拾うこと');
+      push('残置物', 'left.dispose', '残置物 処分費', '', '㎥');
+    }
+
+    /* 石綿 */
+    push('石綿（アスベスト）', 'asb.survey', '事前調査（有資格者による）', 1, '式', '原則すべての建築物で必要');
+    if (c.asbestosSuspect) {
+      push('石綿（アスベスト）', 'asb.analysis', '分析調査', '', '検体');
+      push('石綿（アスベスト）', 'asb.removal', '石綿含有建材 除去', '', '㎡', 'レベルにより工法と金額が大きく変わる');
+    }
+
+    /* 廃材処分 */
+    const wasteNote = tons === null
+      ? '原単位が未設定。「単価と原単位」で自分の実績値を入れると自動で出ます'
+      : `総量の目安 ${tons}t を品目に割ってください`;
+    push('廃材処分', 'waste.wood', '木くず 処分', '', 't', wasteNote);
+    push('廃材処分', 'waste.concrete', 'コンクリートがら 処分', '', 't');
+    push('廃材処分', 'waste.metal', '金属くず 処分（有価の場合は控除）', '', 't');
+    push('廃材処分', 'waste.plaster', '石膏ボード 処分', '', 't');
+    push('廃材処分', 'waste.mixed', '混合廃棄物 処分', '', 't', '一番ぶれる。多めに見ること');
+
+    /* 運搬 */
+    const km = num(c.haulKm);
+    push('運搬', 'haul.truck', `廃材運搬（片道${km || '—'}km）`, num(c.haulTrips) || '', '台', '往復回数で入れる');
+    push('運搬', 'haul.machine', '重機回送', num(c.machineTrips) || '', '往復', '行きと帰りで2回分かかる');
+
+    /* 届出・諸経費 */
+    if (m2 >= 80) push('届出・諸経費', 'doc.recycle', '建設リサイクル法 届出', 1, '式', '床面積80㎡以上が目安。要確認');
+    if (c.roadPermit || c.narrowRoad) push('届出・諸経費', 'doc.road', '道路使用・占用許可申請', 1, '式');
+    push('届出・諸経費', 'doc.asbestos', '石綿事前調査結果の報告', 1, '式', '報告の要否は規模要件を確認');
+    push('届出・諸経費', 'doc.utility', 'ライフライン停止・引込撤去の手配', 1, '式', '電気・ガス・水道');
+    push('届出・諸経費', 'doc.neighbor', '近隣あいさつ・苦情対応', 1, '式');
+    push('届出・諸経費', 'doc.manage', '現場管理費', 1, '式');
+
+    /* 割増 */
+    if (c.narrowRoad) push('割増', 'add.narrow', '狭小道路 割増（小型車両・積替え）', 1, '式');
+    if (c.noHeavyAccess) push('割増', 'add.manual', '重機進入不可 人力割増', 1, '式');
+    if (c.wintertime) push('割増', 'add.winter', '冬期・積雪 割増', 1, '式');
+
+    // 覚えている単価を戻す
+    return out.map((item) => ({ ...item, price: state.prices[item.key] ?? '' }));
+  }
+
+  /* ---- 合計 ---- */
+  function totals() {
+    // 端数が残った金額をそのまま出すと見積書として体裁が悪いので、100円単位に丸める
+    const round100 = (n) => Math.round(n / 100) * 100;
+    const cost = state.items.reduce((s, it) => s + num(it.qty) * num(it.price), 0);
+    const overhead = round100(cost * (num(state.overheadRate) / 100));
+    const margin = round100((cost + overhead) * (num(state.marginRate) / 100));
+    return { cost, overhead, margin, total: cost + overhead + margin };
+  }
+
+  /* ---- 描画 ---- */
+  function renderCond() {
+    document.querySelectorAll('[data-c]').forEach((el) => {
+      const k = el.dataset.c;
+      if (el.type === 'checkbox') el.checked = !!state.cond[k];
+      else el.value = state.cond[k] ?? '';
+    });
+  }
+
+  function renderTable() {
+    const body = $('estBody');
+    if (!state.items.length) {
+      body.innerHTML = '<tr><td colspan="6" class="empty">まだ項目がありません。「1. 条件」を入れて「積算表をつくる」を押してください。</td></tr>';
+    } else {
+      let html = '';
+      let lastGroup = null;
+      let groupSum = 0;
+      let groupStart = 0;
+
+      const flushGroup = () => {
+        if (lastGroup === null) return;
+        html += `<tr class="total"><td>${esc(lastGroup)} 小計</td><td colspan="3"></td><td class="n">${yen(groupSum)}</td><td></td></tr>`;
+      };
+
+      state.items.forEach((it, i) => {
+        if (it.group !== lastGroup) {
+          flushGroup();
+          lastGroup = it.group; groupSum = 0; groupStart = i;
+          html += `<tr class="group-head"><td colspan="6">${esc(it.group)}</td></tr>`;
+        }
+        const amount = num(it.qty) * num(it.price);
+        groupSum += amount;
+        html += `<tr>
+          <td>${esc(it.name)}${it.note ? `<span class="flag">${esc(it.note)}</span>` : ''}</td>
+          <td class="n"><input type="number" step="0.01" min="0" data-i="${i}" data-f="qty" value="${esc(it.qty)}"></td>
+          <td>${esc(it.unit)}</td>
+          <td class="n"><input type="number" step="1" min="0" data-i="${i}" data-f="price" value="${esc(it.price)}"></td>
+          <td class="n">${amount ? yen(amount) : '—'}</td>
+          <td><button type="button" class="del-btn" data-del="${i}" title="この行を消す" aria-label="この行を消す">✕</button></td>
+        </tr>`;
+      });
+      flushGroup();
+
+      const t = totals();
+      html += `<tr class="total"><td>原価合計</td><td colspan="3"></td><td class="n">${yen(t.cost)}</td><td></td></tr>`;
+      html += `<tr class="total"><td>諸経費（${num(state.overheadRate)}%）</td><td colspan="3"></td><td class="n">${yen(t.overhead)}</td><td></td></tr>`;
+      html += `<tr class="total"><td>利益（${num(state.marginRate)}%）</td><td colspan="3"></td><td class="n">${yen(t.margin)}</td><td></td></tr>`;
+      html += `<tr class="grand"><td>見積金額（税抜）</td><td colspan="3"></td><td class="n">${yen(t.total)}</td><td></td></tr>`;
+      body.innerHTML = html;
+    }
+
+    const t = totals();
+    const m2 = floorAreaM2(state.cond);
+    $('kCost').textContent = t.cost ? yen(t.cost) + '円' : '—';
+    $('kOverhead').textContent = t.overhead ? yen(t.overhead) + '円' : '—';
+    $('kTotal').textContent = t.total ? yen(t.total) + '円' : '—';
+    $('kUnit').textContent = (t.total && m2) ? yen(t.total / m2) + '円/㎡' : '—';
+    $('marginRate').value = state.marginRate;
+    $('overheadRate').value = state.overheadRate;
+  }
+
+  function renderChecks() {
+    const c = state.cond;
+    const m2 = floorAreaM2(c);
+    const list = [];
+    const add = (level, title, detail) => list.push({ level, title, detail });
+
+    add('hard', '石綿（アスベスト）の事前調査を済ませたか',
+      '解体・改修では原則として事前調査が必要です。有資格者の要否、報告の要否、報告先は必ず最新の基準で確認してください。ここを飛ばすと工事が止まります。');
+
+    if (m2 >= 80) add('hard', '建設リサイクル法の届出（床面積80㎡以上が目安）',
+      '着工前の届出が要ります。期限に間に合わないと着工できません。日程から逆算してください。');
+
+    if (c.narrowRoad) add('hard', '前面道路が4m未満。重機と車両が入るか現地で確認したか',
+      '入らなければ小型機と積替えになり、金額も工期も変わります。図面だけで判断しないでください。');
+
+    if (c.noHeavyAccess) add('hard', '人力解体になる範囲を数量で押さえたか',
+      '人力は㎡単価が跳ね上がります。範囲を式ではなく㎡で拾ってください。');
+
+    if (c.adjacentClose) add('warn', '隣家との離れ、事前の状況写真は撮ったか',
+      '着工前の写真がないと、既存の傷まで責任を問われます。近隣あいさつの記録も残してください。');
+
+    if (c.leftovers) add('warn', '残置物の量を㎥で拾ったか',
+      '「一式」で出すと必ず足りません。写真から㎥を拾い、品目を分けてください。');
+
+    if (c.basement) add('warn', '地中障害物の扱いを見積条件に書いたか',
+      '掘るまで分かりません。「地中障害物が出た場合は別途協議」と明記しないと、丸ごと負担することになります。');
+
+    add('warn', 'ライフラインの停止手配は誰がやるか決めたか',
+      '電気・ガス・水道の停止と引込撤去。施主側の手配か自社かで、工程が数日変わります。');
+
+    const noPrice = state.items.filter((it) => num(it.qty) > 0 && !num(it.price));
+    if (noPrice.length) add('hard', `単価が入っていない項目が${noPrice.length}件`,
+      noPrice.slice(0, 6).map((it) => '・' + it.name).join('\n'));
+
+    const noQty = state.items.filter((it) => !num(it.qty));
+    if (noQty.length) add('warn', `数量が空の項目が${noQty.length}件`,
+      '要らない項目なら行を消してください。残したまま出すと、見積書に0円で載ります。\n' +
+      noQty.slice(0, 6).map((it) => '・' + it.name).join('\n'));
+
+    if (!num(state.rates[c.structure])) add('warn', '廃材の原単位が未設定',
+      '「単価と原単位」で、過去案件から逆算して入れてください。処分費は一番ぶれます。');
+
+    if (!noPrice.length && !noQty.length && state.items.length) {
+      list.unshift({ level: 'ok', title: '数量と単価は埋まっています', detail: '残りは上の現場確認だけです。' });
+    }
+
+    $('checkList').innerHTML = list.length
+      ? list.map((x) => `<div class="check-item ${x.level === 'hard' ? 'hard' : x.level === 'ok' ? 'ok' : ''}">
+          <b>${esc(x.title)}</b><span style="white-space:pre-wrap">${esc(x.detail)}</span></div>`).join('')
+      : '<p class="empty">積算表を作ると、確認事項が出ます。</p>';
+  }
+
+  function renderQuote() {
+    const c = state.cond;
+    const m = state.master;
+    const t = totals();
+    const today = new Date();
+    const d = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+    const valid = num(m.validDays) || 30;
+
+    const groups = [];
+    state.items.forEach((it) => {
+      const amount = num(it.qty) * num(it.price);
+      let g = groups.find((x) => x.name === it.group);
+      if (!g) { g = { name: it.group, sum: 0 }; groups.push(g); }
+      g.sum += amount;
+    });
+
+    $('quoteSheet').innerHTML = `
+      <h1>御見積書</h1>
+      <div class="quote-head">
+        <div>
+          <div class="to-name">${esc(c.client || '　　　　　　　　　')} 御中</div>
+          <p style="margin:14px 0 4px; font-size:.875rem; color:var(--ink-2)">下記のとおりお見積り申し上げます。</p>
+          <div style="margin-top:10px">
+            <div style="font-size:.8125rem; color:var(--ink-3)">御見積金額（税抜）</div>
+            <div class="quote-total">￥${yen(t.total)}</div>
+          </div>
+        </div>
+        <div style="font-size:.875rem; text-align:right">
+          <div style="color:var(--ink-3); font-family:var(--mono); font-size:.75rem">${esc(d)}</div>
+          <div style="margin-top:10px; font-weight:700">${esc(m.company || '　　　　　')}</div>
+          <div style="color:var(--ink-2)">${esc(m.address || '')}</div>
+          <div style="color:var(--ink-2)">${esc(m.contact || '')}</div>
+        </div>
+      </div>
+
+      <table class="est" style="min-width:0; margin-top:18px">
+        <thead><tr><th>工事区分</th><th class="n">金額</th></tr></thead>
+        <tbody>
+          ${groups.filter((g) => g.sum > 0).map((g) =>
+            `<tr><td>${esc(g.name)}</td><td class="n">${yen(g.sum)}</td></tr>`).join('')}
+          <tr class="total"><td>諸経費</td><td class="n">${yen(t.overhead)}</td></tr>
+          <tr class="total"><td>一般管理費</td><td class="n">${yen(t.margin)}</td></tr>
+          <tr class="grand"><td>合計（税抜）</td><td class="n">${yen(t.total)}</td></tr>
+        </tbody>
+      </table>
+
+      <div style="margin-top:22px; font-size:.8125rem; line-height:1.9; color:var(--ink-2)">
+        <div style="font-weight:700; color:var(--ink); margin-bottom:4px">お見積条件</div>
+        <div>件名：${esc(c.title || '　')}</div>
+        <div>所在地：${esc(c.address || '　')}</div>
+        <div>構造・規模：${esc(STRUCTURE_LABELS[c.structure] || '')} ${esc(c.floors || '')}階建／延床 ${r1(floorAreaM2(c)) || '　'}㎡</div>
+        <div>有効期限：発行日より${valid}日間</div>
+        <div style="margin-top:8px">
+          ・地中障害物、土壌汚染、石綿含有建材が判明した場合は別途協議とさせていただきます。<br>
+          ・残置物が想定を超える場合、追加費用が生じます。<br>
+          ・上記金額に消費税は含まれておりません。
+        </div>
+      </div>`;
+  }
+
+  function renderMaster() {
+    document.querySelectorAll('[data-m]').forEach((el) => { el.value = state.master[el.dataset.m] ?? ''; });
+    document.querySelectorAll('[data-r]').forEach((el) => { el.value = state.rates[el.dataset.r] ?? ''; });
+
+    const keys = Object.keys(state.prices);
+    $('priceList').innerHTML = keys.length
+      ? `<div class="grid">${keys.map((k) => {
+          const label = (state.items.find((it) => it.key === k) || {}).name || k;
+          return `<label class="f">${esc(label)}<input type="number" min="0" step="1" data-pk="${esc(k)}" value="${esc(state.prices[k])}"></label>`;
+        }).join('')}</div>`
+      : '<p class="empty">まだ単価を覚えていません。積算表で入れると、ここに溜まります。</p>';
+  }
+
+  /* ---- 画面切替 ---- */
+  const VIEWS = ['cond', 'table', 'check', 'quote', 'master'];
+  function show(v) {
+    VIEWS.forEach((x) => $('v-' + x).classList.toggle('hidden', x !== v));
+    document.querySelectorAll('nav.tabs button').forEach((b) =>
+      b.setAttribute('aria-selected', String(b.dataset.view === v)));
+    if (v === 'cond') renderCond();
+    if (v === 'table') renderTable();
+    if (v === 'check') renderChecks();
+    if (v === 'quote') renderQuote();
+    if (v === 'master') renderMaster();
+    window.scrollTo({ top: 0 });
+  }
+
+  document.querySelector('nav.tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-view]');
+    if (b) show(b.dataset.view);
+  });
+
+  /* ---- 入力 ---- */
+  document.querySelector('#v-cond').addEventListener('input', (e) => {
+    const el = e.target.closest('[data-c]');
+    if (!el) return;
+    state.cond[el.dataset.c] = el.type === 'checkbox' ? el.checked : el.value;
+    save();
+  });
+
+  $('toTable').addEventListener('click', () => {
+    if (!num(state.cond.floorArea)) { toast('延床面積を入れてください'); return; }
+    state.items = buildItems(state.cond);
+    save();
+    show('table');
+    toast(`${state.items.length}項目を並べました。単価を入れてください。`);
+  });
+
+  $('rebuild').addEventListener('click', () => {
+    const keepPrices = {};
+    state.items.forEach((it) => { if (num(it.price)) keepPrices[it.key] = it.price; });
+    state.prices = { ...state.prices, ...keepPrices };
+    state.items = buildItems(state.cond);
+    save();
+    renderTable();
+    toast('条件から作り直しました（単価は残しています）');
+  });
+
+  $('clearAll').addEventListener('click', () => {
+    state.cond = { structure: 'wood', floors: 2, areaUnit: 'tsubo', machineTrips: 1 };
+    state.items = [];
+    save(); renderCond(); toast('条件を消しました');
+  });
+
+  $('addRow').addEventListener('click', () => {
+    const name = prompt('項目名');
+    if (!name) return;
+    const unit = prompt('単位（㎡ / m / t / 式 など）', '式') || '式';
+    const group = state.items.length ? state.items[state.items.length - 1].group : 'その他';
+    state.items.push({ group, key: 'custom.' + Date.now(), name, qty: '', unit, price: '', note: '' });
+    save(); renderTable();
+  });
+
+  $('estBody').addEventListener('input', (e) => {
+    const el = e.target.closest('[data-i]');
+    if (!el) return;
+    const i = Number(el.dataset.i);
+    const f = el.dataset.f;
+    state.items[i][f] = el.value;
+    if (f === 'price' && num(el.value)) state.prices[state.items[i].key] = el.value;
+    save();
+
+    // 入力欄からフォーカスが外れないよう、合計だけを更新する
+    const t = totals();
+    const m2 = floorAreaM2(state.cond);
+    $('kCost').textContent = t.cost ? yen(t.cost) + '円' : '—';
+    $('kOverhead').textContent = t.overhead ? yen(t.overhead) + '円' : '—';
+    $('kTotal').textContent = t.total ? yen(t.total) + '円' : '—';
+    $('kUnit').textContent = (t.total && m2) ? yen(t.total / m2) + '円/㎡' : '—';
+  });
+
+  $('estBody').addEventListener('change', () => renderTable());
+
+  $('estBody').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-del]');
+    if (!b) return;
+    state.items.splice(Number(b.dataset.del), 1);
+    save(); renderTable();
+  });
+
+  ['marginRate', 'overheadRate'].forEach((id) => {
+    $(id).addEventListener('change', (e) => {
+      state[id] = num(e.target.value);
+      save(); renderTable();
+    });
+  });
+
+  document.querySelector('#v-master').addEventListener('input', (e) => {
+    const m = e.target.closest('[data-m]');
+    if (m) { state.master[m.dataset.m] = m.value; save(); return; }
+    const r = e.target.closest('[data-r]');
+    if (r) { state.rates[r.dataset.r] = r.value; save(); return; }
+    const p = e.target.closest('[data-pk]');
+    if (p) { state.prices[p.dataset.pk] = p.value; save(); return; }
+
+    if (e.target.id === 'backArea' || e.target.id === 'backTons') {
+      const a = num($('backArea').value), t = num($('backTons').value);
+      $('backResult').value = (a > 0 && t > 0) ? (Math.round((t / a) * 1000) / 1000) + ' t/㎡' : '';
+    }
+  });
+
+  $('printQuote').addEventListener('click', () => window.print());
+
+  $('exportBtn').addEventListener('click', () => {
+    $('ioText').value = JSON.stringify(state, null, 2);
+    $('ioArea').classList.remove('hidden');
+  });
+  $('importBtn').addEventListener('click', () => {
+    $('ioText').value = '';
+    $('ioArea').classList.remove('hidden');
+    $('ioText').focus();
+  });
+  $('doImport').addEventListener('click', () => {
+    try {
+      const parsed = JSON.parse($('ioText').value);
+      if (!parsed || typeof parsed !== 'object') throw new Error('形式が違います');
+      state = { ...empty(), ...parsed };
+      save(); show('master'); toast('読み込みました');
+    } catch (err) { toast('読み込めませんでした。書き出した中身をそのまま貼ってください。'); }
+  });
+
+  /* ---- 起動 ---- */
+  const now = new Date();
+  $('topNote').textContent =
+    `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')} ／ 金額は決めません。数量と根拠を組み立てます`;
+  show(state.items.length ? 'table' : 'cond');
+})();
+</script>
