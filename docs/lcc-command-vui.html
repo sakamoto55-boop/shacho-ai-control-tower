@@ -140,7 +140,10 @@
   .fx section, .fx{overflow-x:hidden}
   .fx-bar{height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
   .fx-bar > i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--fx-a),var(--fx-b));box-shadow:0 0 8px var(--fx-a)}
-  @media (prefers-reduced-motion: reduce){.fx-scan,.fx-pill .dot,.fx-chart path.line.draw{animation:none !important}.fx-chart path.line.draw{stroke-dashoffset:0}}
+  /* 入場アニメ（テック調・ふわっと出す）。reduced-motionでは無効 */
+  .fx-card,.fx-tile{animation:fxIn .45s cubic-bezier(.2,.7,.3,1) both}
+  @keyframes fxIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion: reduce){.fx-scan,.fx-pill .dot,.fx-chart path.line.draw,.fx-card,.fx-tile{animation:none !important}.fx-chart path.line.draw{stroke-dashoffset:0}}
   /* Mobile bottom-nav（PC縮小ではなくiPhone用の再構成・タッチ44px以上・safe-area内） */
   .bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:var(--z-nav);display:flex;background:rgba(6,12,30,0.92);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
   .bottom-nav button{flex:1;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--text-mid)}
