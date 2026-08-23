@@ -451,7 +451,9 @@
 
       <!-- 予定支払（資金繰表・asOf以降の支出。近い順） -->
       <div v-if="money.keiri && money.keiri.snapshot.upcoming && money.keiri.snapshot.upcoming.length" class="fx-card">
-        <div class="fx-head"><span class="bar" style="background:linear-gradient(180deg,var(--fx-warn),var(--fx-bad))"></span><h2 class="text-[13px]">これからの支払（予定）</h2></div>
+        <div class="fx-head"><span class="bar" style="background:linear-gradient(180deg,var(--fx-warn),var(--fx-bad))"></span><h2 class="text-[13px]">これからの支払（予定）</h2>
+          <span class="ml-auto fx-num on" style="font-size:16px;color:var(--fx-bad)">計 {{ fxYen(money.keiri.snapshot.upcoming.reduce((s,u)=>s+u.amount,0)) }}</span>
+        </div>
         <div v-for="(u,i) in money.keiri.snapshot.upcoming" :key="i" class="fx-row">
           <div><p class="text-[12px] font-bold">{{ u.payParty }}</p><p class="text-[10px] text-[color:var(--text-low)]">{{ u.date }}{{ u.memo ? '　'+u.memo.slice(0,24) : '' }}</p></div>
           <span class="text-[13px] font-bold" style="color:var(--fx-bad)">{{ fxYen(u.amount) }}</span>
