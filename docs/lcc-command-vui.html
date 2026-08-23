@@ -531,10 +531,15 @@
 
       <!-- データ品質（顧客2,268件由来の実問題） -->
       <details class="h2-details fx-card" v-if="site.quality.length">
-        <summary><span class="chev">▶</span>データ品質の要確認 {{ site.quality.length }}件（顧客・案件の重複など）</summary>
-        <div v-for="(q,i) in site.quality.slice(0,12)" :key="i" class="fx-row">
-          <p class="text-[11px]">{{ q.detail }}</p>
-          <span class="fx-pill off"><span class="dot"></span>{{ q.severity }}</span>
+        <summary><span class="chev">▶</span>データ品質の要確認 {{ site.quality.length }}件（種類別）</summary>
+        <!-- 種類別に集計（生リストは長いので、まず件数で把握） -->
+        <div v-for="g in qualityGroups" :key="g.kind" class="py-1.5 border-b border-white/10 last:border-0">
+          <div class="flex items-center justify-between">
+            <span class="text-[12px] font-bold">{{ g.label }}</span>
+            <span class="text-[13px] font-bold" style="color:var(--fx-warn)">{{ g.count }}件</span>
+          </div>
+          <div class="fx-bar mt-1"><i :style="{width: Math.max(3, Math.round(g.count / site.quality.length * 100)) + '%'}"></i></div>
+          <p class="text-[10px] text-[color:var(--text-low)] mt-1 truncate">例: {{ g.sample }}</p>
         </div>
       </details>
 
@@ -1201,6 +1206,17 @@ createApp({
       return this.topDecisions.filter((d) => !cur || d.key !== cur.key);
     },
     pendingDecisionTotal(){ return this.visibleDecisions.length; },
+    qualityGroups(){
+      // データ品質issueをkind別に集計（生リストは長いので件数で把握）
+      const labels = { customer_name_variant:'顧客名の表記ゆれ・重複', duplicate_project:'案件の重複', project_duplicate:'案件の重複', missing_customer_id:'顧客ID欠損', customer_id_missing:'顧客ID欠損', missing_completion_date:'完工日欠損', completion_date_missing:'完工日欠損', amount_missing:'金額欠損' };
+      const map = new Map();
+      for (const q of (this.site.quality || [])) {
+        const k = q.kind || 'other';
+        if (!map.has(k)) map.set(k, { kind: k, label: labels[k] || k, count: 0, sample: q.detail || '' });
+        map.get(k).count += 1;
+      }
+      return [...map.values()].sort((a,b)=>b.count-a.count);
+    },
     deferredCount(){ return this.decisionList.length - this.visibleDecisions.length; },
     remainingDecisionCount(){
       return Math.max(0, this.visibleDecisions.length - this.topDecisions.length);
