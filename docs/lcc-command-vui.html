@@ -133,6 +133,11 @@
     border:1px dashed rgba(90,140,255,.25);border-radius:14px;background:repeating-linear-gradient(45deg,rgba(90,140,255,.03),rgba(90,140,255,.03) 8px,transparent 8px,transparent 16px)}
   .fx-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid rgba(90,140,255,.1)}
   .fx-row:last-child{border-bottom:0}
+  /* モバイル横スクロール防止: 長い支払先名・備考でも縮んで折り返す */
+  .fx-row > div{min-width:0}
+  .fx-row p{overflow-wrap:anywhere}
+  .fx *{max-width:100%}
+  .fx section, .fx{overflow-x:hidden}
   .fx-bar{height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
   .fx-bar > i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--fx-a),var(--fx-b));box-shadow:0 0 8px var(--fx-a)}
   @media (prefers-reduced-motion: reduce){.fx-scan,.fx-pill .dot,.fx-chart path.line.draw{animation:none !important}.fx-chart path.line.draw{stroke-dashoffset:0}}
