@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toNumber, currentBalance, dailySeries, extractLoans, extractUpcoming, type RawRow } from '../../src/command/sources/shikinguri.js';
+import { toNumber, currentBalance, dailySeries, extractLoans, extractUpcoming, monthTotals, type RawRow } from '../../src/command/sources/shikinguri.js';
 
 const d = (s: string) => new Date(s + 'T00:00:00Z');
 
@@ -78,5 +78,18 @@ describe('資金繰表の解析（決定論・シート記載値のみ）', () =
     const up = extractUpcoming(rows, asOf, period);
     expect(up.map((u) => u.payParty)).toEqual(['鳥銀', '給料']);
     expect(up[0].date).toBe('2026-08-25');
+  });
+
+  it('monthTotals: 期間内の入金計・支出計を合計する（期間外・0/負は除外）', () => {
+    const period = { start: d('2026-08-06'), end: d('2026-09-06') };
+    const rows: RawRow[] = [
+      { date: d('2026-08-10'), incomeAmount: 500000, payAmount: null },
+      { date: d('2026-08-12'), incomeAmount: null, payAmount: 300000 },
+      { date: d('2026-08-15'), incomeAmount: 200000, payAmount: 100000 },
+      { date: d('2026-09-20'), incomeAmount: 999, payAmount: 999 } // 期間外→除外
+    ];
+    const t = monthTotals(rows, period);
+    expect(t.income).toBe(700000);
+    expect(t.expense).toBe(400000);
   });
 });

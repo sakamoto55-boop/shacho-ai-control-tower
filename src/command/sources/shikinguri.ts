@@ -39,6 +39,9 @@ export interface CashSnapshot {
   loanTotal: number;
   /** asOf以降の予定支払（支出行・日付>asOf・期間内）。近い順・上位 */
   upcoming: Array<{ date: string; payParty: string; amount: number; memo: string }>;
+  /** 当月タブの入金計・支出計（期間内の合計。計画含む） */
+  monthIncome: number | null;
+  monthExpense: number | null;
 }
 
 /** カンマ・円・空白・▲ を処理して数値化（▲/△/(...)/末尾-はマイナス） */
@@ -104,6 +107,23 @@ export function extractUpcoming(
     out.push({ date: carried.toISOString().slice(0, 10), payParty: party, amount: amt, memo: (row.memo ?? '').trim() });
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** 当月タブの入金計・支出計（期間内・日付繰越）。合計は記載値のみ。 */
+export function monthTotals(
+  rows: RawRow[],
+  period?: { start: Date; end: Date }
+): { income: number; expense: number } {
+  let carried: Date | null = null;
+  let income = 0;
+  let expense = 0;
+  for (const row of rows) {
+    if (row.date) carried = row.date;
+    if (period && carried && (carried < period.start || carried > period.end)) continue;
+    if (typeof row.incomeAmount === 'number' && row.incomeAmount > 0) income += row.incomeAmount;
+    if (typeof row.payAmount === 'number' && row.payAmount > 0) expense += row.payAmount;
+  }
+  return { income, expense };
 }
 
 /** 立替・貸付の支出行を抽出（会社が誰かの分を立て替えた金額） */

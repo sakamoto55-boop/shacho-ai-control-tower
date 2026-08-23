@@ -9,6 +9,7 @@ import {
   dailySeries,
   extractLoans,
   extractUpcoming,
+  monthTotals,
   toNumber,
   type CashSnapshot,
   type LoanRow,
@@ -75,10 +76,15 @@ export async function snapshotFromBuffer(buffer: ArrayBuffer | Buffer, asOfIso: 
 
   let cur: { balance: number; date: Date } | null = null;
   let series: CashSnapshot['series'] = [];
+  let monthIncome: number | null = null;
+  let monthExpense: number | null = null;
   if (current) {
     const rows = sheetToRows(current.ws);
     cur = currentBalance(rows, asOf, current.period);
     series = dailySeries(rows, current.period);
+    const t = monthTotals(rows, current.period);
+    monthIncome = t.income;
+    monthExpense = t.expense;
   }
 
   // 資金の谷（当月＋翌月タブの、期間内の最小残高）
@@ -119,6 +125,8 @@ export async function snapshotFromBuffer(buffer: ArrayBuffer | Buffer, asOfIso: 
     trough,
     loans,
     loanTotal,
-    upcoming: upcoming.slice(0, 12)
+    upcoming: upcoming.slice(0, 12),
+    monthIncome,
+    monthExpense
   };
 }

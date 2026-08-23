@@ -401,6 +401,12 @@
         </div>
       </div>
 
+      <!-- 当月の入金計・支出計（資金繰表・計画含む） -->
+      <div v-if="money.keiri && (money.keiri.snapshot.monthIncome !== null || money.keiri.snapshot.monthExpense !== null)" class="grid grid-cols-2 gap-3">
+        <div class="fx-tile"><p class="lab">当月 入金計</p><p class="fx-num on" style="color:var(--fx-ok);font-size:22px">{{ fxYen(money.keiri.snapshot.monthIncome) || '—' }}</p><p class="fx-sub">資金繰表・当月（計画含む）</p></div>
+        <div class="fx-tile"><p class="lab">当月 支出計</p><p class="fx-num on" style="color:var(--fx-bad);font-size:22px">{{ fxYen(money.keiri.snapshot.monthExpense) || '—' }}</p><p class="fx-sub">資金繰表・当月（計画含む）</p></div>
+      </div>
+
       <!-- 資金推移（資金繰表の実残高。未接続時のみ空表示） -->
       <div class="fx-card">
         <div class="fx-head"><span class="bar"></span><h2 class="text-[13px]">資金推移（資金繰表・当月）</h2>
