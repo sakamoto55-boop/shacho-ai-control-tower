@@ -3065,7 +3065,7 @@ const appRootApp = createApp({
     load(){
       try{
         const raw=localStorage.getItem(STORE);
-        if(!raw){ this.rates=buildRates(); this.seedDemo(); return; }
+        if(!raw){ this.rates=buildRates(); /* security: disable auto seedDemo on empty launch */ return; }
         const db=JSON.parse(raw);
         Object.assign(this.settings, db.settings||{});
         // 単価マスタは常にbuildRates()で再生成（粗利率35%を最新定義で適用）。カスタム単価は保持
@@ -4319,27 +4319,7 @@ const appRootApp = createApp({
 
     // クラウドから取得できなかった場合、従来のフロー（localStorage / seed）
     if(!cloudLoaded){
-      const hasSeed = !!localStorage.getItem(STORE);
-      if(!hasSeed){
-        // seedを先にロードしてからload()を呼ぶことで、seedDemoを上書きする
-        try{
-          const res = await fetch('./lcc_real_seed.json');
-          if(res.ok){
-            const db = await res.json();
-            if(db && typeof db === 'object' && Array.isArray(db.customers) && Array.isArray(db.projects)){
-              try{
-                localStorage.setItem(STORE, JSON.stringify(db));
-              }catch(e){
-                console.warn('[LCC] 初回シード保存失敗（容量超過の可能性）:', e);
-              }
-            }
-          }else{
-            console.warn('[LCC] lcc_real_seed.json の取得に失敗しました（HTTP '+res.status+'）');
-          }
-        }catch(e){
-          console.warn('[LCC] lcc_real_seed.json の fetch に失敗しました:', e);
-        }
-      }
+      // security: auto-fetch of lcc_real_seed.json disabled; blank start on empty localStorage.
     }
 
     this.load();
