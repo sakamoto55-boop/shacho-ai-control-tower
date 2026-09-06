@@ -1,0 +1,12 @@
+.git
+node_modules
+.env
+.env.*
+secure
+data
+delivery
+*.zip
+*.tar.gz
+*.pem
+*.key
+*credentials*.json
