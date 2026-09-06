@@ -9,6 +9,7 @@ import { PostgresAuditLog, PostgresContextStore } from './state.js';
 import { CloudSessions, SESSION_COOKIE, STATE_COOKIE, cookieValue, secureCookie, type Session } from './auth.js';
 import { brandDiosHtml, mountDiosShell } from '../runtime.js';
 import { containsSensitiveContent } from '../../command/memory/store.js';
+import { ObservabilityLog } from '../../command/observability/observability.js';
 
 export function cloudHtml(original:string):string {
   const tokenStart=original.indexOf('apiToken: (() => {');
@@ -124,7 +125,15 @@ export function createCloudApp(repo:PostgresCommandRepository,auth:CloudSessions
     const data=await repo.getDataset(new Date().toISOString());
     return c.json({connections:data.meta.sources.map(s=>({system:s.sourceName,classification:s.errorState?'NOT_CONNECTED':'SHEET_INGESTED',status:s.errorState?'UNAVAILABLE':'READ_ONLY',lastSyncedAt:s.lastSuccessfulSync,reason:s.errorState,readOnly:true})),externalWritesEnabled:false});
   });
-  const command=createCommandApp({repository:repo,auditLog:new PostgresAuditLog(db),contextStore:new PostgresContextStore(db),disableLocalArtifacts:true,
+  app.post('/command/feedback',async c=>{
+    const b=await c.req.json() as Record<string,unknown>;
+    if(b.rating!=='good'&&b.rating!=='bad')return c.json({error:'INVALID_RATING'},400);
+    await db.query("INSERT INTO dios_records(tenant_id,bucket,record_id,document) VALUES($1,'feedback',$2,$3::jsonb)",
+      [db.tenantId,randomUUID(),JSON.stringify({actor:c.get('diosSession').sub,rating:b.rating,
+        comment:typeof b.comment==='string'?redact(b.comment.slice(0,300)):undefined,createdAt:new Date().toISOString()})]);
+    return c.json({ok:true,note:'評価をクラウドに保存しました。モデルの自動学習には使用しません。'});
+  });
+  const command=createCommandApp({repository:repo,auditLog:new PostgresAuditLog(db),contextStore:new PostgresContextStore(db),disableLocalArtifacts:true,observabilityLog:new ObservabilityLog(''),
     authenticateRequest:async c=>(c.get('diosSession') as Session|undefined)?.principal as Principal??null});
   app.route('/command',command);
   app.get('/dios/runtime.json',c=>c.json({product:'DIOS',mode:'cloud-pilot',storage:'postgres',productionReady:false,releaseGate:'LIVE_ACCEPTANCE_REQUIRED'}));

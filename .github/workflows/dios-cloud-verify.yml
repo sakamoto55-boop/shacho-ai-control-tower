@@ -3,22 +3,22 @@ on:
   push:
     branches: [codex/dios-runtime-hardening-20260906]
     paths:
-      - 'src/dios/**'
-      - 'src/dios-cloud.ts'
-      - 'tests/dios/cloud/**'
+      - 'src/**'
+      - 'tests/dios/**'
       - 'migrations/dios/**'
       - 'scripts/dios/**'
       - 'cloudrun/dios/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/dios-cloud-verify.yml'
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: dios-cloud-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   verify:
-    if: github.ref == 'refs/heads/codex/dios-runtime-hardening-20260906'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -41,7 +41,6 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -49,8 +48,6 @@ jobs:
           cache: npm
       - name: Prepare evidence folder
         run: mkdir -p "$RUNNER_TEMP/dios-cloud-review"
-      - name: Apply only hash-verified legacy wiring
-        run: node scripts/dios/apply-cloud-wiring.mjs
       - name: Install pinned graph without lifecycle scripts
         run: npm ci --ignore-scripts
       - name: Compile existing and cloud entrypoints
@@ -86,26 +83,30 @@ jobs:
           set -e
           test "$code" -ne 0
           grep -q DIOS_CLOUD_STARTUP_REJECTED "$RUNNER_TEMP/dios-cloud-review/unconfigured-startup.log"
-      - name: Commit verified wiring on isolated branch only
-        env:
-          PUSH_TOKEN: ${{ github.token }}
-          EXPECTED_HEAD: ${{ github.sha }}
+      - name: Start actual container with PostgreSQL and read-only filesystem
+        id: cloud_http
         run: |
           set -euo pipefail
-          branch=codex/dios-runtime-hardening-20260906
-          remote_head=$(git ls-remote origin "refs/heads/$branch" | cut -f1)
-          test "$remote_head" = "$EXPECTED_HEAD"
-          node scripts/dios/apply-cloud-wiring.mjs --list > "$RUNNER_TEMP/allowed-paths.txt"
-          while IFS= read -r path; do grep -Fxq "$path" "$RUNNER_TEMP/allowed-paths.txt"; done < <(git diff --name-only)
-          while IFS= read -r path; do git add -- "$path"; done < "$RUNNER_TEMP/allowed-paths.txt"
-          if ! git diff --cached --quiet; then
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'feat(dios): connect verified cloud persistence and server-side identity to existing COMMAND services'
-            credential=$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)
-            echo "::add-mask::$credential"
-            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $credential" push origin "HEAD:refs/heads/$branch"
-          fi
+          image=dios-cloud-test:${{ github.sha }}
+          test "$(docker image inspect "$image" --format '{{.Config.User}}')" = node
+          cid=$(docker run --detach --network host --read-only --tmpfs /tmp:rw,noexec,nosuid,size=32m \
+            -e NODE_ENV=test -e PORT=18080 -e DIOS_TENANT_ID=test_a \
+            -e DIOS_PUBLIC_ORIGIN=https://dios.example.com -e DIOS_GOOGLE_CLIENT_ID=test-client \
+            -e DIOS_GOOGLE_CLIENT_SECRET=test-only -e DIOS_DATABASE_TRANSPORT=local-test \
+            -e DIOS_DATABASE_URL=postgresql://dios_runtime_test_a:ci-only-not-real@127.0.0.1:5432/dios_test "$image")
+          trap 'docker logs "$cid" > "$RUNNER_TEMP/dios-cloud-review/configured-startup.log" 2>&1; docker rm --force "$cid" >/dev/null' EXIT
+          ready=false
+          for i in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:18080/ready > "$RUNNER_TEMP/dios-cloud-review/ready.json"; then ready=true; break; fi
+            sleep 1
+          done
+          test "$ready" = true
+          test "$(curl --silent -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/dios)" = 302
+          test "$(curl --silent -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/command/tasks)" = 401
+          curl --fail --silent http://127.0.0.1:18080/dios/login | grep -q 'Googleでログイン'
+          printf '{"status":"PASS","scope":"actual rootless container with test PostgreSQL","readOnlyFilesystem":true,"liveGoogleLogin":false}\n' > "$RUNNER_TEMP/dios-cloud-review/cloud-http.json"
+      - name: Ensure verification did not edit tracked source
+        run: git diff --exit-code
       - name: Save exact tested source and validation summary
         if: ${{ !cancelled() }}
         env:
@@ -114,6 +115,7 @@ jobs:
           RESTORE_RESULT: ${{ steps.restore.outcome }}
           AUDIT_RESULT: ${{ steps.audit.outcome }}
           CONTAINER_RESULT: ${{ steps.container.outcome }}
+          CLOUD_HTTP_RESULT: ${{ steps.cloud_http.outcome }}
         run: |
           mkdir -p "$RUNNER_TEMP/dios-cloud-review"
           if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -121,7 +123,7 @@ jobs:
             git diff > "$RUNNER_TEMP/dios-cloud-review/uncommitted-candidate.diff"
             git archive --format=tar.gz HEAD -o "$RUNNER_TEMP/dios-cloud-review/source.tar.gz"
           fi
-          printf 'Tests: %s\nBuild: %s\nRestore: %s\nDependency audit: %s\nContainer: %s\nProduction deployment: NOT RUN\n' "$TEST_RESULT" "$BUILD_RESULT" "$RESTORE_RESULT" "$AUDIT_RESULT" "$CONTAINER_RESULT" | tee "$RUNNER_TEMP/dios-cloud-review/summary.txt" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Tests: %s\nBuild: %s\nRestore: %s\nDependency audit: %s\nContainer: %s\nCloud HTTP: %s\nProduction deployment: NOT RUN\n' "$TEST_RESULT" "$BUILD_RESULT" "$RESTORE_RESULT" "$AUDIT_RESULT" "$CONTAINER_RESULT" "$CLOUD_HTTP_RESULT" | tee "$RUNNER_TEMP/dios-cloud-review/summary.txt" >> "$GITHUB_STEP_SUMMARY"
       - name: Retain source and evidence (no database dumps or live secrets)
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
