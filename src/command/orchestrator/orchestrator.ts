@@ -49,7 +49,7 @@ import {
   type ToolContext
 } from '../tools/registry.js';
 import { addDaysJst, jstDate } from '../utils/jst.js';
-import { ContextStore, type ConversationContext, type IntentKey } from './context.js';
+import { ContextStore, type ConversationContext, type ConversationContextStore, type IntentKey } from './context.js';
 import { MemoryService } from '../memory/store.js';
 import {
   curateConversationTurn,
@@ -215,6 +215,9 @@ interface ExecutionState {
 
 /** Phase B1: LLMフック・Observabilityの注入点（未指定時は従来どおり決定論のみで動作） */
 export interface OrchestratorOptions {
+  contextStore?: ConversationContextStore;
+  /** Cloud pilot: artifact planning is supported, local file rendering is not. */
+  disableLocalArtifacts?: boolean;
   /** LLM Curator v2: 候補提案のみ。保存可否はLearning Safetyが最終判定 */
   curatorExtractor?: LlmCandidateExtractor;
   /** Critic v2: 指摘の追加のみ。決定論検査が最終判定 */
@@ -226,7 +229,7 @@ export interface OrchestratorOptions {
 }
 
 export class CommandOrchestrator {
-  private readonly contexts = new ContextStore();
+  private readonly contexts: ConversationContextStore;
   private readonly memoryService: MemoryService;
   private constitutionService!: ConstitutionService;
   private artifactService!: ArtifactService;
@@ -240,6 +243,7 @@ export class CommandOrchestrator {
     private readonly repository: CommandRepository,
     private readonly options: OrchestratorOptions = {}
   ) {
+    this.contexts = options.contextStore ?? new ContextStore();
     this.memoryService = new MemoryService(repository);
     this.constitutionService = new ConstitutionService(repository);
     this.artifactService = new ArtifactService(repository);
@@ -293,7 +297,8 @@ export class CommandOrchestrator {
   ): Promise<CommandChatResponse> {
     const asOf = request.asOf ?? new Date().toISOString();
     const sessionId = request.sessionId ?? 'default';
-    const context = this.contexts.get(sessionId, request.scope ?? 'group');
+    const contextKey = `${principal.role}:${principal.label}:${sessionId}`;
+    const context = await this.contexts.get(contextKey, request.scope ?? 'group');
     const scope: CompanyScope = request.scope ?? context.scope ?? 'group';
 
     // RBAC: Tool実行前にスコープを強制（UI側の制御には依存しない）
@@ -327,7 +332,7 @@ export class CommandOrchestrator {
         evidence: [],
         toolsUsed: []
       };
-      this.remember(context, scope, { response, intent: 'unknown' });
+      await this.remember(context, scope, { response, intent: 'unknown' });
       return response;
     }
 
@@ -344,7 +349,7 @@ export class CommandOrchestrator {
         evidence: [],
         toolsUsed: []
       };
-      this.remember(context, scope, { response, intent: 'unknown' });
+      await this.remember(context, scope, { response, intent: 'unknown' });
       return response;
     }
 
@@ -428,7 +433,7 @@ export class CommandOrchestrator {
     if (result.response.dataStatus !== 'OK') this.emitEvent('WARNING', { sessionId });
     this.emitEvent('ANSWER_COMPLETED', { sessionId });
 
-    this.remember(context, scope, result);
+    await this.remember(context, scope, result);
 
     // Observability: 会話本文は保存せず、メタデータのみ記録（§19）
     void this.options.observability?.record({
@@ -2856,7 +2861,7 @@ export class CommandOrchestrator {
       CODE: 'SOFTWARE_ENGINEERING'
     };
     const rendererReady = executable.has(creationCapability[artifactType]);
-    if (rendererReady && artifactType !== 'IMAGE' && artifactType !== 'CODE' && dataStatus !== 'DATA_UNAVAILABLE') {
+    if (!this.options.disableLocalArtifacts && rendererReady && artifactType !== 'IMAGE' && artifactType !== 'CODE' && dataStatus !== 'DATA_UNAVAILABLE') {
       try {
         return await this.generateArtifactFile(ctx, message, principal, artifactType, route.budget, constitutionHits, dataStatus);
       } catch (error) {
@@ -4013,7 +4018,7 @@ export class CommandOrchestrator {
 
   // ------------------------------------------------------------------
 
-  private remember(context: ConversationContext, scope: CompanyScope, result: HandlerResult): void {
+  private async remember(context: ConversationContext, scope: CompanyScope, result: HandlerResult): Promise<void> {
     context.scope = scope;
     context.lastIntent = result.intent;
     if (result.projectId !== undefined) context.lastProjectId = result.projectId;
@@ -4028,7 +4033,7 @@ export class CommandOrchestrator {
     context.lastText = result.response.text.slice(0, 600);
     context.lastEvidence = result.response.evidence;
     context.lastConfidence = result.response.confidence;
-    this.contexts.save(context);
+    await this.contexts.save(context);
   }
 }
 

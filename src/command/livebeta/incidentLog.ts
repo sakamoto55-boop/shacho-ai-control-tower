@@ -1,3 +1,4 @@
+import { randomUUID as persistentUuid } from 'node:crypto';
 /**
  * Beta Incident Log（LIVE BETA §19）。
  *
@@ -71,7 +72,7 @@ export class IncidentService {
   ): Promise<{ incident: IncidentRecord; growthCandidate: GrowthCandidate | null }> {
     incidentSeq += 1;
     const incident: IncidentRecord = {
-      incidentId: `inc-${String(incidentSeq).padStart(3, '0')}`,
+      incidentId: `inc-${String(incidentSeq).padStart(3, '0')}-${persistentUuid()}`,
       kind: input.kind,
       description: input.description.slice(0, 200),
       sessionId: input.sessionId,

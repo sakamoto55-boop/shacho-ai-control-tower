@@ -1,6 +1,6 @@
 /** DIOS起動口。既存COMMANDを再実装せず、同じAPI・権限・Memoryへ接続する。 */
 import { readFile } from 'node:fs/promises';
-import type { Hono } from 'hono';
+import type { Hono, Env } from 'hono';
 
 export type DiosRuntimeMode = 'local' | 'preview';
 export interface DiosRuntimeInfo {
@@ -46,7 +46,7 @@ export function brandDiosHtml(html: string, mode: DiosRuntimeMode): string {
 }
 
 /** 静的ファイルは明示したものだけ。APIや会話はService Workerへ保存しない。 */
-export function mountDiosShell(app: Hono, mode: DiosRuntimeMode): void {
+export function mountDiosShell<E extends Env>(app: Hono<E>, mode: DiosRuntimeMode): void {
   for (const path of ['/dios', '/dios/*']) {
     app.use(path, async (c, next) => {
       for (const [k, v] of Object.entries(headers)) c.header(k, v);

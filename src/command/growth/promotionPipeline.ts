@@ -1,3 +1,4 @@
+import { randomUUID as persistentUuid } from 'node:crypto';
 /**
  * Self-Improvement Promotion Pipeline（Phase GROWTH §24-§29・§46）。
  *
@@ -39,7 +40,7 @@ export class PromotionPipeline {
     improvementSeq += 1;
     const candidate: ImprovementCandidate = {
       kind: 'IMPROVEMENT',
-      improvementId: `imp-${String(improvementSeq).padStart(3, '0')}`,
+      improvementId: `imp-${String(improvementSeq).padStart(3, '0')}-${persistentUuid()}`,
       status: 'PROPOSED',
       createdAt: now,
       updatedAt: now,

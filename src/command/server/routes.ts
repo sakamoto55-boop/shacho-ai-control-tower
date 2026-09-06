@@ -108,6 +108,11 @@ function errorMessage(error: unknown): string {
 }
 
 export interface CommandAppOptions {
+  /** Trusted server-side session resolver. Never accept a user-supplied Principal header. */
+  authenticateRequest?: (context: Context) => Promise<Principal | null>;
+  contextStore?: import('../orchestrator/context.js').ConversationContextStore;
+  disableLocalArtifacts?: boolean;
+
   repository?: CommandRepository;
   auditLog?: AuditLog;
   rateLimiter?: RateLimiter;
@@ -149,7 +154,9 @@ export function createCommandApp(
     curatorExtractor: llmHooks.curatorExtractor,
     criticAdvisor: llmHooks.criticAdvisor,
     observability,
-    eventBus
+    eventBus,
+    contextStore: options.contextStore,
+    disableLocalArtifacts: options.disableLocalArtifacts
   });
   const memoryService = new MemoryService(repository);
   const targetService = new TargetRegistryService(repository);
@@ -193,7 +200,9 @@ export function createCommandApp(
     const authHeader = c.req.header('authorization');
     const sessionPrincipal = authHeader ? null : pairing.resolveSession(readSid(c));
     // Authentication: Google Identity（設定時）→ 静的トークン → 端末セッション の順。Authorization(RBAC)は共通。
-    const principal = sessionPrincipal
+    const principal = options.authenticateRequest
+      ? await options.authenticateRequest(c)
+      : sessionPrincipal
       ?? (googleAuth
         ? await googleAuth.authenticate(authHeader)
         : resolvePrincipal(

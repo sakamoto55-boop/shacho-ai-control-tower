@@ -1,3 +1,4 @@
+import { randomUUID as persistentUuid } from 'node:crypto';
 /**
  * Company Constitution Layer（Phase X §2-§8）。
  *
@@ -449,7 +450,7 @@ export class ConstitutionService {
     principleSeq += 1;
     const replacement: ConstitutionPrinciple = {
       ...old,
-      principleId: `const-${principleSeq}`,
+      principleId: `const-${principleSeq}-${persistentUuid()}`,
       statement: newStatement,
       status: 'CANDIDATE',
       source: `会話での方針変更（${principal.label}）`,

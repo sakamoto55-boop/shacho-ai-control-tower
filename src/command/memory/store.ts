@@ -1,3 +1,4 @@
+import { randomUUID as persistentUuid } from 'node:crypto';
 /**
  * MemoryService — Persistent Memoryの保存・訂正・検索・重複/矛盾検知。
  *
@@ -24,7 +25,7 @@ export function resetMemorySeq(): void {
   memorySeq = 0;
 }
 function newMemoryId(now: string): string {
-  return `mem-${now.slice(0, 10)}-${memorySeq++}`;
+  return `mem-${now.slice(0, 10)}-${memorySeq++}-${persistentUuid()}`;
 }
 
 /** 給与・口座・個人情報等が実値で書かれていないか（SENSITIVE_REF強制の判定） */
