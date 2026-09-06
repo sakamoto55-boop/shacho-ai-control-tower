@@ -29,7 +29,7 @@ jobs:
           POSTGRES_PASSWORD: ci-only-not-real
         ports: ['5432:5432']
         options: >-
-          --health-cmd 'pg_isready -U postgres -d dios_test'
+          --health-cmd "pg_isready -U postgres -d dios_test"
           --health-interval 5s --health-timeout 5s --health-retries 12
     env:
       AI_PROVIDER: mock
@@ -66,7 +66,9 @@ jobs:
         id: restore
         env:
           DIOS_TEST_PG_CONTAINER: ${{ job.services.postgres.id }}
-        run: node scripts/dios/restore-smoke.mjs | tee "$RUNNER_TEMP/dios-cloud-review/restore.json"
+        run: |
+          set -euo pipefail
+          node scripts/dios/restore-smoke.mjs | tee "$RUNNER_TEMP/dios-cloud-review/restore.json"
       - name: Lint
         id: lint
         run: npm run lint
@@ -113,9 +115,12 @@ jobs:
           AUDIT_RESULT: ${{ steps.audit.outcome }}
           CONTAINER_RESULT: ${{ steps.container.outcome }}
         run: |
-          git rev-parse HEAD > "$RUNNER_TEMP/dios-cloud-review/COMMIT.txt"
-          git diff > "$RUNNER_TEMP/dios-cloud-review/uncommitted-candidate.diff"
-          git archive --format=tar.gz HEAD -o "$RUNNER_TEMP/dios-cloud-review/source.tar.gz"
+          mkdir -p "$RUNNER_TEMP/dios-cloud-review"
+          if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            git rev-parse HEAD > "$RUNNER_TEMP/dios-cloud-review/COMMIT.txt"
+            git diff > "$RUNNER_TEMP/dios-cloud-review/uncommitted-candidate.diff"
+            git archive --format=tar.gz HEAD -o "$RUNNER_TEMP/dios-cloud-review/source.tar.gz"
+          fi
           printf 'Tests: %s\nBuild: %s\nRestore: %s\nDependency audit: %s\nContainer: %s\nProduction deployment: NOT RUN\n' "$TEST_RESULT" "$BUILD_RESULT" "$RESTORE_RESULT" "$AUDIT_RESULT" "$CONTAINER_RESULT" | tee "$RUNNER_TEMP/dios-cloud-review/summary.txt" >> "$GITHUB_STEP_SUMMARY"
       - name: Retain source and evidence (no database dumps or live secrets)
         if: ${{ !cancelled() }}
