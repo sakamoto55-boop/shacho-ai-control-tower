@@ -46,6 +46,14 @@ describe('DIOS runtime: 既存機能の継承と正直な稼働表示', () => {
     }
     expect((await app.request('/jobs/report/morning', { method: 'POST' })).status).toBe(404);
   });
+  it('未取得の追跡数・完了数を0と表示せず、更新時も未確認へ戻す', () => {
+    const original = readFileSync('docs/lcc-command-vui.html', 'utf8');
+    for (const marker of ['{{ tracking.trackingCount }}', '{{ tracking.completedTodayCount }}', 'async loadDecisions(){', 'tracking: { trackingCount: 0, completedTodayCount: 0,']) expect(original).toContain(marker);
+    const branded = brandDiosHtml(original, 'preview');
+    expect(branded).toContain("decisions.loaded ? (tracking.trackingCount ?? '—') : '—'");
+    expect(branded).toContain("decisions.loaded ? (tracking.completedTodayCount ?? '—') : '—'");
+    expect(branded).toContain('async loadDecisions(){ this.tracking = { trackingCount: null, completedTodayCount: null };');
+  });
   it('Service WorkerはAPI・秘密情報を保存しない', async () => {
     const app = await createDiosApp('preview');
     const sw = await (await app.request('/dios/sw.js')).text();

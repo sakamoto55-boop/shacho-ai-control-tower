@@ -21,46 +21,58 @@ jobs:
       LCC_COMMAND_MODE: demo
       ENABLE_DEV_ENDPOINTS: 'false'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
           cache: npm
+      - name: Prepare evidence folder
+        run: mkdir -p "$RUNNER_TEMP/dios-review"
       - name: Install locked dependencies without lifecycle scripts
         id: install
         run: npm ci --ignore-scripts
-      - name: Run baseline tests
+      - name: Run baseline and DIOS tests
         id: tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: npm test
+        run: npm test -- --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/dios-review/vitest.json"
       - name: Compile TypeScript
+        id: build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run build
+      - name: Actual compiled HTTP smoke test
+        id: smoke
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npm run test:dios:smoke
       - name: Run lint
+        id: lint
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run lint
+      - name: Capture dependency advisory report for review
+        id: advisory
+        continue-on-error: true
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm audit --json > "$RUNNER_TEMP/dios-review/dependency-audit.json"
+      - name: Summarize exact validation outcomes
+        if: ${{ !cancelled() }}
+        env:
+          TEST_RESULT: ${{ steps.tests.outcome }}
+          BUILD_RESULT: ${{ steps.build.outcome }}
+          SMOKE_RESULT: ${{ steps.smoke.outcome }}
+          LINT_RESULT: ${{ steps.lint.outcome }}
+          ADVISORY_RESULT: ${{ steps.advisory.outcome }}
+        run: |
+          printf '## DIOS verification\n\nCommit: `%s`\n\nTests: %s\n\nBuild: %s\n\nHTTP smoke: %s\n\nLint: %s\n\nDependency audit: %s (not a production approval)\n\nProduction deployment: NOT RUN\n' "$GITHUB_SHA" "$TEST_RESULT" "$BUILD_RESULT" "$SMOKE_RESULT" "$LINT_RESULT" "$ADVISORY_RESULT" >> "$GITHUB_STEP_SUMMARY"
       - name: Bundle exact source for offline verification
         if: ${{ !cancelled() }}
         run: |
-          mkdir -p "$RUNNER_TEMP/dios-review"
           git rev-parse HEAD > "$RUNNER_TEMP/dios-review/COMMIT.txt"
           git archive --format=tar.gz HEAD -o "$RUNNER_TEMP/dios-review/source.tar.gz"
-      - name: Store source artifact
+      - name: Store source and evidence artifact
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: dios-reviewed-source
           path: ${{ runner.temp }}/dios-review/
           retention-days: 7
-      - name: Bundle dependencies for isolated offline verification
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: tar -czf "$RUNNER_TEMP/dios-node-modules.tar.gz" node_modules
-      - name: Store dependencies artifact
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: dios-offline-dependencies
-          path: ${{ runner.temp }}/dios-node-modules.tar.gz
-          retention-days: 1

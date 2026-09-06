@@ -32,6 +32,11 @@ export function brandDiosHtml(html: string, mode: DiosRuntimeMode): string {
     ? '画面検証版：会社データ・AI・外部サービスは未接続です。'
     : '実装検証版：本番未検収。接続状態は「データ接続」で確認してください。';
   return html.replaceAll('LCC COMMAND', 'DIOS')
+    // 接続不明と0件を分離。取得のたびに未確認へ戻して旧成功値も残さない。
+    .replace('tracking: { trackingCount: 0, completedTodayCount: 0,', 'tracking: { trackingCount: null, completedTodayCount: null,')
+    .replace('async loadDecisions(){', 'async loadDecisions(){ this.tracking = { trackingCount: null, completedTodayCount: null };')
+    .replace('{{ tracking.trackingCount }}', "{{ decisions.loaded ? (tracking.trackingCount ?? '—') : '—' }}")
+    .replace('{{ tracking.completedTodayCount }}', "{{ decisions.loaded ? (tracking.completedTodayCount ?? '—') : '—' }}")
     .replace('__LCC_BUILD_BRANCH__', 'unknown')
     .replace('__LCC_BUILD_COMMIT__', 'unknown')
     .replace('__LCC_SERVED_AT__', '本番検収前')

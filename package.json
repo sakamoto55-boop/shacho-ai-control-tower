@@ -30,7 +30,10 @@
     "sync:ai-history": "tsx scripts/sync-integrations.ts ai-history",
     "subscribers": "tsx scripts/run-subscribers.ts",
     "check:realtime": "tsx scripts/check-realtime-config.ts",
-    "gmail:authorize": "tsx scripts/gmail-authorize.ts"
+    "gmail:authorize": "tsx scripts/gmail-authorize.ts",
+    "start:dios": "node dist/dios.js",
+    "dev:dios": "tsx watch src/dios.ts",
+    "test:dios:smoke": "node scripts/dios-smoke.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
