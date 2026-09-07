@@ -1,0 +1,133 @@
+name: DIOS PostgreSQL and identity verification
+on:
+  push:
+    branches: [codex/dios-runtime-hardening-20260906]
+    paths:
+      - 'src/**'
+      - 'tests/dios/**'
+      - 'migrations/dios/**'
+      - 'scripts/dios/**'
+      - 'cloudrun/dios/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/dios-cloud-verify.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dios-cloud-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: dios_test
+          POSTGRES_PASSWORD: ci-only-not-real
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dios_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      AI_PROVIDER: mock
+      LCC_COMMAND_MODE: demo
+      ENABLE_DEV_ENDPOINTS: 'false'
+      NODE_ENV: test
+      DIOS_TEST_DATABASE_URL: postgresql://postgres:ci-only-not-real@127.0.0.1:5432/dios_test
+      DIOS_CLOUD_TEST_REQUIRED: 'true'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Prepare evidence folder
+        run: mkdir -p "$RUNNER_TEMP/dios-cloud-review"
+      - name: Install pinned graph without lifecycle scripts
+        run: npm ci --ignore-scripts
+      - name: Compile existing and cloud entrypoints
+        id: build
+        run: npm run build
+      - name: Run all tests including actual PostgreSQL and PowerShell
+        id: tests
+        run: npm test -- --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/dios-cloud-review/vitest.json"
+      - name: Verify compiled HTTP startup
+        id: smoke
+        run: npm run test:dios:smoke
+      - name: Actual disposable PostgreSQL dump and restore
+        id: restore
+        env:
+          DIOS_TEST_PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+          node scripts/dios/restore-smoke.mjs | tee "$RUNNER_TEMP/dios-cloud-review/restore.json"
+      - name: Lint
+        id: lint
+        run: npm run lint
+      - name: Require clean dependency vulnerability audit
+        id: audit
+        run: npm audit --audit-level=moderate --json > "$RUNNER_TEMP/dios-cloud-review/dependency-audit.json"
+      - name: Build rootless cloud container
+        id: container
+        run: docker build --file cloudrun/dios/Dockerfile --tag dios-cloud-test:${{ github.sha }} .
+      - name: Confirm container refuses unconfigured startup
+        run: |
+          set +e
+          docker run --rm dios-cloud-test:${{ github.sha }} > "$RUNNER_TEMP/dios-cloud-review/unconfigured-startup.log" 2>&1
+          code=$?
+          set -e
+          test "$code" -ne 0
+          grep -q DIOS_CLOUD_STARTUP_REJECTED "$RUNNER_TEMP/dios-cloud-review/unconfigured-startup.log"
+      - name: Start actual container with PostgreSQL and read-only filesystem
+        id: cloud_http
+        run: |
+          set -euo pipefail
+          image=dios-cloud-test:${{ github.sha }}
+          test "$(docker image inspect "$image" --format '{{.Config.User}}')" = node
+          cid=$(docker run --detach --network host --read-only --tmpfs /tmp:rw,noexec,nosuid,size=32m \
+            -e NODE_ENV=test -e PORT=18080 -e DIOS_TENANT_ID=test_a \
+            -e DIOS_PUBLIC_ORIGIN=https://dios.example.com -e DIOS_GOOGLE_CLIENT_ID=test-client \
+            -e DIOS_GOOGLE_CLIENT_SECRET=test-only -e DIOS_DATABASE_TRANSPORT=local-test \
+            -e DIOS_DATABASE_URL=postgresql://dios_runtime_test_a:ci-only-not-real@127.0.0.1:5432/dios_test "$image")
+          trap 'docker logs "$cid" > "$RUNNER_TEMP/dios-cloud-review/configured-startup.log" 2>&1; docker rm --force "$cid" >/dev/null' EXIT
+          ready=false
+          for i in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:18080/ready > "$RUNNER_TEMP/dios-cloud-review/ready.json"; then ready=true; break; fi
+            sleep 1
+          done
+          test "$ready" = true
+          test "$(curl --silent -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/dios)" = 302
+          test "$(curl --silent -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/command/tasks)" = 401
+          curl --fail --silent http://127.0.0.1:18080/dios/login | grep -q 'Googleでログイン'
+          printf '{"status":"PASS","scope":"actual rootless container with test PostgreSQL","readOnlyFilesystem":true,"liveGoogleLogin":false}\n' > "$RUNNER_TEMP/dios-cloud-review/cloud-http.json"
+      - name: Ensure verification did not edit tracked source
+        run: git diff --exit-code
+      - name: Save exact tested source and validation summary
+        if: ${{ !cancelled() }}
+        env:
+          TEST_RESULT: ${{ steps.tests.outcome }}
+          BUILD_RESULT: ${{ steps.build.outcome }}
+          RESTORE_RESULT: ${{ steps.restore.outcome }}
+          AUDIT_RESULT: ${{ steps.audit.outcome }}
+          CONTAINER_RESULT: ${{ steps.container.outcome }}
+          CLOUD_HTTP_RESULT: ${{ steps.cloud_http.outcome }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/dios-cloud-review"
+          if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            git rev-parse HEAD > "$RUNNER_TEMP/dios-cloud-review/COMMIT.txt"
+            git diff > "$RUNNER_TEMP/dios-cloud-review/uncommitted-candidate.diff"
+            git archive --format=tar.gz HEAD -o "$RUNNER_TEMP/dios-cloud-review/source.tar.gz"
+          fi
+          printf 'Tests: %s\nBuild: %s\nRestore: %s\nDependency audit: %s\nContainer: %s\nCloud HTTP: %s\nProduction deployment: NOT RUN\n' "$TEST_RESULT" "$BUILD_RESULT" "$RESTORE_RESULT" "$AUDIT_RESULT" "$CONTAINER_RESULT" "$CLOUD_HTTP_RESULT" | tee "$RUNNER_TEMP/dios-cloud-review/summary.txt" >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain source and evidence (no database dumps or live secrets)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dios-cloud-review
+          path: ${{ runner.temp }}/dios-cloud-review/
+          retention-days: 7

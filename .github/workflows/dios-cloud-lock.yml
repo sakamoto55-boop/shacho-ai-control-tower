@@ -1,0 +1,44 @@
+name: DIOS pinned dependency lock
+on:
+  push:
+    branches: [codex/dios-runtime-hardening-20260906]
+    paths: [.github/workflows/dios-cloud-lock.yml]
+permissions:
+  contents: write
+jobs:
+  lock:
+    if: github.ref == 'refs/heads/codex/dios-runtime-hardening-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Pin reviewed dependencies only
+        run: |
+          npm pkg set 'overrides.exceljs.uuid=11.1.1'
+          npm install --save-exact --ignore-scripts pg@8.16.3 jose@6.2.8
+          npm install --save-dev --save-exact --ignore-scripts @types/pg@8.15.5
+          npm audit --audit-level=moderate
+          npm run build
+          npm test
+      - name: Commit manifest and lock without touching other files
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          branch=codex/dios-runtime-hardening-20260906
+          remote_head=$(git ls-remote origin "refs/heads/$branch" | cut -f1)
+          test "$remote_head" = "$EXPECTED_HEAD"
+          git diff --name-only | while IFS= read -r path; do
+            case "$path" in package.json|package-lock.json) ;; *) echo 'Unexpected file change'; exit 1;; esac
+          done
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json
+          git diff --cached --quiet && exit 0
+          git commit -m 'build(dios): pin reviewed PostgreSQL/OIDC dependencies and patched uuid'
+          git push origin "HEAD:refs/heads/$branch"

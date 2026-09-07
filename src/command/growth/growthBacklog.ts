@@ -1,3 +1,4 @@
+import { randomUUID as persistentUuid } from 'node:crypto';
 /**
  * Growth Backlog / Priority / Constitution Guard / Goal Alignment（Phase GROWTH §30-§34）。
  *
@@ -107,7 +108,7 @@ export function resetGrowthSeq(): void {
 }
 function nextId(prefix: string): string {
   growthSeq += 1;
-  return `${prefix}-${String(growthSeq).padStart(3, '0')}`;
+  return `${prefix}-${String(growthSeq).padStart(3, '0')}-${persistentUuid()}`;
 }
 
 /** 優先度スコア（§32）。0-1の各軸を重み付け（内訳は必ず保持） */

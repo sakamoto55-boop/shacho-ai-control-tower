@@ -1,3 +1,4 @@
+import { randomUUID as persistentUuid } from 'node:crypto';
 /**
  * Tool層。AIがDBを自由操作する設計にせず、明示的なToolだけを公開する。
  * Read ToolとWrite Toolを分離し、Write ToolはRisk Levelに応じて
@@ -39,7 +40,7 @@ export interface CommandToolDefinition {
 
 let idSeq = 0;
 function newId(prefix: string, asOf: string): string {
-  return `${prefix}-${asOf.slice(0, 10)}-${idSeq++}`;
+  return `${prefix}-${asOf.slice(0, 10)}-${idSeq++}-${persistentUuid()}`;
 }
 
 /** テストの再現性のためID連番をリセットする */

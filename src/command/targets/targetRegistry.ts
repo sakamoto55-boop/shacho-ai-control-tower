@@ -1,3 +1,4 @@
+import { randomUUID as persistentUuid } from 'node:crypto';
 /**
  * Target Registry（Phase B1.5 §11-§15）。
  *
@@ -64,7 +65,7 @@ export function resetTargetSeq(): void {
 }
 function newTargetId(now: string): string {
   targetSeq += 1;
-  return `tgt-${now.slice(0, 10)}-${String(targetSeq).padStart(3, '0')}`;
+  return `tgt-${now.slice(0, 10)}-${String(targetSeq).padStart(3, '0')}-${persistentUuid()}`;
 }
 
 export class TargetRegistryService {
