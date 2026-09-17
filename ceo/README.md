@@ -16,6 +16,7 @@
 | 会社情報 | 02_会社情報_LCCグループ4法人.md | https://drive.google.com/file/d/1ALUt-0bjdYk9_FixaV0BLuFzY4IXDlkt/view |
 | 判断基準（経営方針） | 04_LCCグループ経営方針（案）.md | https://drive.google.com/file/d/1b7F1PHuH4zPR_6ShRMW2ivq2wE8WUkbt/view |
 | 成果物の置き場 | 成果物/ | https://drive.google.com/drive/folders/1Pw3Mh5Wt8keGqZdsFay_bJvrQ6ZUveqb |
+| 社長用ダッシュボード（写し。セッションごとに更新） | LCC CEO ダッシュボード | https://claude.ai/artifact/MA6rQE48HzRfdyDeyQ6YEn |
 
 旧・Google Docs 版（2026-09-17 午前に作成、参照のみ）：https://drive.google.com/drive/folders/1WIFAjWefzhjpeKJMtTnX1RB3IQJKAPEs
 
@@ -32,7 +33,7 @@
 - **現在の案件・進捗・決定・未確認・提案** → `01_統合管理台帳.base` の4ビュー（全件・要確認‼・社長判断待ち・次の一手）。
 - **成果物** → `成果物/` フォルダ。台帳の区分「成果物」ノートにリンクを残す。
 - **次の一手** → 台帳ノートの「次の一手」節。状態が未着手・保留のものから順に。
-- **社長判断が必要な事項** → base の「社長判断待ち」ビュー（担当＝坂本社長）。
+- **社長判断が必要な事項** → base の「社長判断待ち」ビュー（担当＝坂本社長）。スマホで見るならダッシュボードの「社長の一言で進むこと」。
 
 ## LCC CEOが必ず守る3つの行動ルール（坂本社長指示 2026-09-17）
 
@@ -67,4 +68,4 @@
 - 社長の Obsidian で `01_統合管理台帳.base` の表が表示・同期されるか（要確認‼ 台帳 No.23）。
 
 ---
-更新日：2026-09-17（初版）／2026-09-17（3つの行動ルール）／2026-09-17（経営方針と提案の型）／2026-09-17（正本を yuta全能 へ移行、1件1ノート台帳へ切替。LCC CEO）
+更新日：2026-09-17（初版）／2026-09-17（3つの行動ルール）／2026-09-17（経営方針と提案の型）／2026-09-17（正本を yuta全能 へ移行）／2026-09-17（ダッシュボード追加。LCC CEO）
