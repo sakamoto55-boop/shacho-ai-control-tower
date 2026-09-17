@@ -1,34 +1,44 @@
 # LCC CEO（4法人 経営補佐）— 入口の写し
 
 このディレクトリは、坂本社長の唯一のAI窓口「LCC CEO」の入口を Git 側に写したものです。
-**正本は Google Drive** にあります。ここは読み取り用の写しであり、独立したマスターではありません。
-Drive 側を更新したら、この README も追随させます（更新日を下に残す）。
+**正本は Obsidian 保管庫「yuta全能」（Google Drive `yuta全能/yuta全能/LCC CEO/`）** です（2026-09-17 社長決定）。
+ここは読み取り用の写しであり、独立したマスターではありません。正本を更新したら、この README も追随させます（更新日を下に残す）。
 
-## 正本（Google Drive）
+## 正本（Obsidian 保管庫 yuta全能）
 
-| 役割 | ファイル | リンク |
+| 役割 | ノート／フォルダ | Drive 上の場所 |
 |---|---|---|
-| ルートフォルダ | LCC CEO（4法人 経営補佐） | https://drive.google.com/drive/folders/1WIFAjWefzhjpeKJMtTnX1RB3IQJKAPEs |
-| 運用ルールと地図 | 00_はじめに読む_LCC CEOの運用ルールと地図 | https://docs.google.com/document/d/13NjNBm7WrrloaaZw3xegOu60yM_s2OhpJBWB6NTEq84/edit |
-| 進捗・判断・引継ぎの正本 | 01_LCC CEO_統合管理台帳 | https://docs.google.com/spreadsheets/d/1F5NfDkfbi0dLX1SwOO5i-L13idz_XVCzEf7wVLsvlFU/edit |
-| 会社情報 | 02_会社情報_LCCグループ4法人（確認済み要約）_20260917 | https://docs.google.com/document/d/1rBZHQCU1YCMmfoDuZ_jXCzerT_zb6xycI8-jFxF3Mag/edit |
-| 成果物の置き場 | 03_成果物 | https://drive.google.com/drive/folders/1fAigAsn72T2GzW8cBHgrE0TOvIKXD5oM |
-| 判断基準（経営方針） | 04_LCCグループ経営方針（案）_20260917 | https://docs.google.com/document/d/1SD36CLjw26NTAP3Ca-3h3i6v6arJB6iftx7qv6l9NW4/edit |
+| 保管庫の `LCC CEO/` フォルダ | LCC CEO | https://drive.google.com/drive/folders/16NkySMPw14GvbVuHQ3HEWFOztKVq5B8E |
+| 運用ルールと地図 | 00_はじめに読む_LCC CEOの運用ルールと地図.md | https://drive.google.com/file/d/13iR8klfh-x5928AhV-iPTV8BQ9-TYTkL/view |
+| 進捗・判断・引継ぎの正本（説明） | 01_統合管理台帳.md | https://drive.google.com/file/d/1ovbjKj54EbbwAv_MMuQOTc0AhPwbmiq3/view |
+| 台帳の表ビュー（Obsidian Bases） | 01_統合管理台帳.base | https://drive.google.com/file/d/1oB_nH1HS9P3m7Vc76eaEQ40I8DpC6bO8/view |
+| 台帳の本体（1件1ノート） | 台帳/ | https://drive.google.com/drive/folders/1vjUE6ttwOrVRojcuqMIdOchL6YUpiTbj |
+| 会社情報 | 02_会社情報_LCCグループ4法人.md | https://drive.google.com/file/d/1ALUt-0bjdYk9_FixaV0BLuFzY4IXDlkt/view |
+| 判断基準（経営方針） | 04_LCCグループ経営方針（案）.md | https://drive.google.com/file/d/1b7F1PHuH4zPR_6ShRMW2ivq2wE8WUkbt/view |
+| 成果物の置き場 | 成果物/ | https://drive.google.com/drive/folders/1Pw3Mh5Wt8keGqZdsFay_bJvrQ6ZUveqb |
+
+旧・Google Docs 版（2026-09-17 午前に作成、参照のみ）：https://drive.google.com/drive/folders/1WIFAjWefzhjpeKJMtTnX1RB3IQJKAPEs
+
+## 台帳の書き方（1件1ノート・追記型）
+
+- `台帳/YYYY-MM-DD_通し番号_件名.md` を1件ずつ作る。既存ノートは書き換えず、状態が変わったら新しいノートで「No.X の状態を○○に更新」と記録する。
+- プロパティ：no, 日付, 区分（実施/決定/未確認/成果物/次の一手/引継ぎ/フォルダ追加/提案）, 法人（LCC/植竹/GB/みらい/グループ共通）, 状態（未着手/進行中/資料作成済/送信済/承認済/導入済/保留）, 担当, 記録者, リンク。
+- 不明点は「要確認‼」を件名か本文に入れ、何を確認すれば進むかを書く。事実と推測を分ける。
 
 ## どこを見れば分かるか
 
-- **会社情報** → 02_会社情報（4法人の事業・所在地・受付時間・未確認事項・既存資料の所在）。同じ内容の Markdown 写しが `ceo/LCCグループ_会社情報_確認済み要約_20260917.md`。
-- **経営理念・方針（判断基準）** → 04_経営方針（案）。同じ内容の Markdown 写しが `ceo/LCCグループ_経営方針案_20260917.md`。
-- **現在の案件・進捗・決定・未確認・提案** → 01_台帳を「区分」「法人」「状態」で絞る。「要確認‼」で検索すると不明点だけが出る。
-- **成果物** → 03_成果物 フォルダ。台帳の区分「成果物」の行に必ずリンクを残す。
-- **次の一手** → 台帳の「次の一手」列。状態が「未着手」「保留」の行を上から順に。
-- **社長判断が必要な事項** → 台帳で担当が「坂本社長」の行。
+- **会社情報** → 02_会社情報_LCCグループ4法人.md。写しが `ceo/LCCグループ_会社情報_確認済み要約_20260917.md`。
+- **経営理念・方針（判断基準）** → 04_LCCグループ経営方針（案）.md。写しが `ceo/LCCグループ_経営方針案_20260917.md`。
+- **現在の案件・進捗・決定・未確認・提案** → `01_統合管理台帳.base` の4ビュー（全件・要確認‼・社長判断待ち・次の一手）。
+- **成果物** → `成果物/` フォルダ。台帳の区分「成果物」ノートにリンクを残す。
+- **次の一手** → 台帳ノートの「次の一手」節。状態が未着手・保留のものから順に。
+- **社長判断が必要な事項** → base の「社長判断待ち」ビュー（担当＝坂本社長）。
 
 ## LCC CEOが必ず守る3つの行動ルール（坂本社長指示 2026-09-17）
 
 1. **最終判断は、必ずオーナーである坂本社長が行う。** LCC CEOは、判断に必要な情報、推奨案、その理由を整理して提示する。すでに決定・承認された範囲の実務は、同じ確認を繰り返さず、完了まで進める。
 2. **分からないことは勝手に決めず、「要確認‼」と明記する。** 何が不明なのか、何を確認すれば進められるのかを示し、事実と推測を区別する。不明点の影響を受けない作業は、そのまま進める。
-3. **業務が増えたときは、必要なフォルダを自分で作る。** 最初は少ない構成で始め、必要に応じて追加する。既存の保存先との重複を避け、用途が分かる名前にし、作成した場所を 01_統合管理台帳 に記録する。正本の管理台帳は増やさず、同じ台帳（01）を使い続ける。
+3. **業務が増えたときは、必要なフォルダを自分で作る。** 最初は少ない構成で始め、必要に応じて追加する。既存の保存先との重複を避け、用途が分かる名前にし、作成した場所を台帳に記録する。正本の管理台帳は増やさず、同じ台帳を使い続ける。
 
 ## 判断基準と提案の型（坂本社長指示 2026-09-17）
 
@@ -51,9 +61,10 @@ Drive 側を更新したら、この README も追随させます（更新日を
 
 ## 未取得の資料（2026-09-17時点）
 
-- 初回指示の「統合管理台帳」（名称が空欄で伝達。Drive・Notion・Gmail に該当名なし）。2回目の指示「台帳は増やさず同じ台帳を使い続ける」により 01_台帳を正本として継続する。別の既存台帳を正本にしたい場合のみ社長が名称・リンクを提示（要確認‼）。
+- 初回指示の「統合管理台帳」（名称が空欄で伝達。Drive・Notion・Gmail に該当名なし）。2回目の指示により yuta全能 の台帳を正本として継続する。別の既存台帳を正本にしたい場合のみ社長が名称・リンクを提示（要確認‼ 台帳 No.1）。
 - 「LCCグループ_会社情報詳細_20260917.pdf」および同名 Markdown（Drive・Notion・Gmail に無し）。
 - 経営方針（案）の確定・社員配布の時期と方法、理念の表記の統一（既存「LCCグループの理念と約束」と微差）、年度数値目標（要確認‼ 台帳 No.18）。
+- 社長の Obsidian で `01_統合管理台帳.base` の表が表示・同期されるか（要確認‼ 台帳 No.23）。
 
 ---
-更新日：2026-09-17（初版）／2026-09-17（3つの行動ルール）／2026-09-17（経営方針と提案の型を反映、リンク更新。LCC CEO）
+更新日：2026-09-17（初版）／2026-09-17（3つの行動ルール）／2026-09-17（経営方針と提案の型）／2026-09-17（正本を yuta全能 へ移行、1件1ノート台帳へ切替。LCC CEO）
