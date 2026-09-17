@@ -9,8 +9,8 @@ Drive 側を更新したら、この README も追随させます（更新日を
 | 役割 | ファイル | リンク |
 |---|---|---|
 | ルートフォルダ | LCC CEO（4法人 経営補佐） | https://drive.google.com/drive/folders/1WIFAjWefzhjpeKJMtTnX1RB3IQJKAPEs |
-| 運用ルールと地図 | 00_はじめに読む_LCC CEOの運用ルールと地図 | https://docs.google.com/document/d/1FB7eEm03o-OaNOzwpsCyqj4nOY_QXobHH8hPPA8wSGA/edit |
-| 進捗・判断・引継ぎの正本 | 01_LCC CEO_統合管理台帳（暫定・既存台帳と統合予定） | https://docs.google.com/spreadsheets/d/1OlFCvGHfgF-Cd24XZ2nyRqj-qrAH_qt4r0tLQ8nk66Y/edit |
+| 運用ルールと地図 | 00_はじめに読む_LCC CEOの運用ルールと地図 | https://docs.google.com/document/d/14ehvB_M57BdJJCvMB5BCk5NWvrin7Vp78nOCulfWqAI/edit |
+| 進捗・判断・引継ぎの正本 | 01_LCC CEO_統合管理台帳 | https://docs.google.com/spreadsheets/d/1mnV6Im7WjrGdEY5Hz70jnFVXej6GdWIEtKxy6S_--yI/edit |
 | 会社情報 | 02_会社情報_LCCグループ4法人（確認済み要約）_20260917 | https://docs.google.com/document/d/1rBZHQCU1YCMmfoDuZ_jXCzerT_zb6xycI8-jFxF3Mag/edit |
 | 成果物の置き場 | 03_成果物 | https://drive.google.com/drive/folders/1fAigAsn72T2GzW8cBHgrE0TOvIKXD5oM |
 
@@ -21,6 +21,12 @@ Drive 側を更新したら、この README も追随させます（更新日を
 - **成果物** → 03_成果物 フォルダ。台帳の区分「成果物」の行に必ずリンクを残す。
 - **次の一手** → 台帳の「次の一手」列。状態が「未着手」「保留」の行を上から順に。
 - **社長判断が必要な事項** → 台帳で担当が「坂本社長」の行。
+
+## LCC CEOが必ず守る3つの行動ルール（坂本社長指示 2026-09-17）
+
+1. **最終判断は、必ずオーナーである坂本社長が行う。** LCC CEOは、判断に必要な情報、推奨案、その理由を整理して提示する。すでに決定・承認された範囲の実務は、同じ確認を繰り返さず、完了まで進める。
+2. **分からないことは勝手に決めず、「要確認‼」と明記する。** 何が不明なのか、何を確認すれば進められるのかを示し、事実と推測を区別する。不明点の影響を受けない作業は、そのまま進める。
+3. **業務が増えたときは、必要なフォルダを自分で作る。** 最初は少ない構成で始め、必要に応じて追加する。既存の保存先との重複を避け、用途が分かる名前にし、作成した場所を 01_統合管理台帳 に記録する。正本の管理台帳は増やさず、同じ台帳（01）を使い続ける。
 
 ## 運用ルール（要点）
 
@@ -35,8 +41,8 @@ Drive 側を更新したら、この README も追随させます（更新日を
 
 ## 未取得の資料（2026-09-17時点）
 
-- 社長指示の「統合管理台帳」（名称が空欄で伝達。Drive・Notion・Gmail に該当名なし）。特定でき次第、01_台帳の行をそちらへ移し、01 は廃止する。
+- 初回指示の「統合管理台帳」（名称が空欄で伝達。Drive・Notion・Gmail に該当名なし）。2回目の指示「台帳は増やさず同じ台帳を使い続ける」により 01_台帳を正本として継続する。別の既存台帳を正本にしたい場合のみ社長が名称・リンクを提示（要確認‼）。
 - 「LCCグループ_会社情報詳細_20260917.pdf」および同名 Markdown（Drive・Notion・Gmail に無し）。
 
 ---
-更新日：2026-09-17（初版、LCC CEO）
+更新日：2026-09-17（初版）／2026-09-17（3つの行動ルールを反映、台帳リンク更新。LCC CEO）
