@@ -1,13 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
+import { brandDiosHtml } from '../../../src/dios/runtime.js';
+import { cloudHtml } from '../../../src/dios/cloud/app.js';
 
 // Execute the shipped UI's real loaders without mounting a browser or using company data.
 const html = readFileSync('docs/lcc-command-vui.html', 'utf8');
-const script = html.match(/<script>([\s\S]*?)<\/script>/)![1];
 type Ui = Record<string, any>;
 type UiFunction = (this: Ui, ...args: unknown[]) => unknown;
-function createUi(fetcher: ReturnType<typeof vi.fn>) {
+function createUi(fetcher: ReturnType<typeof vi.fn>, rendered = html) {
+  const script = rendered.match(/<script>([\s\S]*?)<\/script>/)![1];
   let component: Ui = {};
   runInNewContext(script, {
     Vue: {
@@ -28,6 +30,13 @@ function createUi(fetcher: ReturnType<typeof vi.fn>) {
 const response = (status: number, body: unknown = {}) => ({ ok: status < 400, status, json: async () => body });
 
 describe('executive UI data availability', () => {
+  it.each(['local', 'cloud'] as const)('preserves unknown tracking after a failed refresh in DIOS %s', async (mode) => {
+    const ui = createUi(vi.fn().mockResolvedValue(response(503)), mode === 'cloud' ? cloudHtml(html) : brandDiosHtml(html, 'local'));
+    ui.tracking.trackingCount = 7;
+    await ui.loadDecisions();
+    expect(ui.tracking.trackingCount).toBeNull();
+    expect(ui.decisions.loaded).toBe(false);
+  });
   it('keeps unverified counts unknown until a successful response and shows source limitations', async () => {
     const fetcher = vi.fn().mockResolvedValue(response(200, { items: [], decisions: [], tracking: { trackingCount: 0, completedTodayCount: null }, limitations: ['外部タスクの追跡は未接続です'] }));
     const ui = createUi(fetcher);
