@@ -265,11 +265,17 @@
           <span class="n">{{ decisions.loaded ? pendingDecisionTotal : '—' }}</span><span class="l">今日 判断する</span>
         </button>
         <button role="listitem" class="h2-stat yellow" @click="view = 'tracking'; loadTracking('active')" aria-label="AIが追跡中の件数">
-          <span class="n">{{ tracking.trackingCount }}</span><span class="l">AIが追跡中</span>
+          <span class="n">{{ tracking.trackingCount ?? '—' }}</span><span class="l">AIが追跡中</span>
         </button>
         <button role="listitem" class="h2-stat grey" @click="view = 'tracking'; loadTracking('completed')" aria-label="今日完了した件数">
-          <span class="n">{{ tracking.completedTodayCount }}</span><span class="l">今日 完了</span>
+          <span class="n">{{ tracking.completedTodayCount ?? '—' }}</span><span class="l">今日 完了</span>
         </button>
+      </div>
+
+      <div v-if="decisions.loaded" class="text-[11px] text-[color:var(--text-mid)]">
+        <p>取得できた範囲の件数です。未接続の情報は含みません。</p>
+        <p v-for="note in decisions.notes" :key="note">{{ note }}</p>
+        <button @click="view = 'connections'; loadHealth()" class="font-bold text-[color:var(--info)] min-h-[44px] lg:min-h-0">接続状態を見る</button>
       </div>
 
       <!-- 判断1件（大カード） -->
@@ -357,8 +363,8 @@
         <button class="h2-btn later mt-3 w-full" @click="deferredCaseIds = []; deferredTitles = []">保留を解除して表示</button>
       </div>
       <div v-else-if="decisions.loaded" class="h2-card" style="border-left-color:var(--text-low)">
-        <p class="text-[17px] font-black">急ぎの判断はありません</p>
-        <p class="text-[12px] text-[color:var(--text-mid)] mt-1">接続済みソース（Gmail／LINE WORKS／シート）から抽出できる要対応は0件です。着信があれば自動でここに出ます。</p>
+        <p class="text-[17px] font-black">取得できた範囲では判断待ちはありません</p>
+        <p class="text-[12px] text-[color:var(--text-mid)] mt-1">未接続の情報や取得後の変化は、この件数に含まれていません。</p>
         <button class="h2-btn later mt-3 w-full" @click="askFromHome('おはよう')">朝ブリーフを聞く</button>
       </div>
       <div v-else class="h2-card" style="border-left-color:var(--text-low)">
@@ -667,7 +673,8 @@
             <button v-if="trackingView === 'active'" @click="completeAction(a.actionId)" class="text-[10px] font-bold text-[color:var(--ok)] mt-1 min-h-[44px] lg:min-h-0">完了にする</button>
           </div>
         </div>
-        <p v-else class="mt-3 text-[11px] text-[color:var(--text-low)]">{{ trackingView === 'completed' ? '完了履歴はまだありません' : '追跡中の仕事はありません' }}</p>
+        <p v-else-if="trackingLoaded" class="mt-3 text-[11px] text-[color:var(--text-low)]">{{ trackingView === 'completed' ? '取得できた範囲に完了履歴はありません' : '取得できた範囲に追跡中の仕事はありません' }}</p>
+        <p v-else-if="!trackingError" class="mt-3 text-[11px] text-[color:var(--text-low)]">確認中…</p>
         <p v-if="trackingError" class="mt-2 text-[11px] text-[color:var(--bad)]">{{ trackingError }}</p>
       </div>
     </section>
@@ -1070,9 +1077,9 @@ createApp({
       /* EXECUTIVE COMMAND CENTER: 画面切替とホーム実データ */
       view: 'home',
       composing: false, // 日本語IME変換中の誤送信防止（compositionstart/end）
-      decisions: { loaded: false, items: [], cases: [], reason: '' },
-      tracking: { trackingCount: 0, completedTodayCount: 0, waitingPresidentCount: 0, awaitingReplyCount: 0 },
-      trackingView: 'active', trackingItems: [], trackingQuery: '', trackingError: '',
+      decisions: { loaded: false, items: [], cases: [], notes: [], reason: '' },
+      tracking: { trackingCount: null, completedTodayCount: null, waitingPresidentCount: null, awaitingReplyCount: null },
+      trackingView: 'active', trackingItems: [], trackingQuery: '', trackingError: '', trackingLoaded: false, trackingRequestId: 0,
       /* §C: 社長判断完了（実結果必須） */
       completingCaseId: '', outcomeDraft: '', caseError: '',
       /* HOME V2: 「後で」（この画面内の保留。追跡は継続・サーバー状態は変えない）と表示中の切替 */
@@ -1147,7 +1154,9 @@ createApp({
       if (this.demoMode) return 'デモモード（実データ表示なし）';
       if (this.authRequired) return '認証が必要（接続は正常）';
       if (this.connectionError) return 'データ取得できません（接続に問題）';
-      return this.health.loaded && this.health.limitedCount > 0 ? '実データ（一部制限あり）' : '実データ';
+      if (!this.health.loaded) return this.health.reason ? 'データ接続を確認できません' : 'データ接続を確認中';
+      if (this.health.okCount === 0) return '実データの接続を確認できません';
+      return this.health.limitedCount > 0 ? '実データ（一部制限あり）' : '実データ';
     },
     decisionList(){
       // HOME V2の表示モデル。リアルタイム取込のDecisionCase（社長判断待ち）が最優先。
@@ -1329,11 +1338,17 @@ createApp({
     },
     async loadTracking(view){
       this.trackingView = view;
+      const requestId = ++this.trackingRequestId;
+      this.trackingLoaded = false; this.trackingError = ''; this.trackingItems = [];
       try {
-        const res = await fetch(`${this.apiBase}/command/intelligence/actions?view=${view}&q=${encodeURIComponent(this.trackingQuery)}`, { headers: this.authHeaders() });
-        if (!res.ok) { this.trackingItems = []; return; }
-        this.trackingItems = (await res.json()).actions || [];
-      } catch { this.trackingItems = []; }
+        const body = await this.fxGet(`intelligence/actions?view=${view}&q=${encodeURIComponent(this.trackingQuery)}`);
+        if (requestId !== this.trackingRequestId) return;
+        if (!Array.isArray(body.actions)) throw new Error('INVALID_DATA');
+        this.trackingItems = body.actions; this.trackingLoaded = true;
+      } catch (e) {
+        if (requestId !== this.trackingRequestId) return;
+        this.trackingError = e.message === 'AUTH' ? '認証が必要' : '追跡情報を取得できません。接続状態を確認してください';
+      }
     },
     async completeAction(id){
       this.trackingError = '';
@@ -1401,17 +1416,18 @@ createApp({
     },
     async loadDecisions(){
       // ホームの件数は実データのみ（取得不能なら—と理由。捏造しない）
+      this.tracking = { trackingCount: null, completedTodayCount: null, waitingPresidentCount: null, awaitingReplyCount: null };
       try {
-        const res = await fetch(`${this.apiBase}/command/today/decisions`, { headers: this.authHeaders() });
-        if (!res.ok) {
-          if (this.markAuth(res.status)) { this.decisions = { loaded: false, items: [], reason: '認証が必要（tokenを付けて開き直し）' }; return; }
-          throw new Error('HTTP ' + res.status);
+        const body = await this.fxGet('today/decisions');
+        if (!Array.isArray(body.items) || !Array.isArray(body.decisions)) throw new Error('INVALID_DATA');
+        const notes = [body.limitations, body.notes].flat().filter(n => typeof n === 'string');
+        this.decisions = { loaded: true, items: body.items, cases: body.decisions, notes, reason: '' };
+        for (const key of Object.keys(this.tracking)) {
+          const count = body.tracking && body.tracking[key];
+          this.tracking[key] = Number.isInteger(count) && count >= 0 ? count : null;
         }
-        const body = await res.json();
-        this.decisions = { loaded: true, items: body.items || [], cases: body.decisions || [], reason: '' };
-        if (body.tracking) this.tracking = body.tracking;
       } catch (e) {
-        this.decisions = { loaded: false, items: [], cases: [], reason: '接続できないため取得不能' };
+        this.decisions = { loaded: false, items: [], cases: [], notes: [], reason: e.message === 'AUTH' ? '認証が必要' : 'データを取得できません' };
       }
     },
     startComplete(caseId, prefix){
@@ -1451,15 +1467,22 @@ createApp({
       if (!res.ok) { if (this.markAuth(res.status)) throw new Error('AUTH'); throw new Error('HTTP ' + res.status); }
       return res.json();
     },
+    async fxReadGroup(paths){
+      const results = await Promise.allSettled(paths.map(path => this.fxGet(path)));
+      if (results.some(r => r.status === 'rejected' && r.reason.message === 'AUTH')) throw new Error('AUTH');
+      const failed = results.filter(r => r.status === 'rejected' || r.value === null || r.value === undefined).length;
+      if (failed === results.length) throw new Error('UNAVAILABLE');
+      return {
+        values: results.map(r => r.status === 'fulfilled' ? r.value : null),
+        error: failed ? '一部の情報を取得できません（' + failed + '/' + results.length + '）。確認できた情報のみ表示しています' : ''
+      };
+    },
     async loadMoney(){
       this.money.error = '';
       try {
-        const [kpi, cash, alerts, gaps, targets, keiri] = await Promise.all([
-          this.fxGet('kpi').catch(() => null), this.fxGet('cash/forecast').catch(() => null),
-          this.fxGet('alerts').catch(() => null), this.fxGet('data-gaps').catch(() => null),
-          this.fxGet('targets').catch(() => null), this.fxGet('keiri/cash').catch(() => null)
-        ]);
-        const money = { loaded: true, error: '' };
+        const result = await this.fxReadGroup(['kpi', 'cash/forecast', 'alerts', 'data-gaps', 'targets', 'keiri/cash']);
+        const [kpi, cash, alerts, gaps, targets, keiri] = result.values;
+        const money = { loaded: true, error: result.error };
         money.keiri = (keiri && keiri.available) ? keiri : null;
         money.kpis = (kpi && kpi.kpis) || [];
         money.cash = cash || null;
@@ -1472,11 +1495,9 @@ createApp({
     async loadSite(){
       this.site.error = '';
       try {
-        const [brief, alerts, quality, summary] = await Promise.all([
-          this.fxGet('brief').catch(() => null), this.fxGet('alerts').catch(() => null),
-          this.fxGet('data-quality').catch(() => null), this.fxGet('projects/summary?scope=' + this.scope).catch(() => null)
-        ]);
-        const site = { loaded: true, error: '' };
+        const result = await this.fxReadGroup(['brief', 'alerts', 'data-quality', 'projects/summary?scope=' + this.scope]);
+        const [brief, alerts, quality, summary] = result.values;
+        const site = { loaded: true, error: result.error };
         site.summary = summary || null;
         site.headline = (brief && brief.headline) || '';
         site.actions = (brief && brief.recommendedActions) || [];
@@ -1488,12 +1509,14 @@ createApp({
     async loadPeople(){
       this.people.error = '';
       try {
-        const h = await this.fxGet('health/connections').catch(() => null);
-        this.people = { loaded: true, error: '', sources: (h && h.connections) || [] };
+        const h = await this.fxGet('health/connections');
+        if (!h || !Array.isArray(h.connections)) throw new Error('INVALID_DATA');
+        this.people = { loaded: true, error: '', sources: h.connections };
       } catch (e) { this.people = { loaded: false, error: e.message === 'AUTH' ? '認証が必要' : '接続できません', sources: [] }; }
     },
     async loadHomeCash(){
-      // ホームの資金警告用。資金繰表の谷/現預金（PRESIDENTのみ取得可・失敗は無視）
+      // ホームの資金警告用。取得不能時は過去の残高を現在値として残さない。
+      this.homeCash = null;
       try {
         const r = await this.fxGet('keiri/cash');
         if (r && r.available) this.homeCash = r.snapshot;

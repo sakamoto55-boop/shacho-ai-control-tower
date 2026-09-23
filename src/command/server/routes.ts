@@ -1031,14 +1031,20 @@ export function createCommandApp(
     const legacyToday = result.items.filter((it) => it.receivedAt && jstDate(it.receivedAt) === todayJst);
     const legacyPastCount = result.items.length - legacyToday.length;
     let decisions: unknown[] = [];
-    let tracking = { trackingCount: 0, completedTodayCount: 0, waitingPresidentCount: 0, awaitingReplyCount: 0 };
+    let tracking: { trackingCount: number | null; completedTodayCount: number | null; waitingPresidentCount: number | null; awaitingReplyCount: number | null } = {
+      trackingCount: null, completedTodayCount: null, waitingPresidentCount: null, awaitingReplyCount: null
+    };
+    const limitations: string[] = [];
     try {
       const { IntelligenceStore } = await import('../intelligence/store.js');
       const { homeDecisionCandidates, trackingCounts } = await import('../intelligence/homeDecisions.js');
       const store = new IntelligenceStore();
       decisions = homeDecisionCandidates(store);
       tracking = trackingCounts(store);
-    } catch { /* 追跡層の失敗で判断表示は止めない */ }
+    } catch {
+      // 受信箱は表示できても、取得不能な追跡件数を0件と報告しない。
+      limitations.push('追跡情報を取得できません。判断待ち・完了件数は未確認です');
+    }
     return c.json({
       generatedAt: result.generatedAt,
       todayJst,
@@ -1049,6 +1055,7 @@ export function createCommandApp(
       legacyPastCount,
       dataBasis: result.dataBasis,
       notes: [...result.notes, '受信箱項目は外部からの申告であり、確定情報ではありません'],
+      limitations,
       tracking
     });
   });
