@@ -105,6 +105,42 @@ class SetupTests(unittest.TestCase):
         self.assertFalse(r['dios_deployed_by_this_step'])
         self.assertNotIn(self.web['client_secret'], json.dumps(r))
 
+    def test_legacy_notebook_does_not_invent_source_or_deployment_proof(self):
+        r = self.run_flow()
+        self.assertEqual(r['status'], 'OAUTH_CREDENTIALS_STAGED')
+        self.assertIsNone(r['source_head'])
+        self.assertEqual(r['source_head_origin'], 'unknown')
+        self.assertFalse(r['source_head_verified'])
+        self.assertFalse(r['dios_deployed_by_this_step'])
+
+    def test_explicit_source_is_preserved_but_not_claimed_verified_on_resume(self):
+        self.seed()
+        head = 'a' * 40
+        setup.configure(project=setup.PROJECT, number=setup.NUMBER, owner=setup.OWNER,
+                        region=setup.REGION, service=setup.SERVICE, source_head=head)
+        r = self.run_flow()
+        self.assertTrue(r['resumed_existing'])
+        self.assertEqual(r['source_head'], head)
+        self.assertEqual(r['source_head_origin'], 'operator_declared')
+        self.assertFalse(r['source_head_verified'])
+        self.assertEqual(self.g.writes, [])
+
+    def test_reconfiguration_clears_previous_source_head(self):
+        setup.configure(project=setup.PROJECT, number=setup.NUMBER, owner=setup.OWNER,
+                        region=setup.REGION, service=setup.SERVICE, source_head='b' * 40)
+        setup.configure(project=setup.PROJECT, number=setup.NUMBER, owner=setup.OWNER,
+                        region=setup.REGION, service=setup.SERVICE)
+        self.assertIsNone(self.run_flow()['source_head'])
+
+    def test_invalid_provenance_is_rejected_without_echoing_input_or_cloud_calls(self):
+        for value in ('691797e', 'main', 'secret-value-not-a-commit', 'A' * 40, 123):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(setup.Stop, '^SETUP_SOURCE_HEAD_INVALID$'):
+                    setup.configure(project=setup.PROJECT, number=setup.NUMBER, owner=setup.OWNER,
+                                    region=setup.REGION, service=setup.SERVICE, source_head=value)
+        self.assertEqual(self.g.reads, [])
+        self.assertEqual(self.g.writes, [])
+
     def test_registered_pair_resumes_without_upload_or_mutation(self):
         self.seed()
         r = self.run_flow()

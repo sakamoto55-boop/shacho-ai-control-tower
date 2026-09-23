@@ -5,7 +5,21 @@ existing private operator notebook. The notebook supplies the approved project,
 project number, company owner email, region and service to `configure(...)` before
 calling `launch()`. Those settings and all credentials stay out of this repository.
 
-Version 3.1 adds:
+Version 3.2 removes the obsolete hard-coded `source_head` from setup receipts.
+Existing notebook callers remain compatible: without a source declaration the
+receipt records `source_head: null` and `source_head_origin: unknown`. A pinned
+loader may pass its full lowercase 40-character commit as `source_head` to
+`configure(...)`, or set `DIOS_SETUP_SOURCE_HEAD` for the command-line entrypoint.
+The receipt labels this `operator_declared` and keeps `source_head_verified: false`:
+the setup script cannot prove its caller's source integrity or the deployed
+application revision. The loader must independently check its downloaded bytes.
+Reconfiguring without the argument clears any previous notebook execution's SHA.
+Do not replace an old hard-coded SHA with another fixed value or infer deployment
+completion from a setup receipt. The private notebook must load this updated
+script before its receipts gain this behavior; a repository change alone does
+not update that notebook.
+
+Version 3.1 introduced:
 
 - A read-only resume path: both existing Secret Manager versions must have the
   expected resource name, ownership labels, regional replication, active state,

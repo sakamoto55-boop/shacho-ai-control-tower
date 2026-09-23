@@ -21,7 +21,7 @@ One deployment and one runtime database role per tenant. Initially only a pre-en
 
 ## Operator setup order
 1. Obtain approval for the target cloud project, region, managed database cost, backup/retention and public HTTPS origin. Do not assume a previous relay authorization also covers this application.
-2. Create a private managed PostgreSQL instance; use a migration operator distinct from the runtime login.
+2. Read back the existing PostgreSQL foundation, network, backup configuration and ownership. Reuse the verified instance and database. Create a private managed PostgreSQL instance only if no matching foundation exists and its creation is explicitly approved; do not recreate an existing foundation merely because application setup is unfinished. Use a migration operator distinct from the runtime login.
 3. Build (`npm ci --ignore-scripts && npm run build`). Run `scripts/dios/migrate.mjs` only with `DIOS_MIGRATION_APPROVED=yes`, the migration operator's database configuration, and no secrets in logs or source control.
 4. Create a non-owner `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE` role using the operator's secure credential process. Apply `scripts/dios/runtime-grants.sql` with psql variables `runtime_role` and `tenant_id`.
 5. Run `scripts/dios/enroll-owner.mjs` with the migration operator's configuration, `DIOS_OWNER_ENROLL_APPROVED=yes`, exact owner email and JSON `DIOS_OWNER_COMPANIES`. It inserts only; it does not overwrite existing accounts.

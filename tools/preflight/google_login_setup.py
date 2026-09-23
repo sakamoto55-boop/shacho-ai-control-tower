@@ -16,13 +16,14 @@ from datetime import datetime, timezone
 
 # Target identity is supplied by the private notebook or environment, never inferred.
 PROJECT = NUMBER = REGION = OWNER = SERVICE = ORIGIN = CALLBACK = ''
+SOURCE_HEAD = None
 IDENTITY = 'https://openidconnect.googleapis.com/v1/userinfo'
 CRM = RUN = SM = ''
 SECRET_ID = 'dios-owner-google-client-id'
 SECRET_VALUE = 'dios-owner-google-client-secret'
 NAMES = (SECRET_ID, SECRET_VALUE)
 REPLICATION = {}
-VERSION = '3.1-oauth-resume'
+VERSION = '3.2-source-provenance'
 
 
 class Stop(Exception):
@@ -35,15 +36,20 @@ def require(ok, code):
         raise Stop(code)
 
 
-def configure(*, project, number, owner, region, service):
+def configure(*, project, number, owner, region, service, source_head=None):
     """Bind the operator's exact target before authentication or API calls."""
     require(bool(re.fullmatch(r'[a-z][a-z0-9-]{4,28}[a-z0-9]', project)), 'SETUP_PROJECT_REQUIRED')
     require(bool(re.fullmatch(r'[0-9]{6,20}', number)), 'SETUP_PROJECT_NUMBER_REQUIRED')
     require(bool(re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', owner)), 'SETUP_OWNER_REQUIRED')
     require(bool(re.fullmatch(r'[a-z]+-[a-z]+[0-9]', region)), 'SETUP_REGION_REQUIRED')
     require(bool(re.fullmatch(r'[a-z][a-z0-9-]{0,47}[a-z0-9]', service)), 'SETUP_SERVICE_REQUIRED')
-    global PROJECT, NUMBER, OWNER, REGION, SERVICE, ORIGIN, CALLBACK, CRM, RUN, SM, REPLICATION
+    require(source_head is None or (isinstance(source_head, str)
+            and bool(re.fullmatch(r'[0-9a-f]{40}', source_head))), 'SETUP_SOURCE_HEAD_INVALID')
+    global PROJECT, NUMBER, OWNER, REGION, SERVICE, ORIGIN, CALLBACK, CRM, RUN, SM, REPLICATION, SOURCE_HEAD
     PROJECT, NUMBER, OWNER, REGION, SERVICE = project, number, owner.lower(), region, service
+    # Metadata from the caller, not proof that these bytes or a deployment match it.
+    # Omission clears a previous notebook execution's provenance instead of reusing it.
+    SOURCE_HEAD = source_head
     ORIGIN = 'https://' + service + '-' + number + '.' + region + '.run.app'
     CALLBACK = ORIGIN + '/dios/auth/callback'
     CRM = 'https://cloudresourcemanager.googleapis.com/v1/projects/' + PROJECT
@@ -309,7 +315,9 @@ def stage(g, raw, receipt):
 def new_receipt():
     return {'kind': 'DIOS_GOOGLE_LOGIN_SETUP', 'version': VERSION, 'started': stamp(),
             'status': 'NOT_STARTED', 'project': PROJECT, 'planned_callback': CALLBACK,
-            'source_head': '5cc14594cca128ad58a0a3ede3cddee7e8036591',
+            'source_head': SOURCE_HEAD,
+            'source_head_origin': 'operator_declared' if SOURCE_HEAD else 'unknown',
+            'source_head_verified': False,
             'secret_values_in_receipt': False, 'iam_changes': 0, 'sql_changes': 0,
             'dios_deployed_by_this_step': False, 'actual_google_login_verified': False,
             'stored_secret_versions': [], 'cloud_mutations_attempted': 0,
@@ -450,5 +458,6 @@ if __name__ == '__main__':
               number=os.environ.get('DIOS_SETUP_PROJECT_NUMBER', ''),
               owner=os.environ.get('DIOS_SETUP_OWNER_EMAIL', ''),
               region=os.environ.get('DIOS_SETUP_REGION', ''),
-              service=os.environ.get('DIOS_SETUP_SERVICE', ''))
+              service=os.environ.get('DIOS_SETUP_SERVICE', ''),
+              source_head=os.environ.get('DIOS_SETUP_SOURCE_HEAD') or None)
     launch()
