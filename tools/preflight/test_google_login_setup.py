@@ -150,6 +150,50 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(self.g.writes, [])
         self.assertEqual(len(r['stored_secret_versions']), 2)
 
+    def bind_client(self, client_id):
+        setup.configure(project=setup.PROJECT, number=setup.NUMBER, owner=setup.OWNER,
+                        region=setup.REGION, service=setup.SERVICE, expected_client_id=client_id)
+
+    def test_expected_existing_client_can_be_staged_and_resumed(self):
+        self.bind_client(self.web['client_id'])
+        self.seed()
+        r = self.run_flow()
+        self.assertEqual(r['status'], 'OAUTH_CREDENTIALS_STAGED')
+        self.assertTrue(r['resumed_existing'])
+        self.assertEqual(self.g.writes, [])
+        self.assertEqual(self.upload_calls, 0)
+
+    def test_another_client_in_same_project_cannot_be_staged(self):
+        self.bind_client(setup.NUMBER + '-approved.apps.googleusercontent.com')
+        r = self.run_flow()
+        self.assertEqual(r['stop_code'], 'OAUTH_CLIENT_MISMATCH')
+        self.assertEqual(self.g.writes, [])
+        self.assertNotIn(self.web['client_secret'], json.dumps(r))
+
+    def test_another_stored_client_cannot_resume(self):
+        self.seed()
+        self.bind_client(setup.NUMBER + '-approved.apps.googleusercontent.com')
+        r = self.run_flow()
+        self.assertEqual(r['stop_code'], 'OAUTH_CLIENT_MISMATCH')
+        self.assertFalse(r['resumed_existing'])
+        self.assertEqual(self.g.writes, [])
+        self.assertEqual(self.upload_calls, 0)
+
+    def test_reconfiguration_clears_previous_client_binding(self):
+        self.bind_client(setup.NUMBER + '-approved.apps.googleusercontent.com')
+        setup.configure(project=setup.PROJECT, number=setup.NUMBER, owner=setup.OWNER,
+                        region=setup.REGION, service=setup.SERVICE)
+        self.assertIsNone(setup.EXPECTED_CLIENT_ID)
+        self.assertEqual(self.run_flow()['status'], 'OAUTH_CREDENTIALS_STAGED')
+
+    def test_invalid_or_foreign_client_binding_is_rejected_before_cloud_calls(self):
+        for value in ('invalid', '999999999999-foreign.apps.googleusercontent.com', 123):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(setup.Stop, '^SETUP_EXPECTED_CLIENT_INVALID$'):
+                    self.bind_client(value)
+        self.assertEqual(self.g.reads, [])
+        self.assertEqual(self.g.writes, [])
+
     def test_partial_setup_finishes_only_missing_second_secret(self):
         self.seed()
         del self.g.stored[setup.SECRET_VALUE]

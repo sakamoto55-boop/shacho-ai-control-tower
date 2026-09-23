@@ -25,7 +25,7 @@ One deployment and one runtime database role per tenant. Initially only a pre-en
 3. Build (`npm ci --ignore-scripts && npm run build`). Run `scripts/dios/migrate.mjs` only with `DIOS_MIGRATION_APPROVED=yes`, the migration operator's database configuration, and no secrets in logs or source control.
 4. Create a non-owner `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE` role using the operator's secure credential process. Apply `scripts/dios/runtime-grants.sql` with psql variables `runtime_role` and `tenant_id`.
 5. Run `scripts/dios/enroll-owner.mjs` with the migration operator's configuration, `DIOS_OWNER_ENROLL_APPROVED=yes`, exact owner email and JSON `DIOS_OWNER_COMPANIES`. It inserts only; it does not overwrite existing accounts.
-6. Register a Google Web OAuth client. Callback: `<DIOS_PUBLIC_ORIGIN>/dios/auth/callback`. Store its secret and runtime DB credential in Secret Manager, not GitHub source or chat.
+6. Inspect and reuse the existing Google Web OAuth client and its callback: `<DIOS_PUBLIC_ORIGIN>/dios/auth/callback`. Only create a client if none exists and creation is approved. Bind the private setup notebook to the inspected client ID; see [Google setup recovery](GOOGLE_SETUP.md). Store its secret and runtime DB credential in Secret Manager, not GitHub source or chat. A lost secret cannot be downloaded again; rotation requires an owner decision after assessing existing use.
 7. Deploy the container defined by `cloudrun/dios/Dockerfile`. Entry is `node dist/dios-cloud.js`.
 8. Check `/ready`, then actual Google login, save a non-sensitive test message, restart the service and retrieve it from both PC and iPhone. Test sign-out, all-session revocation and disabled membership. Do not declare live-ready on CI alone.
 9. Configure one real read-only source and compare source counts, evidence and dates. Add additional connectors only after each passes its own live acceptance.
@@ -44,6 +44,13 @@ LCC_COMMAND_MODE=production
 ENABLE_DEV_ENDPOINTS=false
 ```
 TLS validates the server; optional `DIOS_DATABASE_CA_PEM` supplies a trusted CA. Plain TCP is allowed only on localhost in NODE_ENV=test and is refused on Cloud Run. With a configured Cloud SQL connector, choose `cloudsql-socket` and set `DIOS_CLOUDSQL_SOCKET=/cloudsql/<project>:<region>:<instance>`; the connection parser preserves the socket instead of overriding it with a connection URL. URL TLS/query options are rejected.
+
+For an existing private-IP-only Cloud SQL instance, verify VPC reachability and
+the connector's private-IP configuration before deployment. A socket path and
+instance connection name alone do not establish that route. Keep public IP
+disabled and certificate checks enabled. The current CI verifies local
+PostgreSQL, not the production VPC or Cloud SQL connection. Follow the provider's
+[Cloud Run connection guidance](https://docs.cloud.google.com/sql/docs/postgres/connect-run).
 
 ## Verification and recovery
 `tests/dios/cloud/security.test.ts` is offline verification. `postgres.test.ts` requires a disposable local PostgreSQL database ending in `_test`; `DIOS_CLOUD_TEST_REQUIRED=true` fails rather than hiding missing database coverage. `scripts/dios/restore-smoke.mjs` only runs against the CI service container/database. It restores actual synthetic records and compares them; it deliberately excludes sessions and OAuth state. It is not evidence of configured production backups. Production PITR, encrypted backups, restore drills and retention remain release gates.

@@ -5,6 +5,23 @@ existing private operator notebook. The notebook supplies the approved project,
 project number, company owner email, region and service to `configure(...)` before
 calling `launch()`. Those settings and all credentials stay out of this repository.
 
+Version 3.3 lets the private notebook bind `expected_client_id` to the existing
+Web client inspected in Google Cloud. Both file staging and read-only resume
+reject another client, even in the same project with the same callback, before
+any cloud write. The CLI equivalent is `DIOS_SETUP_EXPECTED_CLIENT_ID`. Omitting
+the optional argument clears a previous binding for legacy callers; the operator
+notebook should supply it after inspecting the existing client.
+
+Reuse the Web OAuth JSON saved when that client's secret was created. Google
+only exposes the full secret at creation; opening the client later cannot
+recover it. If the JSON is missing, stop file selection and establish whether
+an existing secret is in use before requesting an owner-authorized rotation.
+Do not create a duplicate OAuth client, disable an existing secret, or repeatedly
+request an unavailable download as a recovery shortcut. The registration script
+does not rotate credentials, check whether a provider secret remains active,
+or prove a real login. See Google's
+[client-secret handling guidance](https://support.google.com/cloud/answer/15549257?hl=en).
+
 Version 3.2 removes the obsolete hard-coded `source_head` from setup receipts.
 Existing notebook callers remain compatible: without a source declaration the
 receipt records `source_head: null` and `source_head_origin: unknown`. A pinned

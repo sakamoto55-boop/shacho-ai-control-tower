@@ -2,7 +2,8 @@
 """Owner-only credential staging. Does not deploy DIOS or grant IAM permissions.
 
 Runs in the owner's Google Colab, not in the assistant environment. The input
-is a freshly downloaded Google Web OAuth JSON. No credential values are logged.
+is the Web OAuth JSON saved when the existing secret was created. Google does
+not allow later re-download of the secret. No credential values are logged.
 """
 from __future__ import annotations
 
@@ -17,13 +18,14 @@ from datetime import datetime, timezone
 # Target identity is supplied by the private notebook or environment, never inferred.
 PROJECT = NUMBER = REGION = OWNER = SERVICE = ORIGIN = CALLBACK = ''
 SOURCE_HEAD = None
+EXPECTED_CLIENT_ID = None
 IDENTITY = 'https://openidconnect.googleapis.com/v1/userinfo'
 CRM = RUN = SM = ''
 SECRET_ID = 'dios-owner-google-client-id'
 SECRET_VALUE = 'dios-owner-google-client-secret'
 NAMES = (SECRET_ID, SECRET_VALUE)
 REPLICATION = {}
-VERSION = '3.2-source-provenance'
+VERSION = '3.3-existing-client-binding'
 
 
 class Stop(Exception):
@@ -36,7 +38,7 @@ def require(ok, code):
         raise Stop(code)
 
 
-def configure(*, project, number, owner, region, service, source_head=None):
+def configure(*, project, number, owner, region, service, source_head=None, expected_client_id=None):
     """Bind the operator's exact target before authentication or API calls."""
     require(bool(re.fullmatch(r'[a-z][a-z0-9-]{4,28}[a-z0-9]', project)), 'SETUP_PROJECT_REQUIRED')
     require(bool(re.fullmatch(r'[0-9]{6,20}', number)), 'SETUP_PROJECT_NUMBER_REQUIRED')
@@ -45,11 +47,15 @@ def configure(*, project, number, owner, region, service, source_head=None):
     require(bool(re.fullmatch(r'[a-z][a-z0-9-]{0,47}[a-z0-9]', service)), 'SETUP_SERVICE_REQUIRED')
     require(source_head is None or (isinstance(source_head, str)
             and bool(re.fullmatch(r'[0-9a-f]{40}', source_head))), 'SETUP_SOURCE_HEAD_INVALID')
-    global PROJECT, NUMBER, OWNER, REGION, SERVICE, ORIGIN, CALLBACK, CRM, RUN, SM, REPLICATION, SOURCE_HEAD
+    require(expected_client_id is None or (isinstance(expected_client_id, str)
+            and bool(re.fullmatch(number + r'-[a-zA-Z0-9_-]{5,200}\.apps\.googleusercontent\.com', expected_client_id))),
+            'SETUP_EXPECTED_CLIENT_INVALID')
+    global PROJECT, NUMBER, OWNER, REGION, SERVICE, ORIGIN, CALLBACK, CRM, RUN, SM, REPLICATION, SOURCE_HEAD, EXPECTED_CLIENT_ID
     PROJECT, NUMBER, OWNER, REGION, SERVICE = project, number, owner.lower(), region, service
     # Metadata from the caller, not proof that these bytes or a deployment match it.
     # Omission clears a previous notebook execution's provenance instead of reusing it.
     SOURCE_HEAD = source_head
+    EXPECTED_CLIENT_ID = expected_client_id
     ORIGIN = 'https://' + service + '-' + number + '.' + region + '.run.app'
     CALLBACK = ORIGIN + '/dios/auth/callback'
     CRM = 'https://cloudresourcemanager.googleapis.com/v1/projects/' + PROJECT
@@ -93,6 +99,7 @@ def validate_client(raw):
     require(web.get('project_id') == PROJECT, 'OAUTH_PROJECT_MISMATCH')
     client_id, client_secret = web.get('client_id'), web.get('client_secret')
     require(isinstance(client_id, str) and bool(re.fullmatch(NUMBER + r'-[a-zA-Z0-9_-]{5,200}\.apps\.googleusercontent\.com', client_id)), 'CLIENT_ID_INVALID')
+    require(EXPECTED_CLIENT_ID is None or client_id == EXPECTED_CLIENT_ID, 'OAUTH_CLIENT_MISMATCH')
     require(isinstance(client_secret, str) and bool(re.fullmatch(r'[A-Za-z0-9_-]{16,256}', client_secret)), 'CLIENT_SECRET_INVALID')
     require(web.get('auth_uri') in ('https://accounts.google.com/o/oauth2/auth', 'https://accounts.google.com/o/oauth2/v2/auth'), 'AUTH_ENDPOINT_INVALID')
     require(web.get('token_uri') == 'https://oauth2.googleapis.com/token', 'TOKEN_ENDPOINT_INVALID')
@@ -362,6 +369,7 @@ STOP_MESSAGES = {
     'SETUP_CANCELLED': '操作を中断しました。登録済みの情報は削除していません。',
     'WRONG_GOOGLE_ACCOUNT': '会社アカウントの本人確認が一致しませんでした。',
     'EXISTING_SECRET_CONFLICT': '登録済み情報と一致しません。上書きせず停止しました。',
+    'OAUTH_CLIENT_MISMATCH': '確認済みの既存OAuthクライアントと一致しません。新しいクライアントを作らず、対象のJSONを確認してください。',
 }
 
 
@@ -413,6 +421,8 @@ def launch():
     import tempfile
     print('登録済みのログイン情報が確認できれば、JSONの再選択は不要です。')
     print('初回のみDIOS専用のログイン情報2点をSecret Managerへ保存します。')
+    print('JSONは既存OAuthの秘密鍵を作成した時に保存したものを使います。秘密鍵の再ダウンロードはできません。')
+    print('手元にない場合は選択を中止してください。再発行は既存利用への影響を確認し、本人の判断で行います。')
     def authenticate():
         from google.colab import auth
         auth.authenticate_user()
@@ -459,5 +469,6 @@ if __name__ == '__main__':
               owner=os.environ.get('DIOS_SETUP_OWNER_EMAIL', ''),
               region=os.environ.get('DIOS_SETUP_REGION', ''),
               service=os.environ.get('DIOS_SETUP_SERVICE', ''),
-              source_head=os.environ.get('DIOS_SETUP_SOURCE_HEAD') or None)
+              source_head=os.environ.get('DIOS_SETUP_SOURCE_HEAD') or None,
+              expected_client_id=os.environ.get('DIOS_SETUP_EXPECTED_CLIENT_ID') or None)
     launch()
