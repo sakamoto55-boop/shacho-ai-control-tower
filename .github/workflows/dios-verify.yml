@@ -30,6 +30,9 @@ jobs:
           cache: npm
       - name: Prepare evidence folder
         run: mkdir -p "$RUNNER_TEMP/dios-review"
+      - name: Verify resumable Google login setup without cloud access
+        id: oauth_setup
+        run: python3 -m unittest discover -s tools/preflight -p test_google_login_setup.py -v
       - name: Install locked dependencies without lifecycle scripts
         id: install
         run: npm ci --ignore-scripts
@@ -62,7 +65,9 @@ jobs:
           SMOKE_RESULT: ${{ steps.smoke.outcome }}
           LINT_RESULT: ${{ steps.lint.outcome }}
           ADVISORY_RESULT: ${{ steps.advisory.outcome }}
+          OAUTH_SETUP_RESULT: ${{ steps.oauth_setup.outcome }}
         run: |
+          printf 'Google login setup regression tests: %s\n' "$OAUTH_SETUP_RESULT" >> "$GITHUB_STEP_SUMMARY"
           printf '## DIOS verification\n\nCommit: `%s`\n\nTests: %s\n\nBuild: %s\n\nHTTP smoke: %s\n\nLint: %s\n\nDependency audit: %s (not a production approval)\n\nProduction deployment: NOT RUN\n' "$GITHUB_SHA" "$TEST_RESULT" "$BUILD_RESULT" "$SMOKE_RESULT" "$LINT_RESULT" "$ADVISORY_RESULT" >> "$GITHUB_STEP_SUMMARY"
       - name: Bundle exact source for offline verification
         if: ${{ !cancelled() }}
