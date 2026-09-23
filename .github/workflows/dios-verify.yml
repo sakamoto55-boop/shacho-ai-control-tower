@@ -52,11 +52,10 @@ jobs:
         id: lint
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run lint
-      - name: Capture dependency advisory report for review
+      - name: Require dependency audit without moderate or higher findings
         id: advisory
-        continue-on-error: true
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: npm audit --json > "$RUNNER_TEMP/dios-review/dependency-audit.json"
+        run: npm audit --audit-level=moderate --json > "$RUNNER_TEMP/dios-review/dependency-audit.json"
       - name: Summarize exact validation outcomes
         if: ${{ !cancelled() }}
         env:

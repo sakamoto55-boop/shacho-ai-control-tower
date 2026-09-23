@@ -41,7 +41,7 @@
     "docx": "^9.7.1",
     "dotenv": "^16.4.7",
     "exceljs": "^4.4.0",
-    "hono": "^4.6.15",
+    "hono": "4.13.5",
     "jose": "6.2.8",
     "openai": "^6.42.0",
     "pdfkit": "^0.19.1",
@@ -57,7 +57,7 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.19.0",
-    "vitest": "^4.1.10"
+    "vitest": "4.1.11"
   },
   "engines": {
     "node": ">=20.0.0"
