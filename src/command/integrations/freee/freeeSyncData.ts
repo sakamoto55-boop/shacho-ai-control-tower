@@ -151,6 +151,8 @@ export async function syncFreeeData(
     syncedAt?: string;
     maxEmployeesForDetail?: number;
     timeClockDays?: number;
+    /** Verified HR company ID mapped to the existing LCC source; never select the first visible company. */
+    expectedCompanyId?: number;
   } = {}
 ): Promise<FreeeSyncSummary> {
   const vaultDir = options.vaultDir ?? defaultVaultDir();
@@ -166,28 +168,36 @@ export async function syncFreeeData(
     errors: []
   };
 
+  if (!Number.isSafeInteger(options.expectedCompanyId) || (options.expectedCompanyId ?? 0) <= 0) {
+    summary.errors.push('LCCに対応する人事労務の事業所IDが未確認です（FREEE_COMPANY_ID）');
+    summary.kinds.push({ kind: 'companies', endpoint: '/users/me', outcome: 'NOT_EXECUTED', fetched: 0, imported: 0, duplicates: 0 });
+    return summary;
+  }
+
   // 事業所
   let companyId: number;
   try {
     const companies = await client.listCompanies();
     if (companies.length === 0) {
-      summary.kinds.push({ kind: 'companies', endpoint: '/companies', outcome: 'FETCHED_EMPTY', fetched: 0, imported: 0, duplicates: 0 });
+      summary.kinds.push({ kind: 'companies', endpoint: '/users/me', outcome: 'FETCHED_EMPTY', fetched: 0, imported: 0, duplicates: 0 });
       return summary;
     }
-    companyId = companies[0].id;
+    const selected = companies.find((company) => company.id === options.expectedCompanyId);
+    if (!selected) throw new Error('確認済み事業所が認可対象にありません。同期は行いません');
+    companyId = selected.id;
     summary.companyId = companyId;
-    summary.companyName = companies[0].name;
-    const r = appendRecords(vaultDir, 'companies', syncedAt, companies.map((c) => ({
+    summary.companyName = selected.name;
+    const r = appendRecords(vaultDir, 'companies', syncedAt, [selected].map((c) => ({
       id: String(c.id),
       updatedAt: null,
       raw: c as unknown as Record<string, unknown>,
-      locator: `/companies#${c.id}`
+      locator: `/users/me#companies/${c.id}`
     })));
-    summary.kinds.push({ kind: 'companies', endpoint: '/companies', outcome: 'FETCHED', fetched: companies.length, ...r });
+    summary.kinds.push({ kind: 'companies', endpoint: '/users/me', outcome: 'FETCHED', fetched: 1, ...r });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     summary.errors.push(`companies: ${msg}`);
-    summary.kinds.push({ kind: 'companies', endpoint: '/companies', outcome: classifyError(msg), fetched: 0, imported: 0, duplicates: 0 });
+    summary.kinds.push({ kind: 'companies', endpoint: '/users/me', outcome: classifyError(msg), fetched: 0, imported: 0, duplicates: 0 });
     return summary;
   }
 

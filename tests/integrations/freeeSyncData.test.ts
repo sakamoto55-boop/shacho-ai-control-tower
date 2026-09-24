@@ -2,7 +2,7 @@
  * freee実データ同期テスト（GAP AUDIT §14: incremental / duplicate prevention / read-only）。
  */
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { syncFreeeData } from '../../src/command/integrations/freee/freeeSyncData.js';
@@ -38,7 +38,7 @@ describe('freee実データ同期', () => {
   it('実レコードをVaultへ取込み、Evidence・syncedAt・contentHashを持つ（read-only）', async () => {
     const vaultDir = mkdtempSync(join(tmpdir(), 'freee-'));
     const client = fakeClient();
-    const summary = await syncFreeeData(client, { vaultDir, syncedAt: '2026-08-10T05:00:00.000Z' });
+    const summary = await syncFreeeData(client, { vaultDir, expectedCompanyId: 1, syncedAt: '2026-08-10T05:00:00.000Z' });
     expect(summary.companyName).toBe('LCC株式会社');
     expect(summary.writesToSource).toBe(0);
     // GET以外を一切呼ばない
@@ -55,8 +55,8 @@ describe('freee実データ同期', () => {
 
   it('2回目の同期は全件duplicatesで再登録されない（idempotent）', async () => {
     const vaultDir = mkdtempSync(join(tmpdir(), 'freee-'));
-    await syncFreeeData(fakeClient(), { vaultDir, syncedAt: '2026-08-10T05:00:00.000Z' });
-    const second = await syncFreeeData(fakeClient(), { vaultDir, syncedAt: '2026-08-10T06:00:00.000Z' });
+    await syncFreeeData(fakeClient(), { vaultDir, expectedCompanyId: 1, syncedAt: '2026-08-10T05:00:00.000Z' });
+    const second = await syncFreeeData(fakeClient(), { vaultDir, expectedCompanyId: 1, syncedAt: '2026-08-10T06:00:00.000Z' });
     const imported = second.kinds.reduce((s, k) => s + k.imported, 0);
     const dup = second.kinds.reduce((s, k) => s + k.duplicates, 0);
     expect(imported).toBe(0);
@@ -65,11 +65,42 @@ describe('freee実データ同期', () => {
 
   it('404はENDPOINT_UNAVAILABLEとして区別する（推測で0件にしない）', async () => {
     const vaultDir = mkdtempSync(join(tmpdir(), 'freee-'));
-    const summary = await syncFreeeData(fakeClient(), { vaultDir, syncedAt: '2026-08-10T05:00:00.000Z' });
+    const summary = await syncFreeeData(fakeClient(), { vaultDir, expectedCompanyId: 1, syncedAt: '2026-08-10T05:00:00.000Z' });
     const pools = summary.kinds.find((k) => k.kind === 'holiday-pools');
     expect(pools?.outcome).toBe('ENDPOINT_UNAVAILABLE');
     const clocks = summary.kinds.find((k) => k.kind === 'time-clocks');
     expect(clocks?.outcome).toBe('FETCHED');
     expect(clocks?.period).toBeTruthy();
+  });
+
+  it('事業所未指定ではAPIも保存も実行しない', async () => {
+    const vaultDir = mkdtempSync(join(tmpdir(), 'freee-'));
+    const client = fakeClient();
+    const summary = await syncFreeeData(client, { vaultDir });
+    expect(summary.kinds[0].outcome).toBe('NOT_EXECUTED');
+    expect(client.calls).toEqual([]);
+    expect(existsSync(join(vaultDir, 'raw'))).toBe(false);
+  });
+
+  it('事業所IDが認可対象と不一致なら別会社を代用しない', async () => {
+    const vaultDir = mkdtempSync(join(tmpdir(), 'freee-'));
+    const client = fakeClient();
+    const summary = await syncFreeeData(client, { vaultDir, expectedCompanyId: 99 });
+    expect(summary.companyId).toBeNull();
+    expect(summary.errors).toHaveLength(1);
+    expect(client.calls).toEqual(['GET /users/me']);
+    expect(existsSync(join(vaultDir, 'raw'))).toBe(false);
+  });
+
+  it('先頭以外の指定事業所だけを取得・保存する', async () => {
+    const vaultDir = mkdtempSync(join(tmpdir(), 'freee-'));
+    const client = fakeClient();
+    client.listCompanies = async () => [{ id: 99, name: 'Other fixture' }, { id: 1, name: 'LCC株式会社' }];
+    const summary = await syncFreeeData(client, { vaultDir, expectedCompanyId: 1, maxEmployeesForDetail: 0 });
+    expect(summary.companyId).toBe(1);
+    expect(client.calls.some((call) => call.includes('/companies/99/'))).toBe(false);
+    const saved = readFileSync(join(vaultDir, 'raw', 'freee-companies.jsonl'), 'utf8');
+    expect(saved).not.toContain('Other fixture');
+    expect(summary.kinds[0].fetched).toBe(1);
   });
 });

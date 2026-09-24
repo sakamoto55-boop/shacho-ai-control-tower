@@ -8,6 +8,7 @@
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { randomBytes } from 'node:crypto';
 
 const TOKEN_ENDPOINT = 'https://accounts.secure.freee.co.jp/public_api/token';
 const AUTHORIZE_ENDPOINT = 'https://accounts.secure.freee.co.jp/public_api/authorize';
@@ -40,15 +41,17 @@ export function loadFreeeConfig(rootDir = '.'): FreeeConfig {
 
 export type FreeeAuthState =
   | { state: 'ADMIN_SETUP_REQUIRED'; reason: string }
-  | { state: 'AUTH_REQUIRED'; authorizeUrl: string }
+  | { state: 'AUTH_REQUIRED'; authorizeUrl: string; oauthState: string }
   | { state: 'READY'; tokens: FreeeTokens };
 
-export function buildAuthorizeUrl(config: FreeeConfig): string {
+export function buildAuthorizeUrl(config: FreeeConfig, oauthState: string): string {
+  if (!oauthState) throw new Error('freee認可stateが必要です');
   const params = new URLSearchParams({
     client_id: config.clientId ?? '',
     redirect_uri: config.redirectUri,
     response_type: 'code',
-    prompt: 'select_company'
+    prompt: 'select_company',
+    state: oauthState
   });
   return `${AUTHORIZE_ENDPOINT}?${params.toString()}`;
 }
@@ -77,12 +80,13 @@ export function resolveAuthState(config: FreeeConfig): FreeeAuthState {
   if (!config.clientId || !config.clientSecret) {
     return {
       state: 'ADMIN_SETUP_REQUIRED',
-      reason: 'freeeアプリ未登録（FREEE_CLIENT_ID / FREEE_CLIENT_SECRET が.envに未設定）'
+      reason: 'この実行環境にfreee接続設定がありません（FREEE_CLIENT_ID / FREEE_CLIENT_SECRET）。既存アプリの有無は未判定です'
     };
   }
   const tokens = loadTokens(config);
   if (!tokens) {
-    return { state: 'AUTH_REQUIRED', authorizeUrl: buildAuthorizeUrl(config) };
+    const oauthState = randomBytes(32).toString('hex');
+    return { state: 'AUTH_REQUIRED', authorizeUrl: buildAuthorizeUrl(config, oauthState), oauthState };
   }
   return { state: 'READY', tokens };
 }
@@ -179,10 +183,14 @@ export class FreeeClient {
   }
 
   async listEmployees(companyId: number, limit = 50): Promise<Array<Record<string, unknown>>> {
-    const data = await this.get<{ employees?: Array<Record<string, unknown>> }>(
+    const data = await this.get<unknown>(
       `/companies/${companyId}/employees?limit=${limit}`
     );
-    return data.employees ?? [];
+    // The HR API returns a top-level array. A malformed response is not an empty company.
+    if (!Array.isArray(data) || data.some((row) => !row || typeof row !== 'object' || Array.isArray(row))) {
+      throw new Error('freee従業員一覧のレスポンス形式が不正です');
+    }
+    return data as Array<Record<string, unknown>>;
   }
 
   async getTimeClocks(companyId: number, employeeId: number, fromDate: string, toDate: string) {
