@@ -1095,7 +1095,7 @@ function addDays(yyyyMmDd, days) {
   return date.toISOString().slice(0, 10);
 }
 
-/** "2026-08-19" を "8/19(水)" に整形する。現場は曜日で動くため通知の見出しに使う。 */
+/** "2026-09-25" を "9/25(金)" に整形する。現場は曜日で動くため通知の見出しに使う。 */
 function formatJpDate(yyyyMmDd) {
   var match = String(yyyyMmDd || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return String(yyyyMmDd || "");
@@ -1475,6 +1475,13 @@ function registerIntakeItem(id, overrides) {
     throw notFound;
   }
   var item = intake[index];
+  // 自動昇格(manifestAutoPromote)で台帳に入った依頼は promotedManifestId が付く。
+  // ここを素通りさせると、画面の「登録」で同じ依頼がもう1行増える(2026-08-31に8件発生)。
+  if ((item.parsed || {}).promotedManifestId && !(overrides || {}).forceRegister) {
+    var dup = new Error("この依頼は既に台帳へ自動登録済みです(" + item.parsed.promotedManifestId + ")。二重登録になるため中止しました。");
+    dup.statusCode = 409;
+    throw dup;
+  }
   var manifest = addManifest(mergeObjects(mergeObjects(item.parsed || {}, overrides || {}), {
     sourceRoom: item.room || (item.parsed && item.parsed.sourceRoom) || "LCC現場地図",
     lineworksText: item.text,

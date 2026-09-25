@@ -16,9 +16,9 @@ function morningBriefSetupAndTest(){
 }
 
 function mbDeliver_(text){
+  var url = "";
   // getConfig() は引数を取らず設定オブジェクトを返す。getConfig("BRIEF_WEBHOOK_URL") と呼ぶと
   // オブジェクトがそのまま返り、String() が "[object Object]" になって URL として fetch され、毎朝失敗していた。
-  var url = "";
   try { url = String((getConfig() || {}).BRIEF_WEBHOOK_URL || "").trim(); } catch(e){ url = ""; }
   if (url) {
     UrlFetchApp.fetch(url, {

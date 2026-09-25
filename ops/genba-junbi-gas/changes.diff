@@ -1,10 +1,10 @@
---- "gas.orig/\343\202\263\343\203\274\343\203\211.gs"	2026-08-18 23:50:24.963570463 +0000
-+++ "gas/\343\202\263\343\203\274\343\203\211.gs"	2026-08-18 23:51:40.289249062 +0000
+--- "gas_now/\343\202\263\343\203\274\343\203\211.gs"	2026-09-25 01:08:29.444727535 +0000
++++ "work/\343\202\263\343\203\274\343\203\211.gs"	2026-09-25 01:10:03.725472215 +0000
 @@ -1095,23 +1095,38 @@
    return date.toISOString().slice(0, 10);
  }
  
-+/** "2026-08-19" を "8/19(水)" に整形する。現場は曜日で動くため通知の見出しに使う。 */
++/** "2026-09-25" を "9/25(金)" に整形する。現場は曜日で動くため通知の見出しに使う。 */
 +function formatJpDate(yyyyMmDd) {
 +  var match = String(yyyyMmDd || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
 +  if (!match) return String(yyyyMmDd || "");
@@ -60,16 +60,29 @@
  }
  
  /**
---- gas.orig/MorningBrief.gs	2026-08-18 23:50:24.969529664 +0000
-+++ gas/MorningBrief.gs	2026-08-18 23:50:53.945170451 +0000
-@@ -16,17 +16,20 @@
- }
+@@ -1459,6 +1475,13 @@
+     throw notFound;
+   }
+   var item = intake[index];
++  // 自動昇格(manifestAutoPromote)で台帳に入った依頼は promotedManifestId が付く。
++  // ここを素通りさせると、画面の「登録」で同じ依頼がもう1行増える(2026-08-31に8件発生)。
++  if ((item.parsed || {}).promotedManifestId && !(overrides || {}).forceRegister) {
++    var dup = new Error("この依頼は既に台帳へ自動登録済みです(" + item.parsed.promotedManifestId + ")。二重登録になるため中止しました。");
++    dup.statusCode = 409;
++    throw dup;
++  }
+   var manifest = addManifest(mergeObjects(mergeObjects(item.parsed || {}, overrides || {}), {
+     sourceRoom: item.room || (item.parsed && item.parsed.sourceRoom) || "LCC現場地図",
+     lineworksText: item.text,
+--- gas_now/MorningBrief.gs	2026-09-25 01:08:29.445376463 +0000
++++ work/MorningBrief.gs	2026-09-25 01:10:03.725903133 +0000
+@@ -17,16 +17,19 @@
  
  function mbDeliver_(text){
-+  // getConfig() は引数を取らず設定オブジェクトを返す。getConfig("BRIEF_WEBHOOK_URL") と呼ぶと
-+  // オブジェクトがそのまま返り、String() が "[object Object]" になって URL として fetch され、毎朝失敗していた。
    var url = "";
 -  try { url = String(getConfig("BRIEF_WEBHOOK_URL") || "").trim(); } catch(e){}
++  // getConfig() は引数を取らず設定オブジェクトを返す。getConfig("BRIEF_WEBHOOK_URL") と呼ぶと
++  // オブジェクトがそのまま返り、String() が "[object Object]" になって URL として fetch され、毎朝失敗していた。
 +  try { url = String((getConfig() || {}).BRIEF_WEBHOOK_URL || "").trim(); } catch(e){ url = ""; }
    if (url) {
      UrlFetchApp.fetch(url, {
