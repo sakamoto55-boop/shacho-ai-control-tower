@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCommandApp } from '../../src/command/server/routes.js';
 import { InMemoryCommandRepository } from '../../src/command/repositories/CommandRepository.js';
 import { resetToolIdSeq } from '../../src/command/tools/registry.js';
@@ -21,6 +21,24 @@ describe('/command API', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { service: string };
     expect(body.service).toBe('lcc-command');
+  });
+
+  it('追跡情報の障害時は件数を未確認とし、取得範囲の制限を返す', async () => {
+    const insights = await import('../../src/command/integrations/knowledge/vaultInsights.js');
+    const home = await import('../../src/command/intelligence/homeDecisions.js');
+    const inbox = vi.spyOn(insights, 'actionItems').mockReturnValue({
+      generatedAt: ASOF, items: [], notes: [], dataBasis: []
+    } as ReturnType<typeof insights.actionItems>);
+    const tracking = vi.spyOn(home, 'homeDecisionCandidates').mockImplementation(() => { throw new Error('unavailable'); });
+    try {
+      const res = await app.request('/today/decisions');
+      expect(res.status).toBe(200);
+      const body = await res.json() as { tracking: Record<string, number | null>; limitations: string[] };
+      expect(Object.values(body.tracking)).toEqual([null, null, null, null]);
+      expect(body.limitations).toContain('追跡情報を取得できません。判断待ち・完了件数は未確認です');
+    } finally {
+      inbox.mockRestore(); tracking.mockRestore();
+    }
   });
 
   it('POST /chat が会話回答を返す', async () => {

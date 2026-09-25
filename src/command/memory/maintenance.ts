@@ -1,3 +1,4 @@
+import { randomUUID as persistentUuid } from 'node:crypto';
 /**
  * Nightly Memory Maintenance + Proactive Problem Discovery + Experiment Engine補助。
  *
@@ -324,7 +325,7 @@ export function buildExperiment(
   now: string
 ): ExperimentRecord {
   return {
-    experimentId: `exp-${now.slice(0, 10)}-${expSeq++}`,
+    experimentId: `exp-${now.slice(0, 10)}-${expSeq++}-${persistentUuid()}`,
     companyId: input.companyId,
     hypothesisMemoryId: input.hypothesisMemoryId,
     hypothesis: input.hypothesis,

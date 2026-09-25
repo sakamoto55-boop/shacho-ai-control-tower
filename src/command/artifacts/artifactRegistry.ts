@@ -1,3 +1,4 @@
+import { randomUUID as persistentUuid } from 'node:crypto';
 /**
  * Artifact Registry / Artifact Creation Orchestration（Phase X §19-§22・§35-§36）。
  *
@@ -144,7 +145,7 @@ export class ArtifactService {
     const record: ArtifactRecord = {
       version: 1,
       ...input,
-      artifactId: `art-${now.slice(0, 10)}-${String(artifactSeq).padStart(3, '0')}`,
+      artifactId: `art-${now.slice(0, 10)}-${String(artifactSeq).padStart(3, '0')}-${persistentUuid()}`,
       createdAt: input.createdAt ?? now
     };
     await this.repository.saveArtifact(record);

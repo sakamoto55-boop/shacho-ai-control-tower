@@ -8,7 +8,7 @@
  * - 現在端末のログアウト（revoke）とPRESIDENTによる全端末失効（revokeAll）を提供する。
  */
 import { createHash, randomBytes, randomInt } from 'node:crypto';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync, chmodSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { Principal } from '../domain/types.js';
@@ -73,7 +73,14 @@ export class DevicePairingService {
     // 所有者のみ読書き（POSIXは0600。Windowsはicaclsで現ユーザーのみへ制限）
     try {
       if (process.platform === 'win32') {
-        execSync(`icacls "${this.file}" /inheritance:r /grant:r "%USERNAME%:(F)"`, { stdio: 'ignore' });
+        // USERNAME は別アカウントから継承され得る。実行トークンの SID を使う。
+        // シェル展開を使わず、パスやアカウント名をコマンドとして解釈させない。
+        const identity = execFileSync('whoami.exe', ['/user', '/fo', 'csv', '/nh'],
+          { encoding: 'utf8', windowsHide: true, timeout: 5000 });
+        const sid = identity.match(/"(S-1-[0-9]+(?:-[0-9]+)+)"\s*$/m)?.[1];
+        if (!sid) throw new Error('PAIRING_CURRENT_USER_SID_UNAVAILABLE');
+        execFileSync('icacls.exe', [this.file, '/inheritance:r', '/grant:r', `*${sid}:(F)`],
+          { stdio: 'ignore', windowsHide: true, timeout: 5000 });
       } else {
         chmodSync(this.file, 0o600);
       }

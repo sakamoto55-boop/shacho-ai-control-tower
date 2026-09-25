@@ -56,6 +56,10 @@ describe('freee auth state', () => {
     if (state.state === 'AUTH_REQUIRED') {
       expect(state.authorizeUrl).toContain('accounts.secure.freee.co.jp');
       expect(state.authorizeUrl).toContain('response_type=code');
+      expect(new URL(state.authorizeUrl).searchParams.get('state')).toBe(state.oauthState);
+      expect(state.oauthState).toMatch(/^[a-f0-9]{64}$/);
+      const second = resolveAuthState(config);
+      expect(second.state === 'AUTH_REQUIRED' && second.oauthState).not.toBe(state.oauthState);
     }
   });
 
@@ -96,12 +100,24 @@ describe('FreeeClient', () => {
     saveTokens(config, { accessToken: 'at', refreshToken: 'rt', expiresAt: Date.now() + 3600_000, scope: 'hr:read' });
     const { impl, calls } = mockFetch([
       { ok: false, status: 429, json: {} },
-      { ok: true, status: 200, json: { employees: [] } }
+      { ok: true, status: 200, json: [] }
     ]);
     const client = new FreeeClient(config, impl);
     const employees = await client.listEmployees(1);
     expect(employees).toEqual([]);
     expect(calls.every((c) => c.method === 'GET')).toBe(true);
     expect(calls.length).toBe(2);
+  });
+
+  it('公式HR APIの配列形式を読み取り、従業員がいる状態を0件にしない', async () => {
+    saveTokens(config, { accessToken: 'at', refreshToken: 'rt', expiresAt: Date.now() + 3600_000, scope: 'hr:read' });
+    const { impl } = mockFetch([{ ok: true, status: 200, json: [{ id: 11, display_name: 'Fixture' }] }]);
+    expect(await new FreeeClient(config, impl).listEmployees(1)).toEqual([{ id: 11, display_name: 'Fixture' }]);
+  });
+
+  it('形式不正を取得成功・0件にしない', async () => {
+    saveTokens(config, { accessToken: 'at', refreshToken: 'rt', expiresAt: Date.now() + 3600_000, scope: 'hr:read' });
+    const { impl } = mockFetch([{ ok: true, status: 200, json: { unexpected: [] } }]);
+    await expect(new FreeeClient(config, impl).listEmployees(1)).rejects.toThrow('レスポンス形式');
   });
 });

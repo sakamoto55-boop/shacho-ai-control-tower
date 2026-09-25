@@ -1,0 +1,33 @@
+name: DIOS cloud dependency preparation
+on:
+  push:
+    branches: [codex/dios-runtime-hardening-20260906]
+    paths: [.github/workflows/dios-cloud-dependencies.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Prepare exact dependency graph without lifecycle scripts
+        run: |
+          npm pkg set 'overrides.exceljs.uuid=11.1.1'
+          npm install --save-exact --ignore-scripts pg@8.16.3 jose@6.2.8
+          npm install --save-dev --save-exact --ignore-scripts @types/pg@8.15.5
+          mkdir -p "$RUNNER_TEMP/dios-cloud-deps"
+          cp package.json package-lock.json "$RUNNER_TEMP/dios-cloud-deps/"
+          npm audit --json > "$RUNNER_TEMP/dios-cloud-deps/dependency-audit.json" || true
+          tar -czf "$RUNNER_TEMP/dios-cloud-deps/node-modules.tar.gz" node_modules
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dios-cloud-dependencies
+          path: ${{ runner.temp }}/dios-cloud-deps/
+          retention-days: 1

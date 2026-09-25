@@ -89,7 +89,12 @@ export function emptyContext(sessionId: string, scope: CompanyScope): Conversati
   };
 }
 
-export class ContextStore {
+export interface ConversationContextStore {
+  get(sessionId: string, defaultScope: CompanyScope): ConversationContext | Promise<ConversationContext>;
+  save(context: ConversationContext): void | Promise<void>;
+}
+
+export class ContextStore implements ConversationContextStore {
   private readonly sessions = new Map<string, ConversationContext>();
 
   get(sessionId: string, defaultScope: CompanyScope): ConversationContext {

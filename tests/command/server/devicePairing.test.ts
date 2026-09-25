@@ -70,6 +70,24 @@ describe('端末ペアリング（6桁コード→HttpOnlyセッション・CODE
     expect(svc.sessionCount()).toBe(0);
   });
 
+  it.runIf(process.platform === 'win32')('継承された USERNAME が違っても実行ユーザーが保存・再起動・失効できる', () => {
+    const previous = process.env.USERNAME;
+    process.env.USERNAME = 'DIOS_USERNAME_MUST_NOT_SELECT_ACL';
+    try {
+      const file = tmpFile();
+      const svc = new DevicePairingService(file);
+      const sid = svc.issueSession(PRES, 'Windows');
+      expect(readFileSync(file, 'utf8')).toContain('sidHash');
+      const restarted = new DevicePairingService(file);
+      expect(restarted.resolveSession(sid)).toEqual(PRES);
+      expect(restarted.revoke(sid)).toBe(true);
+      expect(new DevicePairingService(file).resolveSession(sid)).toBeNull();
+    } finally {
+      if (previous === undefined) delete process.env.USERNAME;
+      else process.env.USERNAME = previous;
+    }
+  });
+
   it('旧形式（boundToken平文）のセッションは読み込まず破棄する（再ペアリング要）', () => {
     const file = tmpFile();
     const legacy = [{ sidHash: 'x', boundToken: 'secret-token', createdAt: '2026-08-13', expiresAt: Date.now() + 10_000_000 }];
