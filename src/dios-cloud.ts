@@ -8,6 +8,7 @@ import { createCloudApp } from './dios/cloud/app.js';
 import { createSheetsRegistryFromEnv } from './command/sources/googleSheets.js';
 import { ProductionSourceRegistry } from './command/sources/SourceAdapter.js';
 import { isMainModule } from './utils/mainModule.js';
+import { verifyDatabaseAtStartup } from './dios/cloud/startup.js';
 
 export async function createCloudRuntime(env:NodeJS.ProcessEnv=process.env) {
   if(env.DIOS_RUNTIME_MODE!=='cloud-pilot')throw new Error('DIOS_EXPLICIT_CLOUD_PILOT_REQUIRED');
@@ -15,7 +16,7 @@ export async function createCloudRuntime(env:NodeJS.ProcessEnv=process.env) {
   const config=readOidcConfig(env);
   const db=new DiosDatabase(new Pool(databaseConfig(env)),env.DIOS_TENANT_ID??'');
   try {
-    await db.verifyRuntimeRole();
+    await verifyDatabaseAtStartup(db);
     const sources=createSheetsRegistryFromEnv(env)??new ProductionSourceRegistry();
     const repo=new PostgresCommandRepository(db,sources);
     const auth=new CloudSessions(db,config,new GoogleCodeExchange(config));

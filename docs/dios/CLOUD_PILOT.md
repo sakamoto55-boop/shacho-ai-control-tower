@@ -53,6 +53,15 @@ PostgreSQL, not the production VPC or Cloud SQL connection. Follow the provider'
 [Cloud Run connection guidance](https://docs.cloud.google.com/sql/docs/postgres/connect-run).
 
 ## Verification and recovery
+Cloud startup completes the database role, tenant binding, schema and RLS checks
+before opening the HTTP listener. Temporary connection failures are retried up
+to 19 attempts, with 5 seconds between attempts (at most 90 seconds of retry
+delays, plus database operation time). Wrong credentials, certificate failures,
+missing schema and unsafe roles fail immediately. Configure the Cloud Run
+startup probe with enough time for private networking/proxy initialization;
+do not treat an open port alone as evidence of live identity acceptance.
+See [Direct VPC startup guidance](https://docs.cloud.google.com/run/docs/configuring/vpc-direct-vpc#limitations).
+
 `tests/dios/cloud/security.test.ts` is offline verification. `postgres.test.ts` requires a disposable local PostgreSQL database ending in `_test`; `DIOS_CLOUD_TEST_REQUIRED=true` fails rather than hiding missing database coverage. `scripts/dios/restore-smoke.mjs` only runs against the CI service container/database. It restores actual synthetic records and compares them; it deliberately excludes sessions and OAuth state. It is not evidence of configured production backups. Production PITR, encrypted backups, restore drills and retention remain release gates.
 
 ## Deferred work, not disguised as complete
